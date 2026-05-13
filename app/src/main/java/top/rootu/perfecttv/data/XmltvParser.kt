@@ -1,17 +1,22 @@
 package top.rootu.perfecttv.data
 
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
+import java.nio.charset.Charset
 
 /**
- * Потоковый парсер XMLTV поверх XmlPullParser: документ в памяти не держится,
- * каналы и передачи отдаются по мере чтения.
+ * Потоковый парсер XMLTV на уровне байтов (цель ТЗ — 1 ГБ распакованного XML меньше
+ * чем за минуту на S905X).
  *
- * Передачи ненужных каналов ([wanted] = false) пропускаются без разбора содержимого.
- * [beforeProgrammes] вызывается один раз — перед первой передачей (все <channel> обычно
- * идут в начале файла): здесь вызывающий сопоставляет каналы и готовит [wanted].
- * Если <channel> встретится уже после передач, снова вызывается [beforeProgrammes].
+ * Общий XML-разборщик (XmlPullParser) декодирует и токенизирует каждый символ, а в XMLTV
+ * обычно нужна малая часть каналов. Здесь у <programme> читаются только атрибуты открывающего
+ * тега; передача ненужного канала ([wanted] = false) пропускается поиском «</programme>»
+ * по сырым байтам, без декодирования. Нужные элементы копируются целиком и разбираются
+ * маленьким разборщиком: title, sub-title, desc, category, icon, с учётом lang, сущностей
+ * и CDATA. Кодировка — из пролога (UTF-8 по умолчанию, бывает windows-1251).
+ *
+ * [beforeProgrammes] вызывается перед первой передачей (все <channel> обычно идут
+ * в начале): вызывающий сопоставляет каналы и готовит [wanted]. Если <channel> встретится
+ * после передач — вызывается снова.
  */
 class XmltvParser(
     private val langs: List<String> = listOf("ru"),
@@ -27,93 +32,147 @@ class XmltvParser(
     var skipped = 0
         private set
 
+    private var charset: Charset = Charsets.UTF_8
+    private var utf8 = true
+
     // передача без stop ждёт следующую передачу того же канала
     private val noStop = HashMap<String, EpgProgramme>()
+    private val elem = Bytes(16 * 1024)
+    private val tag = Bytes(512)
+    private val attrs = HashMap<String, String>()
+
+    // канал предыдущей передачи: байты значения атрибута, id и решение wanted
+    private var lastBytes = ByteArray(64)
+    private var lastLen = -1
+    private var lastId = ""
+    private var lastWanted = false
+
+    private fun sameAsLast(b: ByteArray, vs: Int, ve: Int): Boolean {
+        if (ve - vs != lastLen) return false
+        for (k in 0 until lastLen) if (b[vs + k] != lastBytes[k]) return false
+        return true
+    }
 
     fun parse(input: InputStream) {
-        val p = newParser()
-        p.setInput(input, null)   // кодировку берёт из пролога <?xml encoding=...?>
+        val s = Scanner(input)
         var programmesStarted = false
         var channelsDirty = false
-        var ev = p.eventType
-        while (ev != XmlPullParser.END_DOCUMENT) {
-            if (ev == XmlPullParser.START_TAG && p.depth == 2) {
-                when (p.name) {
-                    "channel" -> {
-                        readChannel(p)?.let {
-                            channels++
-                            onChannel(it)
-                            if (programmesStarted) channelsDirty = true
+        while (s.skipTo('<'.code.toByte())) {
+            val b = s.peek()
+            if (b < 0) break
+            when (b) {
+                '?'.code -> {
+                    tag.clear()
+                    s.copyUntil(PI_END, tag)
+                    prolog(tag)
+                }
+                '!'.code -> {
+                    if (s.startsWith(COMMENT)) s.skipPast(COMMENT_END) else s.skipPast(GT)
+                }
+                else -> {
+                    tag.clear()
+                    if (!s.readTag(tag)) break
+                    val nameEnd = nameEnd(tag)
+                    when {
+                        tag.equalsAt(0, nameEnd, CHANNEL) -> {
+                            readAttrs(tag, nameEnd)
+                            val id = attrs["id"]
+                            elem.clear()
+                            if (!tag.selfClosed()) s.copyUntil(CHANNEL_END, elem)
+                            if (!id.isNullOrEmpty()) {
+                                channels++
+                                onChannel(channelOf(id, elem))
+                                if (programmesStarted) channelsDirty = true
+                            }
                         }
-                    }
-                    "programme" -> {
-                        if (!programmesStarted || channelsDirty) {
-                            programmesStarted = true
-                            channelsDirty = false
-                            beforeProgrammes()
+                        tag.equalsAt(0, nameEnd, PROGRAMME) -> {
+                            if (!programmesStarted || channelsDirty) {
+                                programmesStarted = true
+                                channelsDirty = false
+                                lastLen = -1
+                                beforeProgrammes()
+                            }
+                            // канал — сравнением байтов с предыдущей передачей (XMLTV обычно идёт
+                            // по каналам подряд): ни строк, ни поиска в множестве на каждую передачу
+                            val r = attrRange(tag, nameEnd, tag.len, CHANNEL_ATTR)
+                            if (r < 0) {
+                                skipped++
+                                if (!tag.selfClosed()) s.skipPast(PROGRAMME_END)
+                                continue
+                            }
+                            val vs = (r ushr 32).toInt()
+                            val ve = r.toInt()
+                            if (!sameAsLast(tag.buf, vs, ve)) {
+                                lastLen = ve - vs
+                                if (lastBytes.size < lastLen) lastBytes = ByteArray(lastLen * 2)
+                                System.arraycopy(tag.buf, vs, lastBytes, 0, lastLen)
+                                lastId = decode(tag.buf, vs, ve)
+                                lastWanted = lastId.isNotEmpty() && wanted(lastId)
+                            }
+                            if (!lastWanted) {
+                                skipped++
+                                if (!tag.selfClosed()) s.skipPast(PROGRAMME_END)
+                            } else {
+                                val start = attrOf(tag, nameEnd, tag.len, "start")
+                                val stop = attrOf(tag, nameEnd, tag.len, "stop")
+                                elem.clear()
+                                if (!tag.selfClosed()) s.copyUntil(PROGRAMME_END, elem)
+                                programme(lastId, start, stop, elem)
+                            }
                         }
-                        readProgramme(p)
+                        // <tv>, </tv>, <!DOCTYPE> и прочее верхнего уровня — пропускаем
                     }
-                    else -> skip(p)
                 }
             }
-            ev = p.next()
         }
         // хвосты без stop: до следующей передачи не дошли — час
         for (pr in noStop.values) emit(pr.copy(stop = pr.start + 3600))
         noStop.clear()
     }
 
-    private fun readChannel(p: XmlPullParser): EpgChannelRaw? {
-        val id = p.getAttributeValue(null, "id")
+    /** <?xml version="1.0" encoding="windows-1251"?> */
+    private fun prolog(t: Bytes) {
+        val str = String(t.buf, 0, t.len, Charsets.ISO_8859_1)
+        val m = Regex("encoding\\s*=\\s*[\"']([^\"']+)[\"']").find(str) ?: return
+        try {
+            charset = Charset.forName(m.groupValues[1])
+            utf8 = charset == Charsets.UTF_8
+        } catch (_: Exception) {
+        }
+    }
+
+    // ------------------------------------------------------------------ элементы
+
+    private fun channelOf(id: String, e: Bytes): EpgChannelRaw {
         val names = ArrayList<String>(2)
         var icon = ""
-        val depth = p.depth
-        while (true) {
-            val ev = p.next()
-            if (ev == XmlPullParser.END_TAG && p.depth == depth) break
-            if (ev == XmlPullParser.END_DOCUMENT) break
-            if (ev != XmlPullParser.START_TAG) continue
-            when (p.name) {
-                "display-name" -> readText(p).trim().takeIf { it.isNotEmpty() }?.let { if (it !in names) names.add(it) }
-                "icon" -> if (icon.isEmpty()) icon = p.getAttributeValue(null, "src") ?: ""
+        children(e) { tagEnd, nEnd, open, textFrom, textTo ->
+            when {
+                e.equalsAt(open, nEnd, DISPLAY_NAME) -> text(e, textFrom, textTo).trim().takeIf { it.isNotEmpty() }?.let { if (it !in names) names.add(it) }
+                e.equalsAt(open, nEnd, ICON) -> if (icon.isEmpty()) icon = attrOf(e, nEnd, tagEnd, "src")
             }
         }
-        if (id.isNullOrEmpty()) return null
         return EpgChannelRaw(id, names, icon)
     }
 
-    private fun readProgramme(p: XmlPullParser) {
-        val ch = p.getAttributeValue(null, "channel")
-        if (ch.isNullOrEmpty() || !wanted(ch)) {
-            skipped++
-            skip(p)
-            return
-        }
-        val start = parseTime(p.getAttributeValue(null, "start"))
-        val stopAttr = p.getAttributeValue(null, "stop")
+    private fun programme(ch: String, startAttr: String?, stopAttr: String?, e: Bytes) {
+        val start = parseTime(startAttr)
+        if (start <= 0) return
         val stop = if (stopAttr.isNullOrEmpty()) 0L else parseTime(stopAttr)
         val title = Pick(langs)
         val sub = Pick(langs)
         val desc = Pick(langs)
         val cat = Pick(langs)
         var icon = ""
-        val depth = p.depth
-        while (true) {
-            val ev = p.next()
-            if (ev == XmlPullParser.END_TAG && p.depth == depth) break
-            if (ev == XmlPullParser.END_DOCUMENT) break
-            if (ev != XmlPullParser.START_TAG) continue
-            when (p.name) {
-                "title" -> title.offer(p.getAttributeValue(null, "lang"), readText(p))
-                "sub-title" -> sub.offer(p.getAttributeValue(null, "lang"), readText(p))
-                "desc" -> desc.offer(p.getAttributeValue(null, "lang"), readText(p))
-                "category" -> cat.offer(p.getAttributeValue(null, "lang"), readText(p))
-                "icon" -> if (icon.isEmpty()) icon = p.getAttributeValue(null, "src") ?: ""
-                else -> skip(p)
+        children(e) { tagEnd, nEnd, open, textFrom, textTo ->
+            when {
+                e.equalsAt(open, nEnd, TITLE) -> title.offer(langOf(e, nEnd, tagEnd)) { text(e, textFrom, textTo) }
+                e.equalsAt(open, nEnd, SUB_TITLE) -> sub.offer(langOf(e, nEnd, tagEnd)) { text(e, textFrom, textTo) }
+                e.equalsAt(open, nEnd, DESC) -> desc.offer(langOf(e, nEnd, tagEnd)) { text(e, textFrom, textTo) }
+                e.equalsAt(open, nEnd, CATEGORY) -> cat.offer(langOf(e, nEnd, tagEnd)) { text(e, textFrom, textTo) }
+                e.equalsAt(open, nEnd, ICON) -> if (icon.isEmpty()) icon = attrOf(e, nEnd, tagEnd, "src")
             }
         }
-        if (start <= 0) return
         val pr = EpgProgramme(ch, start, stop, title.value.trim(), sub.value.trim(), desc.value.trim(), cat.value.trim(), icon)
         val prev = noStop.remove(ch)
         if (prev != null) emit(prev.copy(stop = maxOf(start, prev.start + 60)))
@@ -125,52 +184,466 @@ class XmltvParser(
         onProgramme(pr)
     }
 
-    /** Текст элемента вместе с вложенными (бывает <desc>текст <b>жирный</b></desc>) */
-    private fun readText(p: XmlPullParser): String {
-        val depth = p.depth
-        val sb = StringBuilder()
+    /**
+     * Дочерние элементы первого уровня внутри [e]: block(tagEnd, nameEnd, open, textFrom, textTo),
+     * где open — начало имени (после '<'), nameEnd — конец имени, tagEnd — '>' открывающего тега,
+     * [textFrom, textTo) — содержимое до закрывающего тега (пусто у самозакрытого).
+     */
+    private inline fun children(e: Bytes, block: (tagEnd: Int, nameEnd: Int, open: Int, textFrom: Int, textTo: Int) -> Unit) {
+        val b = e.buf
+        val n = e.len
+        var i = 0
+        while (i < n) {
+            if (b[i] != LT) { i++; continue }
+            val open = i + 1
+            if (open >= n) break
+            val c = b[open]
+            if (c == SLASH || c == BANG || c == QM) {
+                // закрывающий тег, комментарий или CDATA вне текста — пропустить до '>'
+                if (c == BANG && e.startsWithAt(open, COMMENT)) {
+                    val end = e.indexOf(COMMENT_END, open)
+                    i = if (end < 0) n else end + COMMENT_END.size
+                } else {
+                    i = e.indexOfByte(GT_B, open).let { if (it < 0) n else it + 1 }
+                }
+                continue
+            }
+            var nameEnd = open
+            while (nameEnd < n && !isNameEnd(b[nameEnd])) nameEnd++
+            val tagEnd = tagEndOf(e, nameEnd)
+            if (tagEnd < 0) break
+            if (b[tagEnd - 1] == SLASH) {
+                block(tagEnd, nameEnd, open, tagEnd, tagEnd)
+                i = tagEnd + 1
+                continue
+            }
+            // закрывающий </имя> (внутри бывают вложенные теги — <desc>текст <b>жирный</b></desc>)
+            val close = findClose(e, open, nameEnd, tagEnd + 1)
+            val textTo = if (close < 0) n else close
+            block(tagEnd, nameEnd, open, tagEnd + 1, textTo)
+            i = if (close < 0) n else (e.indexOfByte(GT_B, close).let { if (it < 0) n else it + 1 })
+        }
+    }
+
+    private fun findClose(e: Bytes, open: Int, nameEnd: Int, from: Int): Int {
+        val b = e.buf
+        val len = nameEnd - open
+        var i = from
         while (true) {
-            val ev = p.next()
-            if (ev == XmlPullParser.TEXT || ev == XmlPullParser.CDSECT || ev == XmlPullParser.ENTITY_REF) sb.append(p.text ?: "")
-            else if (ev == XmlPullParser.END_TAG && p.depth == depth) break
-            else if (ev == XmlPullParser.END_DOCUMENT) break
+            i = e.indexOfByte(LT, i)
+            if (i < 0 || i + 1 >= e.len) return -1
+            if (b[i + 1] == SLASH && i + 2 + len <= e.len) {
+                var ok = true
+                for (k in 0 until len) if (b[i + 2 + k] != b[open + k]) { ok = false; break }
+                if (ok && (i + 2 + len >= e.len || isNameEnd(b[i + 2 + len]))) return i
+            }
+            // CDATA может содержать «</» — перескочить целиком
+            if (e.startsWithAt(i, CDATA)) {
+                val end = e.indexOf(CDATA_END, i)
+                if (end < 0) return -1
+                i = end + CDATA_END.size
+                continue
+            }
+            i++
+        }
+    }
+
+    /** '>' открывающего тега с учётом кавычек в значениях атрибутов */
+    private fun tagEndOf(e: Bytes, from: Int): Int {
+        val b = e.buf
+        var q: Byte = 0
+        var i = from
+        while (i < e.len) {
+            val c = b[i]
+            if (q != 0.toByte()) {
+                if (c == q) q = 0
+            } else if (c == QUOT || c == APOS) q = c
+            else if (c == GT_B) return i
+            i++
+        }
+        return -1
+    }
+
+    private fun langOf(e: Bytes, nameEnd: Int, tagEnd: Int): String? = attrOf(e, nameEnd, tagEnd, "lang").ifEmpty { null }
+
+    /** Диапазон значения атрибута [name] в теге [from, to): (start shl 32) or end, −1 — нет */
+    private fun attrRange(e: Bytes, from: Int, to: Int, name: ByteArray): Long {
+        val b = e.buf
+        var i = from
+        while (i < to) {
+            while (i < to && isSpace(b[i])) i++
+            val ns = i
+            while (i < to && b[i] != EQ && !isSpace(b[i]) && b[i] != GT_B && b[i] != SLASH) i++
+            val ne = i
+            while (i < to && isSpace(b[i])) i++
+            if (i >= to || b[i] != EQ) { i++; continue }
+            i++
+            while (i < to && isSpace(b[i])) i++
+            if (i >= to) break
+            val q = b[i]
+            val vs: Int
+            val ve: Int
+            if (q == QUOT || q == APOS) {
+                vs = i + 1
+                var j = vs
+                while (j < to && b[j] != q) j++
+                ve = j
+                i = j + 1
+            } else {
+                vs = i
+                while (i < to && !isSpace(b[i]) && b[i] != GT_B) i++
+                ve = i
+            }
+            if (ne - ns == name.size) {
+                var ok = true
+                for (k in name.indices) if (b[ns + k] != name[k]) { ok = false; break }
+                if (ok) return (vs.toLong() shl 32) or ve.toLong()
+            }
+        }
+        return -1
+    }
+
+    /** Значение атрибута [name] в теге [from, to) */
+    private fun attrOf(e: Bytes, from: Int, to: Int, name: String): String {
+        val b = e.buf
+        var i = from
+        while (i < to) {
+            while (i < to && isSpace(b[i])) i++
+            val ns = i
+            while (i < to && b[i] != EQ && !isSpace(b[i]) && b[i] != GT_B && b[i] != SLASH) i++
+            val ne = i
+            while (i < to && isSpace(b[i])) i++
+            if (i >= to || b[i] != EQ) { i++; continue }
+            i++
+            while (i < to && isSpace(b[i])) i++
+            if (i >= to) break
+            val q = b[i]
+            val vs: Int
+            val ve: Int
+            if (q == QUOT || q == APOS) {
+                vs = i + 1
+                var j = vs
+                while (j < to && b[j] != q) j++
+                ve = j
+                i = j + 1
+            } else {
+                vs = i
+                while (i < to && !isSpace(b[i]) && b[i] != GT_B) i++
+                ve = i
+            }
+            if (ne - ns == name.length) {
+                var ok = true
+                for (k in name.indices) if (b[ns + k] != name[k].code.toByte()) { ok = false; break }
+                if (ok) return decode(b, vs, ve)
+            }
+        }
+        return ""
+    }
+
+    /** Атрибуты открывающего тега верхнего уровня (programme, channel) */
+    private fun readAttrs(t: Bytes, nameEnd: Int) {
+        attrs.clear()
+        for (k in TOP_ATTRS) {
+            val v = attrOf(t, nameEnd, t.len, k)
+            if (v.isNotEmpty()) attrs[k] = v
+        }
+    }
+
+    /** Текст элемента: CDATA как есть, вложенные теги убираются, сущности раскрываются */
+    private fun text(e: Bytes, from: Int, to: Int): String {
+        val b = e.buf
+        // быстрый путь: без '<' и '&'
+        var plain = true
+        for (i in from until to) if (b[i] == LT || b[i] == AMP) { plain = false; break }
+        if (plain) return String(b, from, to - from, charset)
+        val sb = StringBuilder(to - from)
+        var i = from
+        while (i < to) {
+            if (b[i] == LT) {
+                if (e.startsWithAt(i, CDATA)) {
+                    val s = i + CDATA.size
+                    val end = e.indexOf(CDATA_END, s).let { if (it < 0 || it > to) to else it }
+                    sb.append(String(b, s, end - s, charset))
+                    i = end + CDATA_END.size
+                    continue
+                }
+                // вложенный тег — пропустить
+                val gt = e.indexOfByte(GT_B, i)
+                i = if (gt < 0 || gt > to) to else gt + 1
+                continue
+            }
+            var j = i
+            while (j < to && b[j] != LT) j++
+            sb.append(decode(b, i, j))
+            i = j
         }
         return sb.toString()
     }
 
-    private fun skip(p: XmlPullParser) {
-        val depth = p.depth
-        while (true) {
-            val ev = p.next()
-            if (ev == XmlPullParser.END_TAG && p.depth == depth) return
-            if (ev == XmlPullParser.END_DOCUMENT) return
-        }
+    /** Байты → строка с раскрытием сущностей (&amp; &lt; &gt; &quot; &apos; &#N; &#xH; &nbsp;) */
+    private fun decode(b: ByteArray, from: Int, to: Int): String {
+        var amp = -1
+        for (i in from until to) if (b[i] == AMP) { amp = i; break }
+        if (amp < 0) return String(b, from, to - from, charset)
+        val s = String(b, from, to - from, charset)
+        return unescape(s)
     }
 
-    /** Значение по языкам: сначала из [langs] по порядку, иначе первое попавшееся */
+    private fun isNameEnd(c: Byte) = c == GT_B || c == SLASH || isSpace(c)
+
+    private fun nameEnd(t: Bytes): Int {
+        var i = 0
+        while (i < t.len && !isNameEnd(t.buf[i])) i++
+        return i
+    }
+
+    /** Значение по языкам: сначала из [langs] по порядку, иначе первое (текст разбирается, только если подходит) */
     private class Pick(private val langs: List<String>) {
         var value = ""
             private set
         private var rank = Int.MAX_VALUE
 
-        fun offer(lang: String?, text: String) {
-            if (text.isBlank()) return
+        inline fun offer(lang: String?, text: () -> String) {
             val i = if (lang == null) langs.size else langs.indexOf(lang.lowercase()).let { if (it < 0) langs.size + 1 else it }
-            if (i < rank) {
-                rank = i
-                value = text
+            if (i >= rank) return
+            val t = text()
+            if (t.isBlank()) return
+            rank = i
+            value = t
+        }
+    }
+
+    // ------------------------------------------------------------------ байтовый ввод
+
+    /** Растущий буфер байт */
+    internal class Bytes(cap: Int) {
+        var buf = ByteArray(cap)
+        var len = 0
+
+        fun clear() { len = 0 }
+
+        fun add(src: ByteArray, off: Int, n: Int) {
+            if (len + n > buf.size) buf = buf.copyOf(maxOf(buf.size * 2, len + n))
+            System.arraycopy(src, off, buf, len, n)
+            len += n
+        }
+
+        fun selfClosed() = len > 0 && buf[len - 1] == SLASH
+
+        fun equalsAt(from: Int, to: Int, name: ByteArray): Boolean {
+            if (to - from != name.size) return false
+            for (k in name.indices) if (buf[from + k] != name[k]) return false
+            return true
+        }
+
+        fun startsWithAt(at: Int, p: ByteArray): Boolean {
+            if (at + p.size > len) return false
+            for (k in p.indices) if (buf[at + k] != p[k]) return false
+            return true
+        }
+
+        fun indexOfByte(c: Byte, from: Int): Int {
+            for (i in from until len) if (buf[i] == c) return i
+            return -1
+        }
+
+        fun indexOf(p: ByteArray, from: Int): Int {
+            var i = from
+            val first = p[0]
+            while (i <= len - p.size) {
+                if (buf[i] == first) {
+                    var ok = true
+                    for (k in 1 until p.size) if (buf[i + k] != p[k]) { ok = false; break }
+                    if (ok) return i
+                }
+                i++
+            }
+            return -1
+        }
+    }
+
+    /** Чтение потока большими блоками с поиском по сырым байтам */
+    internal class Scanner(private val input: InputStream) {
+        private val buf = ByteArray(256 * 1024)
+        private var pos = 0
+        private var lim = 0
+        private var eof = false
+
+        /** Дочитать (сохранив непрочитанное); false — данных больше нет */
+        private fun fill(): Boolean {
+            if (eof) return false
+            if (pos > 0) {
+                System.arraycopy(buf, pos, buf, 0, lim - pos)
+                lim -= pos
+                pos = 0
+            }
+            val r = input.read(buf, lim, buf.size - lim)
+            if (r <= 0) {
+                eof = true
+                return false
+            }
+            lim += r
+            return true
+        }
+
+        private fun ensure(n: Int): Boolean {
+            while (lim - pos < n) if (!fill()) return false
+            return true
+        }
+
+        fun peek(): Int = if (ensure(1)) buf[pos].toInt() and 0xFF else -1
+
+        fun startsWith(p: ByteArray): Boolean {
+            if (!ensure(p.size)) return false
+            for (k in p.indices) if (buf[pos + k] != p[k]) return false
+            return true
+        }
+
+        /** Перейти за ближайший байт [c] */
+        fun skipTo(c: Byte): Boolean {
+            while (true) {
+                val b = buf
+                var i = pos
+                val l = lim
+                while (i < l) {
+                    if (b[i] == c) {
+                        pos = i + 1
+                        return true
+                    }
+                    i++
+                }
+                pos = l
+                if (!fill()) return false
+            }
+        }
+
+        /** Перейти за образец [p] (поиск по первому байту, затем сравнение) */
+        fun skipPast(p: ByteArray) {
+            val first = p[0]
+            while (true) {
+                if (!skipTo(first)) return
+                if (!ensure(p.size - 1)) return
+                var ok = true
+                for (k in 1 until p.size) if (buf[pos + k - 1] != p[k]) { ok = false; break }
+                if (ok) {
+                    pos += p.size - 1
+                    return
+                }
+            }
+        }
+
+        /** Скопировать в [out] всё до образца [p] (сам образец пропускается) */
+        fun copyUntil(p: ByteArray, out: Bytes) {
+            val first = p[0]
+            while (true) {
+                var i = pos
+                while (i < lim && buf[i] != first) i++
+                out.add(buf, pos, i - pos)
+                pos = i
+                if (i >= lim) {
+                    if (!fill()) return
+                    continue
+                }
+                if (!ensure(p.size)) {
+                    out.add(buf, pos, lim - pos)
+                    pos = lim
+                    return
+                }
+                var ok = true
+                for (k in 1 until p.size) if (buf[pos + k] != p[k]) { ok = false; break }
+                if (ok) {
+                    pos += p.size
+                    return
+                }
+                out.add(buf, pos, 1)
+                pos++
+            }
+        }
+
+        /** Открывающий тег после '<' до '>' (с учётом кавычек), без самого '>' */
+        fun readTag(out: Bytes): Boolean {
+            var q: Byte = 0
+            while (true) {
+                if (pos >= lim && !fill()) return false
+                val start = pos
+                var i = pos
+                while (i < lim) {
+                    val c = buf[i]
+                    if (q != 0.toByte()) {
+                        if (c == q) q = 0
+                    } else if (c == QUOT || c == APOS) q = c
+                    else if (c == GT_B) {
+                        out.add(buf, start, i - start)
+                        pos = i + 1
+                        return true
+                    }
+                    i++
+                }
+                out.add(buf, start, i - start)
+                pos = i
+                if (out.len > 64 * 1024) return true   // испорченный тег — не копим бесконечно
             }
         }
     }
 
     companion object {
-        private fun newParser(): XmlPullParser {
-            val f = XmlPullParserFactory.newInstance()
-            f.isNamespaceAware = false
-            val p = f.newPullParser()
-            // нестрогий режим KXml: неизвестные сущности (&nbsp;) и мелкие ошибки не роняют разбор
-            try { p.setFeature("http://xmlpull.org/v1/doc/features.html#relaxed", true) } catch (_: Exception) {}
-            return p
+        private const val LT = '<'.code.toByte()
+        private const val GT_B = '>'.code.toByte()
+        private const val SLASH = '/'.code.toByte()
+        private const val BANG = '!'.code.toByte()
+        private const val QM = '?'.code.toByte()
+        private const val QUOT = '"'.code.toByte()
+        private const val APOS = '\''.code.toByte()
+        private const val AMP = '&'.code.toByte()
+        private const val EQ = '='.code.toByte()
+
+        private fun b(s: String) = s.toByteArray(Charsets.ISO_8859_1)
+        private val CHANNEL = b("channel")
+        private val PROGRAMME = b("programme")
+        private val CHANNEL_END = b("</channel>")
+        private val PROGRAMME_END = b("</programme>")
+        private val DISPLAY_NAME = b("display-name")
+        private val ICON = b("icon")
+        private val TITLE = b("title")
+        private val SUB_TITLE = b("sub-title")
+        private val DESC = b("desc")
+        private val CATEGORY = b("category")
+        private val COMMENT = b("<!--").copyOfRange(1, 4)   // после '<': «!--»
+        private val COMMENT_END = b("-->")
+        private val CDATA = b("<![CDATA[")
+        private val CDATA_END = b("]]>")
+        private val PI_END = b("?>")
+        private val GT = b(">")
+        private val TOP_ATTRS = arrayOf("id")
+        private val CHANNEL_ATTR = b("channel")
+
+        private fun isSpace(c: Byte) = c == ' '.code.toByte() || c == '\n'.code.toByte() || c == '\r'.code.toByte() || c == '\t'.code.toByte()
+
+        fun unescape(s: String): String {
+            val sb = StringBuilder(s.length)
+            var i = 0
+            while (i < s.length) {
+                val c = s[i]
+                if (c != '&') { sb.append(c); i++; continue }
+                val semi = s.indexOf(';', i + 1)
+                if (semi < 0 || semi - i > 10) { sb.append(c); i++; continue }
+                val ent = s.substring(i + 1, semi)
+                val rep: String? = when {
+                    ent == "amp" -> "&"
+                    ent == "lt" -> "<"
+                    ent == "gt" -> ">"
+                    ent == "quot" -> "\""
+                    ent == "apos" -> "'"
+                    ent == "nbsp" -> "\u00A0"
+                    ent.startsWith("#x") || ent.startsWith("#X") -> ent.substring(2).toIntOrNull(16)?.let { String(Character.toChars(it)) }
+                    ent.startsWith("#") -> ent.substring(1).toIntOrNull()?.let { String(Character.toChars(it)) }
+                    else -> null
+                }
+                if (rep == null) { sb.append(c); i++; continue }
+                sb.append(rep)
+                i = semi + 1
+            }
+            return sb.toString()
         }
 
         /**
