@@ -40,10 +40,12 @@ object Logos {
         if (pending.add(url)) {
             loader.enqueue(ImageRequest.Builder(context).data(url).size(256, 160)
                 .allowHardware(false)
+                .listener(onError = { _, r -> android.util.Log.w("IPTV", "logo $url: ${r.throwable}") })
                 .target(
                     onSuccess = { d ->
                         pending.remove(url)
-                        (d as? BitmapDrawable)?.bitmap?.let { bitmaps.put(url, it) } ?: failed.add(url)
+                        val bm = (d as? BitmapDrawable)?.bitmap
+                        if (bm != null) bitmaps.put(url, bm) else failed.add(url)
                         waiters.remove(url)?.forEach { it() }
                     },
                     onError = {

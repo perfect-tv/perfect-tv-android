@@ -3,7 +3,7 @@ package top.rootu.perfecttv.data
 /** Нормализация названий каналов (из tv_plugin: favId в core/utils.js, shortName/translit в playlist/epgmap.js) */
 object Names {
 
-    private val KEY_RE = Regex("[\\s!-/:-@\\[-`{-~]+")
+    private val KEY_RE = Regex("[\\s!-/:-@\\[-`\\{-~]+")
 
     /** Ключ канала для избранного, истории, скрытого и напоминаний: без пробелов и знаков, в нижнем регистре */
     fun key(name: String): String = name.lowercase().replace(KEY_RE, "")

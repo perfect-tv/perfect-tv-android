@@ -14,7 +14,8 @@ import java.util.TimeZone
  */
 object CatchupUrl {
 
-    private val VAR_RE = Regex("\\$\\{(\\((([a-zA-Z\\d]+?)(u)?)([+-]\\d+)?\\))?([^\${}]+)}")
+    // скобки экранированы везде: ICU-регулярки Android строже JVM к «{}» без экрана
+    private val VAR_RE = Regex("\\$\\{(\\((([a-zA-Z\\d]+?)(u)?)([+-]\\d+)?\\))?([^\\$\\{\\}]+)\\}")
 
     /**
      * Шаблон архива канала.
