@@ -46,7 +46,7 @@ class SettingsActivity : Activity() {
 
     private fun page(title: String): LinearLayout {
         frame.removeAllViews()
-        val scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
+        val scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(U.pxi(4f), U.pxi(2f), U.pxi(4f), U.pxi(2f))
@@ -118,6 +118,9 @@ class SettingsActivity : Activity() {
         }
         item(col, "Клавиша ↑ в плеере", if (Prefs.upArchive) "Программа и архив" else "Недавние каналы") {
             Prefs.upArchive = !Prefs.upArchive; showMain()
+        }
+        item(col, "Напоминать о передаче", if (Prefs.remindBefore == 0) "Когда начнётся" else "За ${Prefs.remindBefore} мин") {
+            Prefs.remindBefore = cycle(listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore); showMain()
         }
         item(col, "Скрывать инфопанель через", "${Prefs.infoHide} с") {
             Prefs.infoHide = cycle(listOf(3, 5, 7, 10), Prefs.infoHide); showMain()

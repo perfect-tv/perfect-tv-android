@@ -18,7 +18,7 @@ import top.rootu.perfecttv.data.Channel
  */
 class ScheduleLayer(
     context: Context,
-    private val views: List<String>,          // значки видов (пусто или один — без колонки)
+    private val views: List<Icons.Kind>,      // значки видов (пусто или один — без колонки)
     private var viewIndex: Int,
     private val makeContent: (Int) -> Content,
     private val onBack: () -> Unit
@@ -48,6 +48,7 @@ class ScheduleLayer(
     /** Содержимое вида; [watch] подписывается на обновления и возвращает отписку */
     class Content(
         val channel: Channel?,
+        val icon: Icons.Kind?,
         val title: String,
         val subtitle: String,
         val empty: String,
@@ -83,7 +84,7 @@ class ScheduleLayer(
         content = c
         headBox.removeAllViews()
         // head() добавляет строку в box — переносим её в headBox
-        val sub = head(c.channel, c.title, c.subtitle)
+        val sub = head(c.channel, c.title, c.subtitle, icon = c.icon)
         val headRow = box.getChildAt(box.childCount - 1)
         box.removeView(headRow)
         headBox.addView(headRow)
@@ -245,7 +246,6 @@ class ScheduleLayer(
         private val pIcon = U.paint(0.95f, U.wa(0.8f))
         private val pLive = U.paint(0.75f, bold = true)
         private val pEmpty = U.paint(1.1f, U.wa(0.6f))
-        private val pView = U.paint(1.8f)
         var scrollY0 = 0f
         private var target = 0f
 
@@ -289,8 +289,7 @@ class ScheduleLayer(
             if (rows.isEmpty()) {
                 U.drawText(c, content.empty, listL + 2 * em, 2.5f * em, listR - listL - 4 * em, pEmpty)
             } else {
-                c.save()
-                c.clipRect(listL, 0f, listR, height.toFloat())
+                val save = Fade.begin(c, listL, 0f, listR, height.toFloat())
                 var y = -scrollY0
                 val focusDay = if (zone == Zone.TABS) tabs.getOrNull(tabIndex)?.day else null
                 for (i in rows.indices) {
@@ -300,7 +299,10 @@ class ScheduleLayer(
                     y += rh
                     if (y > height) break
                 }
-                c.restore()
+                // затемнение: сверху — если прокручено, снизу — если ниже ещё есть строки
+                val fl = Fade.length
+                Fade.end(c, save, listL, 0f, listR, height.toFloat(),
+                    scrollY0 / fl, (total() - height - scrollY0) / fl)
             }
             drawTabs(c, w)
         }
@@ -335,12 +337,10 @@ class ScheduleLayer(
                 c.drawText("›", x, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
                 x += 1.1f * em
             }
-            var icons = ""
-            if (r.playing) icons += "▶ "
-            if (r.remind) icons += "⏰ "
-            if (r.archive && !r.live) icons += "⟲"
+            val isz = 1.1f * em
+            val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
             val liveW = if (r.live) pLive.measureText("LIVE") + 1.2f * em else 0f
-            val iw = (if (icons.isNotEmpty()) pIcon.measureText(icons) + 0.6f * em else 0f) + liveW
+            val iw = nIcons * (isz + 0.4f * em) + liveW
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = if (focus) U.BLACK else if (r.past) U.wa(0.75f) else if (r.future) U.wa(0.85f) else U.WHITE
             if (r.sub.isNotEmpty()) {
@@ -361,9 +361,12 @@ class ScheduleLayer(
                 c.drawText("LIVE", ix + 0.15f * em, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= 0.6f * em
             }
-            if (icons.isNotEmpty()) {
-                pIcon.color = if (focus) U.BLACK else U.wa(0.8f)
-                c.drawText(icons, ix - pIcon.measureText(icons), cy - (pIcon.descent() + pIcon.ascent()) / 2, pIcon)
+            val ic = if (focus) U.BLACK else U.wa(0.8f)
+            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.4f * em }
+            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ic); ix -= 0.4f * em }
+            if (r.playing) {
+                pIcon.color = ic
+                c.drawText("▶", ix - pIcon.measureText("▶"), cy - (pIcon.descent() + pIcon.ascent()) / 2, pIcon)
             }
         }
 
@@ -379,6 +382,7 @@ class ScheduleLayer(
             val center = if (zone == Zone.TABS) tabIndex else tabs.indexOfFirst { it.day == activeDay }.coerceAtLeast(0)
             val totalH = tabs.size * (th + 0.3f * em) + 0.8f * em
             val off = (center * (th + 0.3f * em) - height / 2f + th / 2).coerceIn(0f, maxOf(0f, totalH - height))
+            val save = Fade.begin(c, l, 0f, w, height.toFloat())
             for ((k, t) in tabs.withIndex()) {
                 val y = 0.4f * em + k * (th + 0.3f * em) - off
                 if (y + th < 0 || y > height) continue
@@ -399,6 +403,7 @@ class ScheduleLayer(
                     c.drawText(s, l + (tabsW - tw) / 2, ly - (p.descent() + p.ascent()) / 2, p)
                 }
             }
+            Fade.end(c, save, l, 0f, w, height.toFloat(), off / Fade.length, (totalH - height - off) / Fade.length)
         }
 
         private fun drawViews(c: Canvas) {
@@ -411,9 +416,8 @@ class ScheduleLayer(
                 val open = k == viewIndex
                 val focus = open && zone == Zone.VIEWS
                 if (open) U.roundRect(c, 0.5f * em, y, viewsW - 0.6f * em, y + th, U.px(U.RADIUS_S), if (focus) U.WHITE else U.FILL_MARKED)
-                pView.color = if (focus) U.BLACK else if (open) U.WHITE else U.wa(0.7f)
-                val tw = pView.measureText(icon)
-                c.drawText(icon, (viewsW - tw) / 2, y + th / 2 - (pView.descent() + pView.ascent()) / 2, pView)
+                val sz = 2.8f * em
+                Icons.draw(c, icon, (viewsW - 0.1f * em - sz) / 2, y + (th - sz) / 2, sz, if (focus) U.BLACK else if (open) U.WHITE else U.wa(0.7f))
             }
         }
 

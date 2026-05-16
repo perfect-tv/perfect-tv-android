@@ -235,7 +235,6 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val pNameBold = U.paint(1.15f, bold = true)
         private val pCell = U.paint(1.05f)
         private val pCellTime = U.paint(0.85f, U.wa(0.55f))
-        private val pIcon = U.paint(0.9f, U.wa(0.7f))
         private val pEmpty = U.paint(1.2f, U.wa(0.6f))
         private val line = Paint().apply { color = U.wa(0.25f); strokeWidth = 0.1f * em }
         private val nowLine = Paint().apply { color = U.wa(0.7f); strokeWidth = 0.12f * em }
@@ -377,10 +376,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             val current = ch === tv.state.channel
             val pn = if (current) pNameBold else pName
             pn.color = fg
-            var icons = ""
-            if (tv.catalog?.isFavorite(ch) == true) icons += "♥"
-            if (ch.hasArchive) icons += " ⟲"
-            val iw = if (icons.isNotEmpty()) pIcon.measureText(icons) + 0.6f * em else 0f
+            val fav = tv.catalog?.isFavorite(ch) == true
+            val isz = 1f * em
+            val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0)) * (isz + 0.35f * em)
             if (grid) {
                 U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
             } else {
@@ -395,10 +393,10 @@ class GuideLayer(private val tv: Tv) : Layer {
                     U.roundRect(c, x, y + 2.6f * em, x + bw * Fmt.progress(p.start, p.stop, now), y + 2.8f * em, 0.1f * em, if (chFocus) U.BLACK else U.WHITE)
                 }
             }
-            if (icons.isNotEmpty()) {
-                pIcon.color = if (chFocus) U.BLACK else U.wa(0.7f)
-                c.drawText(icons, r - 0.8f * em - pIcon.measureText(icons), cy - (pIcon.descent() + pIcon.ascent()) / 2, pIcon)
-            }
+            val ic = if (chFocus) U.BLACK else U.wa(0.7f)
+            var ix = r - 0.8f * em
+            if (ch.hasArchive) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.35f * em }
+            if (fav) { ix -= isz; Icons.draw(c, Icons.Kind.FAV, ix, cy - isz / 2, isz, ic) }
             if (!grid) return
             // сетка: ячейки окна [winStart, winStart + SPAN)
             val from = winStart
@@ -419,7 +417,13 @@ class GuideLayer(private val tv: Tv) : Layer {
                 }
                 U.roundRect(c, cl, y, cr, y + rowH, U.px(U.RADIUS_S), color)
                 val tl = cl + 0.7f * em
-                val tw = cr - tl - 0.5f * em
+                var tw = cr - tl - 0.5f * em
+                // запланированное напоминание — значок часов в ячейке
+                if (cell.program != null && cell.start > now && tv.reminders.has(ch, cell.start) && tw > 2 * em) {
+                    val isz = 0.9f * em
+                    Icons.draw(c, Icons.Kind.REMIND, cr - 0.5f * em - isz, cy - isz / 2, isz, if (isFocus) U.BLACK else U.wa(0.85f))
+                    tw -= isz + 0.4f * em
+                }
                 if (tw > em) {
                     pCell.color = if (isFocus) U.BLACK else if (cell.end <= now) U.wa(0.6f) else U.WHITE
                     U.drawText(c, cell.title.ifEmpty { if (isFocus) Fmt.timeRange(cell.start, cell.end) else "" }, tl, cy, tw, pCell)

@@ -60,6 +60,11 @@ class Channel(
     val hasArchive get() = catchupType != null
 
     fun logoUrl(): String = logo.ifEmpty { epgIcon }
+
+    companion object {
+        /** Канал-«заглушка» для логотипа (запись напоминания) */
+        fun stub(name: String, num: Int, logo: String) = Channel(-1, 0, num, Names.key(name), name, "", "", logo, "", "", 0f, null, "", 0, "", "", "")
+    }
 }
 
 /** Передача (время — unix-секунды) */

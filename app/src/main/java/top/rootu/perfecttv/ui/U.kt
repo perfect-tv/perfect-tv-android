@@ -183,3 +183,61 @@ object Fmt {
         return out.joinToString(" ")
     }
 }
+
+/**
+ * Затемнение краёв прокручиваемого списка: содержимое у верхнего/нижнего края плавно гаснет,
+ * если в ту сторону есть ещё строки. Рисуется поверх содержимого внутри saveLayer той же
+ * области (DST_OUT вычитает альфу), поэтому работает на полупрозрачном окне над видео.
+ */
+object Fade {
+    private val paint = android.graphics.Paint().apply { xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT) }
+    private val matrix = android.graphics.Matrix()
+    private var shader: android.graphics.LinearGradient? = null
+    private var shaderLen = 0f
+
+    /** Длина затемнения, px */
+    val length get() = U.px(3f)
+
+    private fun shader(len: Float): android.graphics.LinearGradient {
+        if (shader == null || shaderLen != len) {
+            shaderLen = len
+            shader = android.graphics.LinearGradient(0f, 0f, 0f, len, Color.BLACK, Color.TRANSPARENT, android.graphics.Shader.TileMode.CLAMP)
+        }
+        return shader!!
+    }
+
+    /** Начать область: вернуть save-счётчик для [end] */
+    fun begin(c: Canvas, l: Float, t: Float, r: Float, b: Float): Int = c.saveLayer(l, t, r, b, null)
+
+    /**
+     * Затемнить края и закрыть область.
+     * @param top, bottom — сила 0..1 (0 — у края списка ничего нет, не затемнять)
+     */
+    fun end(c: Canvas, save: Int, l: Float, t: Float, r: Float, b: Float, top: Float, bottom: Float) {
+        val len = minOf(length, (b - t) / 3)
+        val s = shader(len)
+        if (top > 0f) {
+            matrix.setTranslate(0f, t)
+            s.setLocalMatrix(matrix)
+            paint.shader = s
+            paint.alpha = Math.round(255 * top.coerceAtMost(1f))
+            c.drawRect(l, t, r, t + len, paint)
+        }
+        if (bottom > 0f) {
+            // тот же градиент, отражённый: чёрный у нижнего края
+            matrix.setScale(1f, -1f)
+            matrix.postTranslate(0f, b)
+            s.setLocalMatrix(matrix)
+            paint.shader = s
+            paint.alpha = Math.round(255 * bottom.coerceAtMost(1f))
+            c.drawRect(l, b - len, r, b, paint)
+        }
+        c.restoreToCount(save)
+    }
+
+    /** Встроенное затухание краёв у ScrollView (показывается, только если есть куда прокрутить) */
+    fun scroll(v: android.view.View) {
+        v.isVerticalFadingEdgeEnabled = true
+        v.setFadingEdgeLength(Math.round(length))
+    }
+}

@@ -31,14 +31,17 @@ abstract class PopupLayer(context: Context, widthEm: Float, heightFraction: Floa
     }
 
     /** Шапка окна: логотип канала (или null), заголовок, подзаголовок, справа — подпись */
-    protected fun head(ch: Channel?, title: String, subtitle: String = "", side: String = ""): TextView {
+    protected fun head(ch: Channel?, title: String, subtitle: String = "", side: String = "", icon: Icons.Kind? = null): TextView {
         val ctx = root.context
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(0.8f))
         }
-        if (ch != null) {
+        if (icon != null) {
+            val v = ImageView(ctx).apply { setImageDrawable(Icons.drawable(icon).constantState?.newDrawable()?.mutate()); setColorFilter(U.WHITE) }
+            row.addView(v, LinearLayout.LayoutParams(U.pxi(2.4f), U.pxi(2.4f)).apply { rightMargin = U.pxi(1f) })
+        } else if (ch != null) {
             val logo = ImageView(ctx)
             Logos.into(logo, ch)
             row.addView(logo, LinearLayout.LayoutParams(U.pxi(3.4f), U.pxi(2.4f)).apply { rightMargin = U.pxi(1f) })
@@ -79,7 +82,7 @@ class ListLayer(
     )
 
     private val rows = ArrayList<View>()
-    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false }
+    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
     private var index = start.coerceIn(0, maxOf(0, items.size - 1))
 
     init {
@@ -184,7 +187,7 @@ class DetailsLayer(
 
     private val btnViews = ArrayList<TextView>()
     private var index = 0
-    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false }
+    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
 
     init {
         head(ch, ch.name, kicker)

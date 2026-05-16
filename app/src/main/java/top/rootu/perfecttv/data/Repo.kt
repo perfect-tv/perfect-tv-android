@@ -17,6 +17,7 @@ import java.util.concurrent.Executors
  */
 class Repo(context: Context) {
     val db = Db(context)
+    val reminders = Reminders(db)
     private val loaders = Loaders(db) { maxOf(Prefs.archiveDays, maxArchiveDays) }
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "loader").apply { priority = Thread.MIN_PRIORITY } }
     private val main = Handler(Looper.getMainLooper())

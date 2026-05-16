@@ -16,5 +16,8 @@ class App : Application() {
     companion object {
         lateinit var repo: Repo
             private set
+
+        /** TvActivity на экране — напоминания показывает она, а не уведомления */
+        @Volatile var foreground = false
     }
 }

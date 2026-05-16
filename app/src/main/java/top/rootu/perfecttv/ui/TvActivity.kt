@@ -12,6 +12,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import top.rootu.perfecttv.App
+import top.rootu.perfecttv.core.Alarms
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.player.Playback
 
@@ -33,6 +34,7 @@ class TvActivity : Activity() {
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         U.init(this)
         Logos.init(this)
+        Icons.init(this)
         Anim.on = Prefs.animations
         root = FrameLayout(this)
         root.setBackgroundColor(U.BLACK)
@@ -48,6 +50,42 @@ class TvActivity : Activity() {
         root.addView(pv, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
         tv = Tv(this, root, pb)
+        reminderFromIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        reminderFromIntent(intent)
+    }
+
+    // уведомление о напоминании: включить передачу, когда плейлист откроется
+    private var pendingReminder: String? = null
+
+    private fun reminderFromIntent(i: Intent?) {
+        pendingReminder = i?.getStringExtra(Alarms.EXTRA_REMINDER) ?: return
+        i.removeExtra(Alarms.EXTRA_REMINDER)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        App.foreground = true
+        pendingReminder?.let { id ->
+            pendingReminder = null
+            root.post { tv?.launchReminder(id) }
+        }
+    }
+
+    override fun onPause() {
+        App.foreground = false
+        Alarms.schedule(this)
+        super.onPause()
+    }
+
+    /** Разрешение на уведомления (Android 13+) — чтобы напоминание дошло, когда приложение закрыто */
+    fun askNotifications() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
     }
 
     override fun onStart() {
