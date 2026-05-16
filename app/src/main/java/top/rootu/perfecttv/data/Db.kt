@@ -106,11 +106,18 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             id TEXT PRIMARY KEY, playlist_id INTEGER NOT NULL, playlist_name TEXT NOT NULL,
             ch_key TEXT NOT NULL, ch_name TEXT NOT NULL, ch_num INTEGER NOT NULL, logo TEXT NOT NULL,
             start INTEGER NOT NULL, stop INTEGER NOT NULL, title TEXT NOT NULL, descr TEXT NOT NULL,
-            snooze INTEGER NOT NULL DEFAULT 0)""")
+            snooze INTEGER NOT NULL DEFAULT 0,
+            archive_days INTEGER NOT NULL DEFAULT 0,     -- глубина архива канала при добавлении
+            missed_seen INTEGER NOT NULL DEFAULT 0)     -- пропущенная уже показана
+            """)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // миграции добавляются сюда по версиям
+        // миграции по версиям
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE reminder ADD COLUMN archive_days INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE reminder ADD COLUMN missed_seen INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     /** Источник EPG по URL (создаёт при первом обращении) */
@@ -121,7 +128,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
     }
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
     }
 }
 

@@ -153,9 +153,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val cat = catalog ?: return
         if (cat.channels.isEmpty()) return
         val p = playlist ?: return
-        pendingPlayKey?.let { k ->
-            pendingPlayKey = null
-            cat.byKey[k]?.let { return playChannel(it) }
+        pendingPlay?.let { r ->
+            pendingPlay = null
+            cat.byKey[r.chKey]?.let { ch -> return if (r.missed(Clock.now())) playArchive(ch, r.start, r.stop) else playChannel(ch) }
         }
         val last = cat.byKey[Prefs.lastChannel(p.id)]
         if (last != null) playChannel(last, Prefs.lastGroup(p.id)) else openGuide()
@@ -824,7 +824,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 rows.add(ScheduleLayer.Row(
                     separator = false, day = d, title = r.title, id = r.start, time = Fmt.hhmm(r.start),
                     sub = r.chName + (if (multi && r.playlistName.isNotEmpty()) " · " + r.playlistName else "") + " · " + whenText(r),
-                    channel = Channel.stub(r.chName, r.chNum, r.logo), payload = r
+                    channel = Channel.stub(r.chName, r.chNum, r.logo), payload = r,
+                    past = r.missed(Clock.now()), archive = r.missed(Clock.now())
                 ))
             }
             ScheduleLayer.Built(rows, tabs)
@@ -851,18 +852,26 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     private fun whenText(r: Reminders.Reminder): String {
-        val left = r.start - Clock.now()
-        return if (left > 0) "до начала " + Fmt.until(left) else "уже идёт"
+        val now = Clock.now()
+        val left = r.start - now
+        return when {
+            r.missed(now) -> "пропущено · смотреть из архива"
+            left > 0 -> "до начала " + Fmt.until(left)
+            else -> "уже идёт"
+        }
     }
 
     /** Карточка запланированной передачи: «Удалить напоминание» (+ «Смотреть», если уже идёт) */
     private fun reminderDetails(r: Reminders.Reminder) {
         val buttons = ArrayList<Pair<String, String>>()
-        if (r.start <= Clock.now()) buttons.add("Смотреть" to "watch")
+        val now = Clock.now()
+        if (r.missed(now)) buttons.add("Смотреть из архива" to "watch")
+        else if (r.start <= now) buttons.add("Смотреть" to "watch")
         buttons.add("Удалить напоминание" to "remove")
         var layer: DetailsLayer? = null
         layer = DetailsLayer(activity, Channel.stub(r.chName, r.chNum, r.logo),
-            kicker = "Напоминание · " + whenText(r) + if (r.playlistName.isNotEmpty()) " · " + r.playlistName else "",
+            kicker = (if (r.missed(now)) "Пропущено · в архиве ещё " + Fmt.until(r.start + r.archiveDays * 86400L - now) else "Напоминание · " + whenText(r)) +
+                if (r.playlistName.isNotEmpty()) " · " + r.playlistName else "",
             title = r.title, time = Fmt.dayTimeRange(r.start, r.stop), desc = r.desc, buttons = buttons,
             onAction = { a ->
                 remove(layer!!)
@@ -875,70 +884,55 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     // ------------------------------------------------------------------ показ напоминаний
 
-    private val reminderQueue = ArrayList<Reminders.Reminder>()
-    private var reminderShown: Reminders.Reminder? = null
-    private var reminderLayer: Layer? = null
+    private var reminderLayer: ReminderLayer? = null
 
-    /** Пора показать: по одному, остальные — в очереди */
+    /** Пора показать: все в одном окне со счётчиком (см. [ReminderLayer]) */
     private fun notifyReminder(r: Reminders.Reminder) {
-        if (reminderShown != null) {
-            reminderQueue.add(r)
-            return
-        }
-        reminderShown = r
-        val started = r.start <= Clock.now()
-        var layer: DetailsLayer? = null
-        val done = {
+        reminderLayer?.let { it.add(r); return }
+        var layer: ReminderLayer? = null
+        layer = ReminderLayer(activity, onAction = { rem, a -> reminderAction(rem, a) }, onEmpty = {
             remove(layer!!)
-            reminderShown = null
             reminderLayer = null
-            if (reminderQueue.isNotEmpty()) notifyReminder(reminderQueue.removeAt(0))
-        }
-        layer = DetailsLayer(activity, Channel.stub(r.chName, r.chNum, r.logo),
-            kicker = "Напоминание · " + (if (started) "уже идёт" else "через " + Fmt.until(r.start - Clock.now())) +
-                if (r.playlistName.isNotEmpty()) " · " + r.playlistName else "",
-            title = r.title, time = Fmt.dayTimeRange(r.start, r.stop), desc = r.desc,
-            buttons = listOf("Смотреть" to "watch", "Отложить на 5 мин" to "snooze", "Закрыть" to "close"),
-            onAction = { a ->
-                if (a == "snooze") reminders.snooze(r.id) else reminders.remove(r.id)
-                done()
-                if (a == "watch") launch(r)
-            },
-            onBack = {
-                reminders.remove(r.id)
-                done()
-            })
+        })
         reminderLayer = layer
+        layer.add(r)
         push(layer)
     }
 
-    /** Включить передачу напоминания: тот же плейлист — переключить канал, иначе сменить плейлист */
+    private fun reminderAction(r: Reminders.Reminder, a: String) {
+        when (a) {
+            "snooze" -> reminders.snooze(r.id)
+            "later" -> reminders.keepMissed(r.id)
+            "release" -> reminders.release(r.id)
+            "close" -> reminders.remove(r.id)
+            "watch" -> { reminders.remove(r.id); launch(r) }
+            "archive" -> { reminders.remove(r.id); launch(r) }
+        }
+    }
+
+    /** Включить передачу: идёт — эфир, закончилась — из архива. Другой плейлист — сменить */
     fun launch(r: Reminders.Reminder) {
         val p = repo.playlist(r.playlistId) ?: return toast.show("Плейлист удалён")
         if (playlist?.id != p.id) {
-            pendingPlayKey = r.chKey
+            pendingPlay = r
             switchPlaylist(p)
             return
         }
         val ch = catalog?.byKey?.get(r.chKey) ?: return toast.show("Канала больше нет в плейлисте")
-        layers.toList().reversed().forEach { if (it !== guide) remove(it) }
-        playChannel(ch)
+        layers.toList().reversed().forEach { if (it !== guide && it !== reminderLayer) remove(it) }
+        if (r.missed(Clock.now())) playArchive(ch, r.start, r.stop) else playChannel(ch)
     }
 
     /** Открыть напоминание из уведомления (приложение было закрыто) */
     fun launchReminder(id: String) {
         val r = reminders.all().firstOrNull { it.id == id } ?: return
-        // то же напоминание уже показано окном — закрыть его
-        if (reminderShown?.id == id) {
-            reminderLayer?.let { remove(it) }
-            reminderShown = null
-            reminderLayer = null
-        }
+        // то же напоминание уже в окне — убрать оттуда
+        reminderLayer?.drop(id)
         reminders.remove(id)
         launch(r)
     }
 
-    private var pendingPlayKey: String? = null
+    private var pendingPlay: Reminders.Reminder? = null
 
     fun openHelp() {
         var layer: HelpLayer? = null
