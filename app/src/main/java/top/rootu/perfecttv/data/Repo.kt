@@ -29,6 +29,14 @@ class Repo(context: Context) {
     val loadingSources = HashSet<Long>()
 
     init {
+        // первое открытие БД (и миграция) — в фоне; после пересоздания таблиц — VACUUM
+        worker.execute {
+            db.writableDatabase
+            if (db.needVacuum) {
+                db.needVacuum = false
+                try { db.writableDatabase.execSQL("VACUUM") } catch (e: Exception) { Log.w(Loaders.TAG, "vacuum: $e") }
+            }
+        }
         Bus.on { e ->
             if (e is DataEvent.EpgProgress) {
                 if (e.done) loadingSources.remove(e.sourceId) else loadingSources.add(e.sourceId)

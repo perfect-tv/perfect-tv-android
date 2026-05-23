@@ -69,9 +69,19 @@ object Logos {
 
     private val dst = RectF()
 
-    /** Нарисовать логотип канала (вписать по центру) или заглушку в прямоугольник */
-    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, invalidate: () -> Unit) {
+    /** Тёмная подложка логотипа на белом (строка в фокусе): белые логотипы иначе не видно */
+    val PLATE = Color.rgb(42, 44, 47)
+
+    /**
+     * Нарисовать логотип канала (вписать по центру) или заглушку в прямоугольник.
+     * @param plate подложить тёмную плашку (строка в фокусе с белым фоном)
+     */
+    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, plate: Boolean = false, invalidate: () -> Unit) {
         val bm = bitmap(context, ch, invalidate)
+        if (plate && bm != null) {
+            val pad = (b - t) * 0.12f
+            U.roundRect(c, l - pad, t - pad, r + pad, b + pad, U.px(U.RADIUS_S), PLATE)
+        }
         if (bm == null) {
             Stub.of(ch.name).draw(c, l, t, r, b)
             return

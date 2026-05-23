@@ -326,7 +326,7 @@ class ScheduleLayer(
             val cy = y + rh / 2
             var x = l + 0.8f * em
             if (r.channel != null) {
-                Logos.draw(c, context, r.channel, x, y + 0.6f * em, x + 3.4f * em, y + rh - 0.6f * em) { invalidate() }
+                Logos.draw(c, context, r.channel, x, y + 0.6f * em, x + 3.4f * em, y + rh - 0.6f * em, plate = focus) { invalidate() }
                 x += 4.2f * em
             }
             pTime.color = if (focus) U.BLACK else U.wa(0.8f)

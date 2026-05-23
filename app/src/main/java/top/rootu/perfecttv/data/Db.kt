@@ -78,18 +78,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             ch_key TEXT NOT NULL,
             xml_id TEXT NOT NULL,
             PRIMARY KEY(source_id, ch_key)) WITHOUT ROWID""")
-        db.execSQL("""CREATE TABLE programme(
-            source_id INTEGER NOT NULL,
-            xml_id TEXT NOT NULL,
-            start INTEGER NOT NULL,
-            stop INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            sub_title TEXT NOT NULL,
-            descr TEXT NOT NULL,
-            category TEXT NOT NULL,
-            icon TEXT NOT NULL,
-            load_id INTEGER NOT NULL,
-            PRIMARY KEY(source_id, xml_id, start)) WITHOUT ROWID""")
+        createProgramme(db)
         db.execSQL("""CREATE TABLE favorite(
             playlist_id INTEGER NOT NULL, key TEXT NOT NULL, sort INTEGER NOT NULL,
             PRIMARY KEY(playlist_id, key)) WITHOUT ROWID""")
@@ -112,11 +101,37 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             """)
     }
 
+    /**
+     * Программа — обычная таблица с rowid и уникальным индексом: строки большие (описания),
+     * а WITHOUT ROWID с такими строками заполняет страницы наполовину (БД в полтора раза больше).
+     */
+    private fun createProgramme(db: SQLiteDatabase) {
+        db.execSQL("""CREATE TABLE programme(
+            source_id INTEGER NOT NULL,
+            xml_id TEXT NOT NULL,
+            start INTEGER NOT NULL,
+            stop INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            sub_title TEXT NOT NULL,
+            descr TEXT NOT NULL,
+            category TEXT NOT NULL,
+            icon TEXT NOT NULL,
+            load_id INTEGER NOT NULL)""")
+        db.execSQL("CREATE UNIQUE INDEX programme_key ON programme(source_id, xml_id, start)")
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // миграции по версиям
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE reminder ADD COLUMN archive_days INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE reminder ADD COLUMN missed_seen INTEGER NOT NULL DEFAULT 0")
+        }
+        if (oldVersion < 3) {
+            // новая раскладка программы: пересоздать и загрузить источники заново
+            db.execSQL("DROP TABLE programme")
+            createProgramme(db)
+            db.execSQL("UPDATE epg_source SET status=0, etag='', last_modified='', programmes_count=0")
+            needVacuum = true
         }
     }
 
@@ -127,8 +142,11 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
         return db.insert("epg_source", null, ContentValues().apply { put("url", url) })
     }
 
+    /** После миграции с удалением больших таблиц — сжать файл (VACUUM нельзя внутри onUpgrade) */
+    @Volatile var needVacuum = false
+
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }
 

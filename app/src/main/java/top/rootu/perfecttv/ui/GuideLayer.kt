@@ -368,7 +368,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
             var x = l + 0.8f * em
-            Logos.draw(c, context, ch, x, y + 0.4f * em, x + 3.4f * em, y + rowH - 0.4f * em) { invalidate() }
+            Logos.draw(c, context, ch, x, y + 0.4f * em, x + 3.4f * em, y + rowH - 0.4f * em, plate = chFocus) { invalidate() }
             x += 3.4f * em + 0.7f * em
             pNum.color = if (chFocus) U.BLACK else U.wa(0.5f)
             c.drawText(ch.num.toString(), x, cy - (pNum.descent() + pNum.ascent()) / 2, pNum)

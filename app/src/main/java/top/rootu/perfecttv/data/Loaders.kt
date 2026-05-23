@@ -170,6 +170,7 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
             val minT = now - (maxArchiveDays() + 1) * 86400L
             val maxT = now + 8 * 86400L
             val counting = Streams.Counting(src.input)
+            var skippedOf: () -> Int = { 0 }
             val matcher = EpgMatcher()
             val wanted = HashSet<String>()
             val chIns = w.compileStatement("INSERT OR REPLACE INTO epg_channel(source_id,xml_id,names,icon) VALUES(?,?,?,?)")
@@ -177,9 +178,12 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
             var inBatch = 0
             var written = 0
             var lastEvent = 0L
+            var dbNs = 0L      // время записи в БД (вставки и коммиты) — для разбивки в логе
             val commit = {
+                val c0 = System.nanoTime()
                 w.setTransactionSuccessful()
                 w.endTransaction()
+                dbNs += System.nanoTime() - c0
                 val t = System.currentTimeMillis()
                 if (t - lastEvent > 700) {
                     lastEvent = t
@@ -188,6 +192,9 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
                 }
                 w.beginTransactionNonExclusive()
             }
+            // на время загрузки: кэш страниц побольше и checkpoint WAL реже — меньше повторной записи
+            w.rawQuery("PRAGMA cache_size=-16000", null).close()
+            w.rawQuery("PRAGMA wal_autocheckpoint=8000", null).close()
             w.beginTransactionNonExclusive()
             try {
                 val parser = XmltvParser(
@@ -231,7 +238,9 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
                             prIns.bindString(8, pr.category)
                             prIns.bindString(9, pr.icon)
                             prIns.bindLong(10, loadId)
+                            val i0 = System.nanoTime()
                             prIns.executeInsert()
+                            dbNs += System.nanoTime() - i0
                             written++
                             if (++inBatch >= EPG_BATCH) {
                                 inBatch = 0
@@ -240,19 +249,22 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
                         }
                     }
                 )
+                skippedOf = { parser.skipped }
                 parser.parse(Streams.open(counting) { it.endsWith(".xml", true) || !it.contains('.') })
                 w.setTransactionSuccessful()
             } finally {
                 w.endTransaction()
                 chIns.close()
                 prIns.close()
+                w.rawQuery("PRAGMA wal_autocheckpoint=1000", null).close()
             }
             w.tx {
                 execSQL("DELETE FROM programme WHERE source_id=? AND (load_id<>? OR stop<?)", arrayOf<Any>(sourceId, loadId, minT))
                 execSQL("UPDATE epg_source SET status=?, loaded_at=?, etag=?, last_modified=?, programmes_count=?, load_id=?, error='' WHERE id=?",
                     arrayOf<Any>(STATUS_READY, Clock.now(), src.etag, src.lastModified, written, loadId, sourceId))
             }
-            Log.i(TAG, "epg $url: передач $written за ${System.currentTimeMillis() - t0} мс")
+            Log.i(TAG, "epg $url: передач $written за ${System.currentTimeMillis() - t0} мс " +
+                "(${counting.bytes / 1048576} МБ скачано, запись в БД ${dbNs / 1_000_000} мс, пропущено ${skippedOf()} передач)")
             Bus.post(DataEvent.EpgProgress(sourceId, url, written, 100, true))
         } catch (e: Exception) {
             val code = when (e) {
@@ -277,7 +289,7 @@ class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
     companion object {
         const val TAG = "IPTV"
         const val PLAYLIST_BATCH = 500
-        const val EPG_BATCH = 2000
+        const val EPG_BATCH = 5000
         const val STATUS_NONE = 0
         const val STATUS_LOADING = 1
         const val STATUS_READY = 2

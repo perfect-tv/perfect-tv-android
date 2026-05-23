@@ -124,6 +124,8 @@ class ListLayer(
             val f = i == index
             r.background = if (f) U.bg(U.WHITE, 0.5f) else null
             tint(r, if (f) U.BLACK else U.WHITE)
+            // белые логотипы на белой строке — на тёмной плашке
+            (r as? LinearLayout)?.getChildAt(0)?.let { if (it is ImageView) it.background = if (f) U.bg(Logos.PLATE, U.RADIUS_S) else null }
         }
         rows.getOrNull(index)?.let { r -> r.post { scroll.smoothScrollTo(0, maxOf(0, r.top - scroll.height / 2 + r.height / 2)) } }
     }
