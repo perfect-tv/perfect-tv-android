@@ -113,7 +113,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             checkArchiveLive()
             watchArchive()
             if (info.visible) updateInfo()
-            if (ticks++ % 30 == 0) reminders.check()
+            if (ticks % 30 == 0) reminders.check()
+            if (ticks > 0 && ticks % AUTO_REFRESH == 0) autoRefresh()
+            ticks++
             main.postDelayed(this, 1000)
         }
     }
@@ -192,6 +194,16 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
         if (state.channel == null) startFromLast()
+    }
+
+    /**
+     * Пока приложение открыто: плейлист старше «перекачивать через» — обновить (с программой),
+     * иначе — источники программы, которым больше «обновлять программу каждые».
+     */
+    private fun autoRefresh() {
+        val p = repo.playlist(playlist?.id ?: return) ?: return
+        if (repo.isStale(p)) repo.refresh(p, false) { err -> onRefreshed(p, err) }
+        else repo.refreshEpg(p, false)
     }
 
     private fun showError(code: String) {
@@ -338,7 +350,18 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
      * Включить канал.
      * @param archive unix-сек начала архива (null — эфир); program — передача (её конец задаёт длительность)
      */
-    fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false) {
+    fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false, unlocked: Boolean = false) {
+        // блокировка: заблокированный канал или категория — только с PIN; играющий повторно не спрашиваем
+        if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch)) {
+            main.removeCallbacks(switchRun)
+            pending = null
+            return askPin("${ch.num}. ${ch.name}", {
+                if (!Prefs.pinEveryTime) { unlockedKeys.add(ch.key); unlockedKeys.add("g:" + ch.groupKey) }
+                playChannel(ch, groupKey, archive, programEnd, reload, unlocked = true)
+            }) {
+                if (!hasVideo()) openGuide() else updateInfo()
+            }
+        }
         main.removeCallbacks(switchRun)
         pending = null
         stopSeekHold()
@@ -390,6 +413,32 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         playback.play(ch, url, if (a != null) 0 else C.TIME_UNSET)
         closeGuide(true)
         showInfo()
+    }
+
+    // разблокировано до выхода из приложения (настройка «Спрашивать PIN: один раз»)
+    private val unlockedKeys = HashSet<String>()
+
+    private fun sessionUnlocked(ch: Channel): Boolean {
+        val cat = catalog ?: return false
+        val chOk = !cat.isChannelLocked(ch) || ch.key in unlockedKeys
+        val gOk = !cat.isGroupLocked(ch.groupKey) || ("g:" + ch.groupKey) in unlockedKeys
+        return chOk && gOk
+    }
+
+    /** Окно PIN поверх всего; ok — верный PIN, cancel — «Назад» */
+    fun askPin(title: String, ok: () -> Unit, cancel: () -> Unit = {}) {
+        var layer: PinLayer? = null
+        layer = PinLayer(activity, PinLayer.Mode.CHECK, title, onDone = { remove(layer!!); ok() }, onCancel = { remove(layer!!); cancel() })
+        push(layer)
+    }
+
+    /** Задать PIN (если ещё нет) и затем [ok] */
+    private fun ensurePin(ok: () -> Unit) {
+        if (Prefs.pin.isNotEmpty()) return ok()
+        var layer: PinLayer? = null
+        layer = PinLayer(activity, PinLayer.Mode.CREATE, "Новый PIN", onDone = { remove(layer!!); toast.show("PIN задан. Сменить или убрать — в настройках"); ok() },
+            onCancel = { remove(layer!!) })
+        push(layer)
     }
 
     private var lastUrl = ""
@@ -1063,6 +1112,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         }
         items.add(ListLayer.Item("Скрыть канал", action = "hide"))
         if (ch.group.isNotEmpty()) items.add(ListLayer.Item("Скрыть категорию", ch.group, action = "hide_group"))
+        val pinOn = Prefs.pin.isNotEmpty()
+        items.add(ListLayer.Item(if (pinOn && cat.isChannelLocked(ch)) "Разблокировать канал" else "Заблокировать канал", "по PIN", action = if (pinOn && cat.isChannelLocked(ch)) "unlock" else "lock"))
+        items.add(ListLayer.Item(if (pinOn && cat.isGroupLocked(ch.groupKey)) "Разблокировать категорию" else "Заблокировать категорию", ch.groupKey,
+            action = if (pinOn && cat.isGroupLocked(ch.groupKey)) "unlock_group" else "lock_group"))
         if (cat.hiddenCount() > 0) items.add(ListLayer.Item("Скрытое", cat.hiddenCount().toString(), action = "hidden"))
         items.add(ListLayer.Item("Адаптивная сортировка", if (Prefs.adaptiveSort) "Вкл." else "Выкл.", action = "adaptive"))
         items.add(ListLayer.Item("Вид", if (Prefs.guideGrid) "ТВ-гид" else "Список", action = "view"))
@@ -1097,6 +1150,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "hide" -> { cat.hideChannel(ch); guide.reload(); toast.show("Канал скрыт") }
             "hide_group" -> { cat.hideGroup(ch.group); guide.reload(); toast.show("Категория скрыта") }
             "hidden" -> openHidden()
+            "lock" -> ensurePin { cat.setLocked("channel", ch.key, true); unlockedKeys.remove(ch.key); guide.refresh(); toast.show("Канал заблокирован") }
+            "lock_group" -> ensurePin { cat.setLocked("group", ch.groupKey, true); unlockedKeys.remove("g:" + ch.groupKey); guide.refresh(); toast.show("Категория заблокирована") }
+            "unlock" -> askPin("Разблокировать канал", { cat.setLocked("channel", ch.key, false); guide.refresh() })
+            "unlock_group" -> askPin("Разблокировать категорию", { cat.setLocked("group", ch.groupKey, false); guide.refresh() })
             "adaptive" -> { Prefs.adaptiveSort = !Prefs.adaptiveSort; cat.applyView(); guide.reload() }
             "view" -> { Prefs.guideGrid = !Prefs.guideGrid; guide.setView(Prefs.guideGrid) }
             "playlist" -> openPlaylists()
@@ -1198,6 +1255,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     companion object {
         const val TAG = "IPTV"
         const val BACK_EXIT = 2000L
+        /** Проверка устаревания плейлиста и программы, тиков (с) */
+        const val AUTO_REFRESH = 15 * 60
         const val SWITCH_DELAY = 700L
         const val OSD_NUMBER = 2000L
         const val SEEK_DELAY = 900L

@@ -72,7 +72,7 @@ class Repo(context: Context) {
 
     fun deletePlaylist(id: Long) {
         db.writableDatabase.tx {
-            for (t in listOf("channel", "favorite", "history", "hidden", "score")) delete(t, "playlist_id=?", arrayOf(id.toString()))
+            for (t in listOf("channel", "favorite", "history", "hidden", "score", "locked")) delete(t, "playlist_id=?", arrayOf(id.toString()))
             delete("playlist", "id=?", arrayOf(id.toString()))
         }
     }
@@ -124,19 +124,26 @@ class Repo(context: Context) {
         worker.execute { queueEpg(p, force) }
     }
 
+    // источники в очереди загрузки: повторная проверка не ставит их второй раз
+    private val queued = java.util.Collections.synchronizedSet(HashSet<Long>())
+
     private fun queueEpg(p: Playlist, force: Boolean) {
         val maxAge = Prefs.epgRefreshHours * 3600L
         for (url in p.epgUrls()) {
             val id = db.sourceId(url)
+            if (id in queued) continue
             var fresh = false
             db.readableDatabase.rawQuery("SELECT loaded_at, status FROM epg_source WHERE id=?", arrayOf(id.toString())).use {
                 if (it.moveToFirst()) fresh = it.getInt(1) == Loaders.STATUS_READY && Clock.now() - it.getLong(0) < maxAge
             }
             if (fresh && !force) continue
+            queued.add(id)
             worker.execute {
                 try {
                     loaders.loadEpg(id, url, wantedFor(url), force, langs())
                 } catch (_: Loaders.LoadError) {
+                } finally {
+                    queued.remove(id)
                 }
             }
         }
@@ -287,6 +294,22 @@ class Repo(context: Context) {
             put("playlist_id", id); put("kind", kind); put("key", key); put("title", title)
         }, android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
         else w.delete("hidden", "playlist_id=? AND kind=? AND key=?", arrayOf(id.toString(), kind, key))
+    }
+
+    fun locked(id: Long, kind: String): MutableSet<String> {
+        val out = HashSet<String>()
+        db.readableDatabase.rawQuery("SELECT key FROM locked WHERE playlist_id=? AND kind=?", arrayOf(id.toString(), kind)).use {
+            while (it.moveToNext()) out.add(it.getString(0))
+        }
+        return out
+    }
+
+    fun setLocked(id: Long, kind: String, key: String, on: Boolean) {
+        val w = db.writableDatabase
+        if (on) w.insertWithOnConflict("locked", null, ContentValues().apply {
+            put("playlist_id", id); put("kind", kind); put("key", key)
+        }, android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
+        else w.delete("locked", "playlist_id=? AND kind=? AND key=?", arrayOf(id.toString(), kind, key))
     }
 
     fun scores(id: Long): MutableMap<String, Int> {

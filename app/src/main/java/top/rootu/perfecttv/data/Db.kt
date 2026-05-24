@@ -88,6 +88,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
         db.execSQL("""CREATE TABLE hidden(
             playlist_id INTEGER NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, title TEXT NOT NULL,
             PRIMARY KEY(playlist_id, kind, key)) WITHOUT ROWID""")
+        createLocked(db)
         db.execSQL("""CREATE TABLE score(
             playlist_id INTEGER NOT NULL, key TEXT NOT NULL, value INTEGER NOT NULL,
             PRIMARY KEY(playlist_id, key)) WITHOUT ROWID""")
@@ -120,6 +121,13 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
         db.execSQL("CREATE UNIQUE INDEX programme_key ON programme(source_id, xml_id, start)")
     }
 
+    /** Заблокированные (по PIN) каналы и категории: kind — group|channel */
+    private fun createLocked(db: SQLiteDatabase) {
+        db.execSQL("""CREATE TABLE locked(
+            playlist_id INTEGER NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL,
+            PRIMARY KEY(playlist_id, kind, key)) WITHOUT ROWID""")
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // миграции по версиям
         if (oldVersion < 2) {
@@ -133,6 +141,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             db.execSQL("UPDATE epg_source SET status=0, etag='', last_modified='', programmes_count=0")
             needVacuum = true
         }
+        if (oldVersion < 4) createLocked(db)
     }
 
     /** Источник EPG по URL (создаёт при первом обращении) */
@@ -146,7 +155,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
     @Volatile var needVacuum = false
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
     }
 }
 

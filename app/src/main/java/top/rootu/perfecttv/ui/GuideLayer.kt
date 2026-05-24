@@ -377,8 +377,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             val pn = if (current) pNameBold else pName
             pn.color = fg
             val fav = tv.catalog?.isFavorite(ch) == true
+            val locked = tv.catalog?.isLocked(ch) == true
             val isz = 1f * em
-            val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0)) * (isz + 0.35f * em)
+            val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0) + (if (locked) 1 else 0)) * (isz + 0.35f * em)
             if (grid) {
                 U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
             } else {
@@ -396,7 +397,8 @@ class GuideLayer(private val tv: Tv) : Layer {
             val ic = if (chFocus) U.BLACK else U.wa(0.7f)
             var ix = r - 0.8f * em
             if (ch.hasArchive) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.35f * em }
-            if (fav) { ix -= isz; Icons.draw(c, Icons.Kind.FAV, ix, cy - isz / 2, isz, ic) }
+            if (fav) { ix -= isz; Icons.draw(c, Icons.Kind.FAV, ix, cy - isz / 2, isz, ic); ix -= 0.35f * em }
+            if (locked) { ix -= isz; Icons.draw(c, Icons.Kind.LOCK, ix, cy - isz / 2, isz, ic) }
             if (!grid) return
             // сетка: ячейки окна [winStart, winStart + SPAN)
             val from = winStart

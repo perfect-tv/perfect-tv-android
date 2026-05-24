@@ -18,6 +18,8 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
     var hiddenGroups: MutableMap<String, String> = repo.hidden(playlist.id, "group")
     var hiddenChannels: MutableMap<String, String> = repo.hidden(playlist.id, "channel")
     private val scores: MutableMap<String, Int> = repo.scores(playlist.id)
+    private val lockedGroups: MutableSet<String> = repo.locked(playlist.id, "group")
+    private val lockedChannels: MutableSet<String> = repo.locked(playlist.id, "channel")
 
     var favGroup = Group(FAV_KEY, favoritesTitle, emptyList(), true)
         private set
@@ -137,6 +139,19 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
     }
 
     fun hiddenCount() = hiddenGroups.size + hiddenChannels.size
+
+    // ---- блокировка по PIN (действует, только если PIN задан) ----
+    fun isChannelLocked(ch: Channel) = ch.key in lockedChannels
+    fun isGroupLocked(key: String) = key in lockedGroups
+
+    /** Канал заблокирован сам или его категория */
+    fun isLocked(ch: Channel) = Prefs.pin.isNotEmpty() && (ch.key in lockedChannels || ch.groupKey in lockedGroups)
+
+    fun setLocked(kind: String, key: String, on: Boolean) {
+        val set = if (kind == "group") lockedGroups else lockedChannels
+        if (on) set.add(key) else set.remove(key)
+        repo.setLocked(playlist.id, kind, key, on)
+    }
 
     // ---- адаптивная сортировка ----
     fun addScore(ch: Channel) {

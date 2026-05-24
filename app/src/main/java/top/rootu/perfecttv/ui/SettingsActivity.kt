@@ -134,7 +134,43 @@ class SettingsActivity : Activity() {
         item(col, "Обновлять программу каждые", "${Prefs.epgRefreshHours} ч") {
             Prefs.epgRefreshHours = cycle(listOf(6, 12, 24), Prefs.epgRefreshHours); showMain()
         }
+        section(col, "Блокировка")
+        if (Prefs.pin.isEmpty()) {
+            item(col, "PIN-код", "не задан", "каналы и категории блокируются в меню канала (удерж. OK)") { showPin(null) }
+        } else {
+            item(col, "Сменить PIN", "") { showPin(Prefs.pin) }
+            item(col, "Спрашивать PIN", if (Prefs.pinEveryTime) "Каждый раз" else "Один раз до выхода") {
+                Prefs.pinEveryTime = !Prefs.pinEveryTime; showMain()
+            }
+            item(col, "Убрать PIN", "", "блокировки перестанут действовать, отметки сохранятся") { showPin(Prefs.pin, remove = true) }
+        }
         first?.requestFocus()
+    }
+
+    // ------------------------------------------------------------------ PIN
+
+    /**
+     * Задать, сменить или убрать PIN. [current] — нужно сначала ввести текущий.
+     * Поля — системная клавиатура (цифровая), как и остальные формы настроек.
+     */
+    private fun showPin(current: String?, remove: Boolean = false) {
+        editing = -2
+        val col = page(if (remove) "Убрать PIN" else if (current == null) "Новый PIN" else "Сменить PIN")
+        val form = FormView(this, "PIN-код", "4 цифры. Спрашивается при включении заблокированного канала или категории.")
+        val old = if (current != null) form.field("Текущий PIN", "", pin = true) else null
+        val new1 = if (!remove) form.field("Новый PIN", "", pin = true) else null
+        val new2 = if (!remove) form.field("Повторите", "", pin = true) else null
+        form.button(if (remove) "Убрать" else "Сохранить") {
+            if (old != null && old.text.toString() != current) { old.error = "Неверный PIN"; old.requestFocus(); return@button }
+            if (remove) { Prefs.pin = ""; showMain(); return@button }
+            val p = new1!!.text.toString()
+            if (!Regex("^\\d{4}$").matches(p)) { new1.error = "Нужно 4 цифры"; new1.requestFocus(); return@button }
+            if (new2!!.text.toString() != p) { new2.error = "Не совпадает"; new2.requestFocus(); return@button }
+            Prefs.pin = p
+            showMain()
+        }
+        col.addView(form)
+        (old ?: new1)?.requestFocus()
     }
 
     // ------------------------------------------------------------------ плейлист

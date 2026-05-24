@@ -57,6 +57,16 @@ object Prefs {
         get() = int("playlist_refresh", 24)
         set(v) = sp.edit().putInt("playlist_refresh", v).apply()
 
+    /** PIN блокировки каналов и категорий; пусто — блокировка выключена */
+    var pin: String
+        get() = sp.getString("pin", "") ?: ""
+        set(v) = sp.edit().putString("pin", v).apply()
+
+    /** Спрашивать PIN: true — каждый раз, false — один раз до выхода из приложения */
+    var pinEveryTime: Boolean
+        get() = bool("pin_every", false)
+        set(v) = sp.edit().putBoolean("pin_every", v).apply()
+
     var lastPlaylist: Long
         get() = sp.getLong("last_playlist", 0)
         set(v) = sp.edit().putLong("last_playlist", v).apply()

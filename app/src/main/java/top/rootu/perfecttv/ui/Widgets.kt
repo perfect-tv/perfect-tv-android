@@ -135,7 +135,7 @@ class FormView(context: Context, title: String, hint: String) : LinearLayout(con
         if (hint.isNotEmpty()) addView(U.text(context, 0.95f, 0.6f, lines = 3).apply { text = hint }, LayoutParams(-1, -2).apply { topMargin = U.pxi(0.4f) })
     }
 
-    fun field(label: String, value: String, url: Boolean = false): EditText {
+    fun field(label: String, value: String, url: Boolean = false, pin: Boolean = false): EditText {
         addView(U.text(context, 0.95f, 0.7f).apply { text = label }, LayoutParams(-1, -2).apply { topMargin = U.pxi(1f) })
         val e = EditText(context).apply {
             setText(value)
@@ -143,7 +143,12 @@ class FormView(context: Context, title: String, hint: String) : LinearLayout(con
             setTextColor(U.WHITE)
             setHintTextColor(U.wa(0.4f))
             isSingleLine = true
-            inputType = if (url) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI else InputType.TYPE_CLASS_TEXT
+            inputType = when {
+                pin -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                url -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                else -> InputType.TYPE_CLASS_TEXT
+            }
+            if (pin) filters = arrayOf(android.text.InputFilter.LengthFilter(4))
             imeOptions = EditorInfo.IME_ACTION_NEXT or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setPadding(U.pxi(0.8f), U.pxi(0.6f), U.pxi(0.8f), U.pxi(0.6f))
             focusBg(this)
