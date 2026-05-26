@@ -13,6 +13,8 @@ interface Layer {
     val view: View?
     fun key(name: String, long: Boolean, digit: Int) {}
     fun hasLong(name: String) = false
+    /** Удержание ↑/↓ листает, автоповтор ←/→ проходит (false — каждое нажатие один раз: ввод PIN) */
+    val holdRepeat: Boolean get() = true
     fun keyUp(name: String) {}
     fun enter() {}
     fun long() {}

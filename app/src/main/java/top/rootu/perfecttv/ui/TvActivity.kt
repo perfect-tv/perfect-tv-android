@@ -121,9 +121,18 @@ class TvActivity : Activity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
-        tv?.onKeyDown(keyCode, event) == true || super.onKeyDown(keyCode, event)
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-        tv?.onKeyUp(keyCode) == true || super.onKeyUp(keyCode, event)
+    /**
+     * Клавиши пульта — сразу в [Tv], мимо View: иначе стрелки уводят фокус Android на
+     * кликабельные элементы окон, и OK «кликает» по ним вместо нашего действия.
+     * Тач и мышь по-прежнему идут к View (клики по строкам и кнопкам).
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val t = tv ?: return super.dispatchKeyEvent(event)
+        val handled = when (event.action) {
+            KeyEvent.ACTION_DOWN -> t.onKeyDown(event.keyCode, event)
+            KeyEvent.ACTION_UP -> t.onKeyUp(event.keyCode)
+            else -> false
+        }
+        return handled || super.dispatchKeyEvent(event)
+    }
 }

@@ -142,6 +142,9 @@ class SettingsActivity : Activity() {
             item(col, "Спрашивать PIN", if (Prefs.pinEveryTime) "Каждый раз" else "Один раз до выхода") {
                 Prefs.pinEveryTime = !Prefs.pinEveryTime; showMain()
             }
+            item(col, "Ввод PIN", PIN_INPUTS[Prefs.pinInput.coerceIn(0, 2)], "кольцо и ряды не показывают, какая цифра набрана") {
+                Prefs.pinInput = (Prefs.pinInput + 1) % 3; showMain()
+            }
             item(col, "Убрать PIN", "", "блокировки перестанут действовать, отметки сохранятся") { showPin(Prefs.pin, remove = true) }
         }
         first?.requestFocus()
@@ -156,7 +159,7 @@ class SettingsActivity : Activity() {
     private fun showPin(current: String?, remove: Boolean = false) {
         editing = -2
         val col = page(if (remove) "Убрать PIN" else if (current == null) "Новый PIN" else "Сменить PIN")
-        val form = FormView(this, "PIN-код", "4 цифры. Спрашивается при включении заблокированного канала или категории.")
+        val form = FormView(this, "PIN-код", "От 4 до 6 цифр. Спрашивается при включении заблокированного канала или категории.")
         val old = if (current != null) form.field("Текущий PIN", "", pin = true) else null
         val new1 = if (!remove) form.field("Новый PIN", "", pin = true) else null
         val new2 = if (!remove) form.field("Повторите", "", pin = true) else null
@@ -164,7 +167,7 @@ class SettingsActivity : Activity() {
             if (old != null && old.text.toString() != current) { old.error = "Неверный PIN"; old.requestFocus(); return@button }
             if (remove) { Prefs.pin = ""; showMain(); return@button }
             val p = new1!!.text.toString()
-            if (!Regex("^\\d{4}$").matches(p)) { new1.error = "Нужно 4 цифры"; new1.requestFocus(); return@button }
+            if (!Regex("^\\d{4,6}$").matches(p)) { new1.error = "Нужно от 4 до 6 цифр"; new1.requestFocus(); return@button }
             if (new2!!.text.toString() != p) { new2.error = "Не совпадает"; new2.requestFocus(); return@button }
             Prefs.pin = p
             showMain()
@@ -256,6 +259,7 @@ class SettingsActivity : Activity() {
 
     companion object {
         const val EXTRA_FIRST = "first"
+        val PIN_INPUTS = listOf("Кольцо (как Fire TV)", "Ряды (как Google)", "Клавиатура")
     }
 }
 

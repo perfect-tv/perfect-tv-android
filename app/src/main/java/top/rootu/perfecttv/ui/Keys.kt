@@ -61,6 +61,10 @@ class Keys(private val handler: () -> Layer?) {
             startHeld(name, layer, LONG_PRESS)
             return true
         }
+        if (!layer.holdRepeat) {
+            if (e.repeatCount == 0) { release(); layer.key(name, false, 0) }
+            return true
+        }
         val r = repeat
         if (r != null && r.name == name) {
             r.last = SystemClock.uptimeMillis()

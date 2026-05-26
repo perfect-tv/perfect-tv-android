@@ -148,7 +148,7 @@ class FormView(context: Context, title: String, hint: String) : LinearLayout(con
                 url -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
                 else -> InputType.TYPE_CLASS_TEXT
             }
-            if (pin) filters = arrayOf(android.text.InputFilter.LengthFilter(4))
+            if (pin) filters = arrayOf(android.text.InputFilter.LengthFilter(6))
             imeOptions = EditorInfo.IME_ACTION_NEXT or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setPadding(U.pxi(0.8f), U.pxi(0.6f), U.pxi(0.8f), U.pxi(0.6f))
             focusBg(this)

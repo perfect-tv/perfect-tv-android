@@ -67,6 +67,11 @@ object Prefs {
         get() = bool("pin_every", false)
         set(v) = sp.edit().putBoolean("pin_every", v).apply()
 
+    /** Ввод PIN: 0 — кольцо (как Fire TV), 1 — ряды (как Google), 2 — клавиатура */
+    var pinInput: Int
+        get() = int("pin_input", 2)
+        set(v) = sp.edit().putInt("pin_input", v).apply()
+
     var lastPlaylist: Long
         get() = sp.getLong("last_playlist", 0)
         set(v) = sp.edit().putLong("last_playlist", v).apply()
