@@ -61,6 +61,9 @@ class Channel(
 
     fun logoUrl(): String = logo.ifEmpty { epgIcon }
 
+    /** Название для показа: с номером («2. Россия 1»), если номер показывается рядом с названием */
+    fun title(): String = if (top.rootu.perfecttv.core.Prefs.numberMode == top.rootu.perfecttv.core.Prefs.NUMBER_NEAR_NAME) "$num. $name" else name
+
     companion object {
         /** Канал-«заглушка» для логотипа (запись напоминания) */
         fun stub(name: String, num: Int, logo: String) = Channel(-1, 0, num, Names.key(name), name, "", "", logo, "", "", 0f, null, "", 0, "", "", "")

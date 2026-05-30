@@ -294,15 +294,14 @@ class GuideLayer(private val tv: Tv) : Layer {
             val ch = focused ?: return
             val t = padTop
             val logoW = 9f * em
-            U.roundRect(c, padX, t, padX + logoW, t + 6.2f * em, U.px(U.RADIUS), U.FILL_SOFT)
-            Logos.draw(c, context, ch, padX + 0.6f * em, t + 0.6f * em, padX + logoW - 0.6f * em, t + 5.6f * em) { invalidate() }
+            Logos.draw(c, context, ch, padX, t, padX + logoW, t + 6.2f * em) { invalidate() }
             val x = padX + logoW + 1.2f * em
             val clockW = pClock.measureText("00:00") + em
             val w = width - padX - x - clockW
             val ref = if (zone == Zone.GRID) focusTime else now
             val cell = Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
-            U.drawText(c, "${ch.num}. ${ch.name}", x, t + 0.7f * em, w, pChannel)
+            U.drawText(c, ch.title(), x, t + 0.7f * em, w, pChannel)
             U.drawText(c, p?.title ?: L.t("Нет программы"), x, t + 2.3f * em, w, pTitle)
             U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 3.9f * em, w, pTime)
             val desc = p?.desc ?: ""
@@ -371,12 +370,15 @@ class GuideLayer(private val tv: Tv) : Layer {
             U.roundRect(c, l, y, r, y + rowH, U.px(U.RADIUS_S), bg)
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
-            var x = l + 0.8f * em
-            Logos.draw(c, context, ch, x, y + 0.4f * em, x + 3.4f * em, y + rowH - 0.4f * em, plate = chFocus) { invalidate() }
-            x += 3.4f * em + 0.7f * em
-            pNum.color = if (chFocus) U.BLACK else U.wa(0.5f)
-            c.drawText(ch.num.toString(), x, cy - (pNum.descent() + pNum.ascent()) / 2, pNum)
-            x += 2.4f * em
+            var x = l + 0.35f * em
+            Logos.draw(c, context, ch, x, y + 0.25f * em, x + 3.9f * em, y + rowH - 0.25f * em, plate = chFocus) { invalidate() }
+            x += 3.9f * em + 0.7f * em
+            // колонка номеров — только в режиме «рядом с названием»
+            if (Prefs.numberMode == Prefs.NUMBER_NEAR_NAME) {
+                pNum.color = if (chFocus) U.BLACK else U.wa(0.5f)
+                c.drawText(ch.num.toString(), x, cy - (pNum.descent() + pNum.ascent()) / 2, pNum)
+                x += 2.4f * em
+            } else x += 0.5f * em
             val current = ch === tv.state.channel
             val pn = if (current) pNameBold else pName
             pn.color = fg

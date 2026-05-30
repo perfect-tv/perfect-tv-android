@@ -100,6 +100,15 @@ object Prefs {
         get() = sp.getString("language", "") ?: ""
         set(v) = sp.edit().putString("language", v).apply()
 
+    /** Где показывать номер канала: 0 — нигде, 1 — рядом с названием, 2 — бейдж на логотипе */
+    var numberMode: Int
+        get() = int("number_mode", NUMBER_BADGE)
+        set(v) = sp.edit().putInt("number_mode", v).apply()
+
+    const val NUMBER_NONE = 0
+    const val NUMBER_NEAR_NAME = 1
+    const val NUMBER_BADGE = 2
+
     var lastPlaylist: Long
         get() = sp.getLong("last_playlist", 0)
         set(v) = sp.edit().putLong("last_playlist", v).apply()

@@ -411,7 +411,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch)) {
             main.removeCallbacks(switchRun)
             pending = null
-            return askPin("${ch.num}. ${ch.name}", {
+            return askPin(ch.title(), {
                 if (!Prefs.pinEveryTime) { unlockedKeys.add(ch.key); unlockedKeys.add("g:" + ch.groupKey) }
                 playChannel(ch, groupKey, archive, programEnd, reload, unlocked = true)
             }) {
@@ -905,7 +905,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         var layer: ListLayer? = null
         val items = cat.recent(state.channel).map { ch ->
             val p = repo.at(ch, now)
-            ListLayer.Item("${ch.num}. ${ch.name}", p?.title ?: "", ch, p?.let { Fmt.progress(it.start, it.stop, now) } ?: -1f)
+            ListLayer.Item(ch.title(), p?.title ?: "", ch, p?.let { Fmt.progress(it.start, it.stop, now) } ?: -1f)
         }
         layer = ListLayer(activity, L.t("Недавние каналы"), items,
             onSelect = { it.channel?.let { ch -> remove(layer!!); playChannel(ch) } },
@@ -1102,7 +1102,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         return ScheduleLayer.Content(
             channel = ch,
             icon = null,
-            title = "${ch.num}  ${ch.name}",
+            title = ch.title(),
             subtitle = ch.group + if (ch.hasArchive) " · " + L.f("Архив %s дн.", ch.archiveDays) else "",
             empty = L.t("Нет программы"),
             build = build,
@@ -1200,7 +1200,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         items.add(ListLayer.Item(L.t("Управление"), action = "help"))
         items.add(ListLayer.Item(L.t("Настройки"), action = "settings"))
         var layer: ListLayer? = null
-        layer = ListLayer(activity, "${ch.num}. ${ch.name}", items, onSelect = { it ->
+        layer = ListLayer(activity, ch.title(), items, onSelect = { it ->
             remove(layer!!)
             menuAction(ch, it.action)
         }, onBack = { remove(layer!!) })

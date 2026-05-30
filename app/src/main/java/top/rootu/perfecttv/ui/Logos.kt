@@ -10,12 +10,13 @@ import android.util.LruCache
 import android.widget.ImageView
 import coil.ImageLoader
 import coil.request.ImageRequest
+import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Channel
 
 /**
  * Логотипы каналов: загрузка через Coil (дисковый кэш), в памяти — LRU битмапов для рисования
  * на Canvas (гид, списки). Нет логотипа или не загрузился — цветная плашка с аббревиатурой
- * (logoStub плагина).
+ * номер канала на плашке; при логотипе — бейдж с номером (настройка «Номер канала»).
  */
 object Logos {
     private lateinit var loader: ImageLoader
@@ -58,13 +59,13 @@ object Logos {
         return null
     }
 
-    /** Логотип в ImageView (инфопанель, карточки); заглушка рисуется сразу */
-    fun into(view: ImageView, ch: Channel) {
-        val stub = Stub.of(ch.name)
-        view.setImageDrawable(StubDrawable(stub))
-        val bm = bitmap(view.context, ch) { bitmaps.get(ch.logoUrl())?.let { if (view.tag === ch) view.setImageBitmap(it) } }
+    /**
+     * Логотип в ImageView (инфопанель, карточки, окна): рисует [LogoDrawable] — логотип или
+     * номер на плашке, по настройке — с бейджем номера.
+     */
+    fun into(view: ImageView, ch: Channel, badge: Boolean = true) {
         view.tag = ch
-        if (bm != null) view.setImageBitmap(bm)
+        view.setImageDrawable(LogoDrawable(view, ch, badge))
     }
 
     /** Баннер передачи (TMDB) в ImageView: без кэша битмапов для Canvas, только дисковый кэш Coil */
@@ -79,69 +80,60 @@ object Logos {
     val PLATE = Color.rgb(42, 44, 47)
 
     /**
-     * Нарисовать логотип канала (вписать по центру) или заглушку в прямоугольник.
-     * @param plate подложить тёмную плашку (строка в фокусе с белым фоном)
+     * Логотип канала в прямоугольнике [l, t, r, b]: серая подложка (как под логотипами
+     * в шапке гида и инфопанели), логотип внутри с отступом, по настройке «Номер канала» —
+     * бейдж с номером в левом верхнем углу. Логотипа нет (или ещё грузится) — на подложке
+     * крупный номер канала (вместо цветных плашек с буквами — у всех одинаково).
+     * @param plate тёмная подложка (строка в фокусе с белым фоном: белые логотипы иначе не видно)
+     * @param badge рисовать бейдж (если включён в настройках)
      */
-    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, plate: Boolean = false, invalidate: () -> Unit) {
+    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, plate: Boolean = false, badge: Boolean = true, invalidate: () -> Unit) {
         val bm = bitmap(context, ch, invalidate)
-        if (plate && bm != null) {
-            val pad = (b - t) * 0.12f
-            U.roundRect(c, l - pad, t - pad, r + pad, b + pad, U.px(U.RADIUS_S), PLATE)
-        }
-        if (bm == null) {
-            Stub.of(ch.name).draw(c, l, t, r, b)
-            return
-        }
-        val scale = minOf((r - l) / bm.width, (b - t) / bm.height)
+        val h = b - t
+        val radius = minOf(U.px(U.RADIUS_S), h * 0.2f)
+        U.roundRect(c, l, t, r, b, radius, if (plate) PLATE else U.FILL_SOFT)
+        if (bm == null) return drawNumber(c, ch, l, t, r, b)
+        val pad = h * 0.14f
+        val scale = minOf((r - l - 2 * pad) / bm.width, (h - 2 * pad) / bm.height)
         val w = bm.width * scale
-        val h = bm.height * scale
-        dst.set((l + r - w) / 2, (t + b - h) / 2, (l + r + w) / 2, (t + b + h) / 2)
+        val bh = bm.height * scale
+        dst.set((l + r - w) / 2, (t + b - bh) / 2, (l + r + w) / 2, (t + b + bh) / 2)
         c.drawBitmap(bm, null, dst, U.fill.apply { color = Color.WHITE; isFilterBitmap = true })
+        if (badge && Prefs.numberMode == Prefs.NUMBER_BADGE && ch.num > 0) drawBadge(c, ch.num, l, t, h, radius)
     }
 
-    /** Плашка-заглушка: аббревиатура названия на цвете от хеша */
-    class Stub(val text: String, val bg: Int, val fg: Int) {
-        fun draw(c: Canvas, l: Float, t: Float, r: Float, b: Float) {
-            val h = b - t
-            val w = minOf(r - l, h * 1.45f)
-            val x = (l + r - w) / 2
-            U.roundRect(c, x, t, x + w, b, U.px(U.RADIUS_S), bg)
-            paint.color = fg
-            paint.textSize = h * (if (text.length > 4) 0.28f else 0.36f)
-            val tw = paint.measureText(text)
-            c.drawText(text, (l + r - tw) / 2, (t + b) / 2 - (paint.descent() + paint.ascent()) / 2, paint)
-        }
+    private val numPaint = U.paint(1f, bold = true)
 
-        companion object {
-            private val paint = U.paint(1f, bold = true)
-            private val cache = HashMap<String, Stub>()
-            private val SPACES = Regex("\\s+")
-            private val SHORT = Regex("^(\\+?\\d+|[UF]?HD|4K)$", RegexOption.IGNORE_CASE)
-
-            fun of(title: String): Stub = cache.getOrPut(title) {
-                val name = title.replace(Regex("\\s+\\(([+-]?\\d+)\\)"), " $1")
-                    .replace(Regex("[-.()\\s]+"), " ")
-                    .replace(Regex("(^|\\s+)(TV|ТВ)(\\s+|$)", RegexOption.IGNORE_CASE), "$3")
-                    .trim()
-                val text = if (name.replace(SPACES, "").length > 5)
-                    name.split(SPACES).joinToString("") { if (SHORT.matches(it)) it else it.take(1).uppercase() }.take(6)
-                else name.replace(SPACES, "")
-                var h = 0
-                for (ch in title) h = (h shl 5) - h + ch.code
-                val rgb = (h and 0xFFFFFF)
-                val r = rgb shr 16 and 0xFF
-                val g = rgb shr 8 and 0xFF
-                val b = rgb and 0xFF
-                val fg = if (r * 0.299 + g * 0.587 + b * 0.114 > 186) Color.BLACK else Color.WHITE
-                Stub(text.ifEmpty { "?" }, Color.rgb(r, g, b), fg)
-            }
-        }
+    /** Номер канала крупно по центру подложки */
+    private fun drawNumber(c: Canvas, ch: Channel, l: Float, t: Float, r: Float, b: Float) {
+        val h = b - t
+        val text = if (ch.num > 0) ch.num.toString() else ch.name.take(2).uppercase()
+        numPaint.color = U.wa(0.75f)
+        numPaint.textSize = minOf(h * (if (text.length > 3) 0.36f else 0.46f), (r - l) * 0.8f / maxOf(1, text.length) * 1.6f)
+        val tw = numPaint.measureText(text)
+        c.drawText(text, (l + r - tw) / 2, (t + b) / 2 - (numPaint.descent() + numPaint.ascent()) / 2, numPaint)
     }
 
-    private class StubDrawable(val stub: Stub) : android.graphics.drawable.Drawable() {
+    /** Бейдж номера в левом верхнем углу подложки высотой [h] (угол — как у подложки) */
+    private val badgeBg = Color.argb(240, 12, 13, 14)
+    private val badgePaint = U.paint(1f, Color.WHITE, bold = true)
+
+    private fun drawBadge(c: Canvas, num: Int, l: Float, t: Float, h: Float, radius: Float) {
+        val text = num.toString()
+        badgePaint.textSize = maxOf(U.px(0.65f), h * 0.26f)
+        val bh = badgePaint.textSize * 1.35f
+        val bw = maxOf(bh * 1.15f, badgePaint.measureText(text) + badgePaint.textSize * 0.8f)
+        U.roundRect(c, l, t, l + bw, t + bh, radius, badgeBg)
+        c.drawText(text, l + (bw - badgePaint.measureText(text)) / 2, t + bh / 2 - (badgePaint.descent() + badgePaint.ascent()) / 2, badgePaint)
+    }
+
+    /** Логотип для ImageView: перерисовывается, когда битмап загрузится */
+    private class LogoDrawable(private val view: ImageView, private val ch: Channel, private val badge: Boolean) : android.graphics.drawable.Drawable() {
         override fun draw(canvas: Canvas) {
             val r = bounds
-            stub.draw(canvas, r.left.toFloat(), r.top.toFloat() + r.height() * 0.1f, r.right.toFloat(), r.bottom.toFloat() - r.height() * 0.1f)
+            draw(canvas, view.context, ch, r.left.toFloat(), r.top.toFloat(), r.right.toFloat(), r.bottom.toFloat(), badge = badge) {
+                if (view.tag === ch) invalidateSelf()
+            }
         }
 
         override fun setAlpha(alpha: Int) {}

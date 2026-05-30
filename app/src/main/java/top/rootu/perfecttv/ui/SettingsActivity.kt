@@ -128,6 +128,9 @@ class SettingsActivity : Activity() {
         item(col, L.t("Напоминать о передаче"), if (Prefs.remindBefore == 0) L.t("Когда начнётся") else L.f("За %s мин", Prefs.remindBefore)) {
             Prefs.remindBefore = cycle(listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore); showMain()
         }
+        item(col, L.t("Номер канала"), NUMBER_MODES[Prefs.numberMode.coerceIn(0, 2)].let { L.t(it) }, L.t("без логотипа номер всегда на плашке вместо него")) {
+            Prefs.numberMode = (Prefs.numberMode + 1) % 3; showMain()
+        }
         item(col, L.t("Скрывать инфопанель через"), L.f("%s с", Prefs.infoHide)) {
             Prefs.infoHide = cycle(listOf(3, 5, 7, 10), Prefs.infoHide); showMain()
         }
@@ -422,6 +425,7 @@ class SettingsActivity : Activity() {
     companion object {
         const val EXTRA_FIRST = "first"
         const val PICK_FILE = 10
+        val NUMBER_MODES = listOf("Не показывать", "Рядом с названием", "Бейдж на логотипе")
         const val PICK_PERMISSION = 11
         val PIN_INPUTS = listOf(L.t("Кольцо (как Fire TV)"), L.t("Ряды (как Google)"), L.t("Клавиатура"))
     }

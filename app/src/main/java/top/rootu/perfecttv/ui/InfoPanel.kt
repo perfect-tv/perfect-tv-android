@@ -58,11 +58,8 @@ class InfoPanel(context: Context) {
         setPadding(U.pxi(1.2f), U.pxi(1f), U.pxi(1.5f), U.pxi(1f))
         visibility = View.GONE
     }
-    private val logo = ImageView(context).apply {
-        background = U.bg(U.FILL_SOFT, U.RADIUS)
-        scaleType = ImageView.ScaleType.FIT_CENTER
-        setPadding(U.pxi(0.5f), U.pxi(0.5f), U.pxi(0.5f), U.pxi(0.5f))
-    }
+    // подложку, отступ и бейдж номера рисует сам логотип (Logos)
+    private val logo = ImageView(context)
     private val chName = U.text(context, 1.1f, 0.75f)
     private val badges = U.text(context, 0.85f)
     private val clock = U.text(context, 1.25f, 0.9f)
@@ -142,7 +139,7 @@ class InfoPanel(context: Context) {
             channel = ch
             Logos.into(logo, ch)
         }
-        set(chName, "${ch.num}. ${ch.name}")
+        set(chName, ch.title())
         set(clock, Fmt.hhmm(Clock.now()))
         set(badges, badgesOf(m))
         val p = m.program
@@ -207,12 +204,15 @@ class InfoPanel(context: Context) {
                     bannerUrl = image
                     banner.scaleType = ImageView.ScaleType.CENTER_CROP
                     banner.setPadding(0, 0, 0, 0)
+                    banner.background = U.bg(U.FILL_SOFT, U.RADIUS)
                     Logos.banner(banner, image)
                 }
             } else if (ch != null) {
                 bannerUrl = null
                 banner.scaleType = ImageView.ScaleType.FIT_CENTER
-                banner.setPadding(U.pxi(3f), U.pxi(2f), U.pxi(3f), U.pxi(2f))
+                // логотип со своей подложкой на всю область баннера
+                banner.setPadding(0, 0, 0, 0)
+                banner.background = null
                 Logos.into(banner, ch)
             }
         }
