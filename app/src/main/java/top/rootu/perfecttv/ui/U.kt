@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -24,9 +25,15 @@ object U {
     var em = 13.3f
         private set
 
+    /** Сенсорное устройство, но не ТВ: показываем кнопки в инфопанели и ✕ в гиде (как плагин) */
+    var touch = false
+        private set
+
     fun init(context: Context) {
         val dm = context.resources.displayMetrics
         em = minOf(dm.heightPixels, dm.widthPixels * 9 / 16) / 54f
+        val tvMode = (context.getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        touch = !tvMode && context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
     }
 
     fun px(e: Float) = e * em
@@ -105,8 +112,8 @@ object U {
 
 /** Форматирование времени (порт core/time.js плагина) */
 object Fmt {
-    private val WEEK = arrayOf("Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб")
-    private val MONTH = arrayOf("янв.", "февр.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сент.", "окт.", "нояб.", "дек.")
+    private val WEEK = arrayOf(L.t("Вс"), L.t("Пн"), L.t("Вт"), L.t("Ср"), L.t("Чт"), L.t("Пт"), L.t("Сб"))
+    private val MONTH = arrayOf(L.t("янв."), L.t("февр."), L.t("мар."), L.t("апр."), L.t("мая"), L.t("июн."), L.t("июл."), L.t("авг."), L.t("сент."), L.t("окт."), L.t("нояб."), L.t("дек."))
     private val cal = Calendar.getInstance()
 
     private fun at(sec: Long): Calendar {
@@ -138,9 +145,9 @@ object Fmt {
     fun dayLabel(sec: Long): String {
         val diff = dayIndex(sec) - dayIndex(Clock.now())
         return when (diff) {
-            0L -> "Сегодня"
-            -1L -> "Вчера"
-            1L -> "Завтра"
+            0L -> L.t("Сегодня")
+            -1L -> L.t("Вчера")
+            1L -> L.t("Завтра")
             else -> {
                 val c = at(sec)
                 WEEK[c.get(Calendar.DAY_OF_WEEK) - 1] + ", " + pad2(c.get(Calendar.DAY_OF_MONTH)) + "." + pad2(c.get(Calendar.MONTH) + 1)
@@ -177,9 +184,9 @@ object Fmt {
         val h = sec % 86400 / 3600
         val m = (sec % 3600 + 59) / 60
         val out = ArrayList<String>()
-        if (d > 0) out.add("${d}д")
-        if (h > 0) out.add("${h}ч")
-        if (m > 0 || out.isEmpty()) out.add("${m}м")
+        if (d > 0) out.add(L.f("%sд", d))
+        if (h > 0) out.add(L.f("%sч", h))
+        if (m > 0 || out.isEmpty()) out.add(L.f("%sм", m))
         return out.joinToString(" ")
     }
 }

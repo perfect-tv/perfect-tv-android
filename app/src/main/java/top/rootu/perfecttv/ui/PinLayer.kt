@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -42,7 +43,7 @@ class PinLayer(
     private var high = false                   // RING: раскладка 5–9
     private var row = 0                        // ROWS: ряд 0..2
     private var padIndex = 4                   // PAD: кнопка в фокусе («5»)
-    private val padKeys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "Готово")
+    private val padKeys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", L.t("Готово"))
     private val padViews = ArrayList<TextView>()
     private val dots = Dots(context)
     private val hint = U.text(context, 1f, 0.65f).apply { gravity = Gravity.CENTER }
@@ -75,15 +76,15 @@ class PinLayer(
             }
         } else {
             col.addView(wheel, LinearLayout.LayoutParams(-1, U.pxi(13f)).apply { topMargin = U.pxi(0.8f) })
-            if (style == Style.ROWS) help.text = "↑/↓ — другой ряд, на 7·8·9 ↓ — 0\n«Назад» — стереть"
+            if (style == Style.ROWS) help.text = L.t("↑/↓ — другой ряд, на 7·8·9 ↓ — 0\n«Назад» — стереть")
         }
         col.addView(help, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.6f) })
         box.addView(col)
         hint.text = when {
-            mode == Mode.CREATE -> "Придумайте PIN из 4–6 цифр"
-            else -> "Введите PIN"
+            mode == Mode.CREATE -> L.t("Придумайте PIN из 4–6 цифр")
+            else -> L.t("Введите PIN")
         }
-        if (mode == Mode.CREATE) help.text = "«Готово» — когда набрали; «Назад» — стереть"
+        if (mode == Mode.CREATE) help.text = L.t("«Готово» — когда набрали; «Назад» — стереть")
         render()
     }
 
@@ -93,18 +94,18 @@ class PinLayer(
             v.background = U.bg(if (i == padIndex) U.WHITE else U.FILL_BTN, U.RADIUS_S)
             v.setTextColor(if (i == padIndex) U.BLACK else U.WHITE)
         }
-        if (style == Style.RING) help.text = "«Меню» или удерж. OK — цифры " + (if (high) "0–4" else "5–9") + "\n«Назад» — стереть"
+        if (style == Style.RING) help.text = L.t("«Меню» или удерж. OK — цифры ") + (if (high) "0–4" else "5–9") + L.t("\n«Назад» — стереть")
         wheel.invalidate()
     }
 
     private fun digit(d: Int) {
         if (buf.length >= MAX) return
         buf += d
-        hint.text = if (mode == Mode.CREATE) (if (first == null) "Придумайте PIN из 4–6 цифр" else "Повторите PIN") else "Введите PIN"
+        hint.text = if (mode == Mode.CREATE) (if (first == null) L.t("Придумайте PIN из 4–6 цифр") else L.t("Повторите PIN")) else L.t("Введите PIN")
         render()
         if (mode == Mode.CHECK) {
             if (buf == Prefs.pin) return onDone(buf)
-            if (buf.length >= MAX) fail("Неверный PIN")
+            if (buf.length >= MAX) fail(L.t("Неверный PIN"))
         }
     }
 
@@ -116,12 +117,12 @@ class PinLayer(
 
     /** CREATE: «Готово» */
     private fun confirm() {
-        if (buf.length < MIN) return fail("Нужно от $MIN до $MAX цифр")
+        if (buf.length < MIN) return fail(L.f("Нужно от %s до %s цифр", MIN, MAX))
         val f = first
         if (f == null) {
             first = buf
             buf = ""
-            hint.text = "Повторите PIN"
+            hint.text = L.t("Повторите PIN")
             return render()
         }
         if (f == buf) {
@@ -129,13 +130,13 @@ class PinLayer(
             return onDone(buf)
         }
         first = null
-        fail("Не совпало — придумайте PIN заново")
+        fail(L.t("Не совпало — придумайте PIN заново"))
     }
 
     private fun padPress(k: String) {
         when (k) {
             "⌫" -> { buf = buf.dropLast(1); render() }
-            "Готово" -> if (mode == Mode.CREATE) confirm() else if (buf.isNotEmpty()) fail("Неверный PIN")
+            L.t("Готово") -> if (mode == Mode.CREATE) confirm() else if (buf.isNotEmpty()) fail(L.t("Неверный PIN"))
             else -> digit(k.toInt())
         }
     }

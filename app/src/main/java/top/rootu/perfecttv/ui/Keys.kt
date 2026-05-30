@@ -14,9 +14,23 @@ import android.view.KeyEvent
  * для них игнорируется. Автоповтор ←/→ передаётся слою как есть (перемотка считает его сама).
  * OK: короткое — enter() на keyup, долгое (800 мс, как в Lampa) — long().
  */
-class Keys(private val handler: () -> Layer?) {
+class Keys(
+    private val handler: () -> Layer?,
+    private val main: Scheduler = MainScheduler(),
+    private val clock: () -> Long = { SystemClock.uptimeMillis() }
+) {
 
-    private val main = Handler(Looper.getMainLooper())
+    /** Таймеры (в тестах — поддельные) */
+    interface Scheduler {
+        fun postDelayed(r: Runnable, ms: Long)
+        fun removeCallbacks(r: Runnable)
+    }
+
+    class MainScheduler : Scheduler {
+        private val h = Handler(Looper.getMainLooper())
+        override fun postDelayed(r: Runnable, ms: Long) { h.postDelayed(r, ms) }
+        override fun removeCallbacks(r: Runnable) = h.removeCallbacks(r)
+    }
 
     private class Held(val name: String, val layer: Layer) {
         var fired = false
@@ -26,30 +40,34 @@ class Keys(private val handler: () -> Layer?) {
     private var heldTimer: Runnable? = null
     private var repeat: Repeat? = null
 
-    private class Repeat(val name: String, val layer: Layer, val since: Long) {
-        var last = SystemClock.uptimeMillis()
+    private class Repeat(val name: String, val layer: Layer, val since: Long, var last: Long) {
         var timer: Runnable? = null
     }
 
-    /** @return true — клавиша наша */
-    fun onKeyDown(code: Int, e: KeyEvent): Boolean {
+    fun onKeyDown(code: Int, e: KeyEvent): Boolean = onKeyDown(code, e.repeatCount)
+
+    /**
+     * @param repeatCount 0 — нажатие, больше — автоповтор системы
+     * @return true — клавиша наша
+     */
+    fun onKeyDown(code: Int, repeatCount: Int): Boolean {
         digit(code)?.let { d ->
-            if (e.repeatCount == 0) handler()?.key("digit", false, d)
+            if (repeatCount == 0) handler()?.key("digit", false, d)
             return true
         }
         if (isOk(code)) {
-            if (e.repeatCount > 0) return true
+            if (repeatCount > 0) return true
             val layer = handler() ?: return true
             startHeld("ok", layer, OK_LONG_PRESS)
             return true
         }
         if (isBack(code)) {
-            if (e.repeatCount == 0) handler()?.back()
+            if (repeatCount == 0) handler()?.back()
             return true
         }
         media(code)?.let { m ->
             // автоповтор ⏪/⏩ — удержание перемотки
-            if (e.repeatCount == 0 || m == "rewind" || m == "forward") handler()?.media(m)
+            if (repeatCount == 0 || m == "rewind" || m == "forward") handler()?.media(m)
             return true
         }
         val name = NAMES[code] ?: return false
@@ -57,22 +75,22 @@ class Keys(private val handler: () -> Layer?) {
         val h = held
         if (h != null && h.name == name) return true
         if (layer.hasLong(name)) {
-            if (e.repeatCount > 0) return true
+            if (repeatCount > 0) return true
             startHeld(name, layer, LONG_PRESS)
             return true
         }
         if (!layer.holdRepeat) {
-            if (e.repeatCount == 0) { release(); layer.key(name, false, 0) }
+            if (repeatCount == 0) { release(); layer.key(name, false, 0) }
             return true
         }
         val r = repeat
         if (r != null && r.name == name) {
-            r.last = SystemClock.uptimeMillis()
+            r.last = clock()
             return true
         }
         release()
         layer.key(name, false, 0)
-        if ((name == "up" || name == "down") && e.repeatCount == 0) startRepeat(name, layer)
+        if ((name == "up" || name == "down") && repeatCount == 0) startRepeat(name, layer)
         return true
     }
 
@@ -109,16 +127,16 @@ class Keys(private val handler: () -> Layer?) {
     }
 
     private fun startRepeat(name: String, layer: Layer) {
-        val rep = Repeat(name, layer, SystemClock.uptimeMillis() + Hold.DELAY)
+        val rep = Repeat(name, layer, clock() + Hold.DELAY, clock())
         repeat = rep
         val tick = object : Runnable {
             override fun run() {
                 if (repeat !== rep) return
-                val t = SystemClock.uptimeMillis()
+                val t = clock()
                 if (t - rep.last > Hold.GAP || handler() !== layer) return stopRepeat()
                 layer.key(name, false, 0)
                 val k = minOf(1f, (t - rep.since).toFloat() / Hold.RAMP)
-                val spent = SystemClock.uptimeMillis() - t
+                val spent = clock() - t
                 main.postDelayed(this, maxOf(16L, (Hold.START - (Hold.START - Hold.MIN) * k).toLong() - spent))
             }
         }

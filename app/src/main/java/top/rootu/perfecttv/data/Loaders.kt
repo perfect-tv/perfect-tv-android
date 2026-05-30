@@ -14,14 +14,22 @@ import java.io.InputStream
  * интерфейс видит их сразу (WAL), файл целиком в памяти не бывает.
  * Вызывать в фоновом потоке (см. [Repo]).
  */
-class Loaders(private val db: Db, private val maxArchiveDays: () -> Int) {
+class Loaders(private val db: Db, private val resolver: android.content.ContentResolver, private val maxArchiveDays: () -> Int) {
 
     class LoadError(val code: String, message: String) : IOException(message)
 
     private class Source(val input: InputStream, val length: Long, val etag: String, val lastModified: String, val notModified: Boolean, val close: () -> Unit)
 
-    /** URL или локальный файл (file://, абсолютный путь) */
+    /** URL, файл из системного выбора (content://) или локальный файл (file://, абсолютный путь) */
     private fun open(url: String, etag: String, lastModified: String): Source {
+        if (url.startsWith("content://")) {
+            val input = try {
+                resolver.openInputStream(android.net.Uri.parse(url))
+            } catch (e: Exception) {
+                null
+            } ?: throw LoadError("no_url", "файл недоступен (нет доступа или удалён)")
+            return Source(input, -1, "", "", false) { input.close() }
+        }
         if (url.startsWith("file://") || url.startsWith("/")) {
             val f = File(url.removePrefix("file://"))
             if (!f.exists()) throw LoadError("no_url", "нет файла $url")

@@ -421,19 +421,17 @@ class ScheduleLayer(
             }
         }
 
-        @SuppressLint("ClickableViewAccessibility")
-        override fun onTouchEvent(e: MotionEvent): Boolean {
-            if (e.action != MotionEvent.ACTION_UP) return true
-            if (e.x < viewsW) {
-                val k = ((e.y - 0.4f * em) / (3.9f * em)).toInt()
+        private fun tap(ex: Float, ey: Float) {
+            if (ex < viewsW) {
+                val k = ((ey - 0.4f * em) / (3.9f * em)).toInt()
                 switchView(k)
-                return true
+                return
             }
-            if (e.x > width - tabsW) return true
+            if (ex > width - tabsW) return
             var y = -scrollY0
             for (i in rows.indices) {
                 val rh = h(rows[i])
-                if (e.y >= y && e.y < y + rh) {
+                if (ey >= y && ey < y + rh) {
                     if (!rows[i].separator) {
                         index = i
                         zone = Zone.LIST
@@ -444,6 +442,30 @@ class ScheduleLayer(
                 }
                 y += rh
             }
+        }
+
+        // тап — выбрать, перетаскивание и колесо — прокрутка списка (фокус не двигается)
+        private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onSingleTapUp(e: MotionEvent): Boolean { tap(e.x, e.y); return true }
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                scrollBy(dy)
+                return true
+            }
+        })
+
+        private fun scrollBy(dy: Float) {
+            target = (target + dy).coerceIn(0f, maxOf(0f, total() - height))
+            scrollY0 = target
+            invalidate()
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(e: MotionEvent) = gestures.onTouchEvent(e)
+
+        override fun onGenericMotionEvent(e: MotionEvent): Boolean {
+            if (e.action != MotionEvent.ACTION_SCROLL) return super.onGenericMotionEvent(e)
+            scrollBy(-e.getAxisValue(MotionEvent.AXIS_VSCROLL) * rowH * 2)
             return true
         }
     }

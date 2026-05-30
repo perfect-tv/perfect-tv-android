@@ -72,6 +72,34 @@ object Prefs {
         get() = int("pin_input", 2)
         set(v) = sp.edit().putInt("pin_input", v).apply()
 
+    /** Ключ TMDB (v3 api_key или v4 токен); пусто — описания и баннеры только из EPG */
+    var tmdbKey: String
+        get() = sp.getString("tmdb_key", "") ?: ""
+        set(v) = sp.edit().putString("tmdb_key", v.trim()).apply()
+
+    /** Адрес API TMDB (можно заменить прокси) */
+    var tmdbApi: String
+        get() = sp.getString("tmdb_api", "")?.takeIf { it.isNotBlank() } ?: TMDB_API
+        set(v) = sp.edit().putString("tmdb_api", v.trim()).apply()
+
+    /** Адрес картинок TMDB */
+    var tmdbImages: String
+        get() = sp.getString("tmdb_images", "")?.takeIf { it.isNotBlank() } ?: TMDB_IMAGES
+        set(v) = sp.edit().putString("tmdb_images", v.trim()).apply()
+
+    const val TMDB_API = "https://api.themoviedb.org/3"
+    const val TMDB_IMAGES = "https://image.tmdb.org"
+
+    /** При запуске — сразу последний канал (иначе — гид на нём) */
+    var autoplayLast: Boolean
+        get() = bool("autoplay_last", true)
+        set(v) = sp.edit().putBoolean("autoplay_last", v).apply()
+
+    /** Язык интерфейса: "" — системный, "ru", "en" */
+    var language: String
+        get() = sp.getString("language", "") ?: ""
+        set(v) = sp.edit().putString("language", v).apply()
+
     var lastPlaylist: Long
         get() = sp.getLong("last_playlist", 0)
         set(v) = sp.edit().putLong("last_playlist", v).apply()

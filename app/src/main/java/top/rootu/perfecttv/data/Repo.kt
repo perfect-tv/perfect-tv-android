@@ -18,7 +18,7 @@ import java.util.concurrent.Executors
 class Repo(context: Context) {
     val db = Db(context)
     val reminders = Reminders(db)
-    private val loaders = Loaders(db) { maxOf(Prefs.archiveDays, maxArchiveDays) }
+    private val loaders = Loaders(db, context.contentResolver) { maxOf(Prefs.archiveDays, maxArchiveDays) }
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "loader").apply { priority = Thread.MIN_PRIORITY } }
     private val main = Handler(Looper.getMainLooper())
 
@@ -68,6 +68,34 @@ class Repo(context: Context) {
         db.writableDatabase.update("playlist", ContentValues().apply {
             put("name", name); put("url", url.trim()); put("epg_mode", epgMode); put("user_epg", userEpg.joinToString("\n"))
         }, "id=?", arrayOf(id.toString()))
+    }
+
+    /** Сдвинуть плейлист в списке (dir −1 — выше, +1 — ниже) */
+    fun movePlaylist(id: Long, dir: Int) {
+        val list = playlists().toMutableList()
+        val i = list.indexOfFirst { it.id == id }
+        val j = i + dir
+        if (i < 0 || j < 0 || j >= list.size) return
+        val t = list[i]; list[i] = list[j]; list[j] = t
+        db.writableDatabase.tx {
+            list.forEachIndexed { k, p -> execSQL("UPDATE playlist SET sort=? WHERE id=?", arrayOf<Any>(k, p.id)) }
+        }
+    }
+
+    /** Скрытое всех плейлистов: (плейлист, kind, key, title) */
+    fun allHidden(): List<HiddenItem> {
+        val names = playlists().associate { it.id to it.name }
+        val out = ArrayList<HiddenItem>()
+        db.readableDatabase.rawQuery("SELECT playlist_id, kind, key, title FROM hidden ORDER BY playlist_id, kind, title", null).use {
+            while (it.moveToNext()) out.add(HiddenItem(it.getLong(0), names[it.getLong(0)] ?: "", it.getString(1), it.getString(2), it.getString(3)))
+        }
+        return out
+    }
+
+    class HiddenItem(val playlistId: Long, val playlistName: String, val kind: String, val key: String, val title: String)
+
+    fun resetAllScores() {
+        db.writableDatabase.delete("score", null, null)
     }
 
     fun deletePlaylist(id: Long) {

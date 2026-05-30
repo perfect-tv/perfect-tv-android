@@ -39,7 +39,7 @@ object Alarms {
         val rem = App.repo.reminders
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Напоминания о передачах", NotificationManager.IMPORTANCE_HIGH))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, L.t("Напоминания о передачах"), NotificationManager.IMPORTANCE_HIGH))
         }
         rem.onDue = { r ->
             val open = Intent(context, TvActivity::class.java).putExtra(EXTRA_REMINDER, r.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -49,7 +49,7 @@ object Alarms {
             val b = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(context, CHANNEL) else android.app.Notification.Builder(context)
             val n = b.setSmallIcon(R.drawable.ic_remind)
                 .setContentTitle(r.title)
-                .setContentText(r.chName + " · " + if (started) "уже идёт" else "в " + top.rootu.perfecttv.ui.Fmt.hhmm(r.start))
+                .setContentText(r.chName + " · " + if (started) L.t("уже идёт") else L.t("в ") + top.rootu.perfecttv.ui.Fmt.hhmm(r.start))
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setCategory(android.app.Notification.CATEGORY_REMINDER)

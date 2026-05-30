@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -88,8 +89,16 @@ class TvActivity : Activity() {
         }
     }
 
+    // язык, с которым построен экран: сменили в настройках — пересоздать
+    private var builtEn = L.en
+
     override fun onStart() {
         super.onStart()
+        if (builtEn != L.en) {
+            builtEn = L.en
+            recreate()
+            return
+        }
         val t = tv ?: return
         val list = App.repo.playlists()
         if (list.isEmpty()) {
@@ -102,7 +111,10 @@ class TvActivity : Activity() {
             // вернулись из настроек: плейлист мог измениться
             val fresh = App.repo.playlist(p.id)
             if (fresh != null && (fresh.url != t.playlist?.url || fresh.epgUrls() != t.playlist?.epgUrls())) t.switchPlaylist(fresh)
-            else t.state.channel?.let { if (playback?.player?.isPlaying != true) t.playChannel(it, t.state.groupKey, reload = true) }
+            else {
+                t.reloadCatalog()
+                t.state.channel?.let { if (playback?.player?.isPlaying != true) t.playChannel(it, t.state.groupKey, reload = true) }
+            }
         }
     }
 

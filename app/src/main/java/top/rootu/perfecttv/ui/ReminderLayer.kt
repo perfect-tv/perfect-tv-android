@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.content.Context
 import android.view.Gravity
 import android.widget.ImageView
@@ -67,9 +68,9 @@ class ReminderLayer(
         val now = Clock.now()
         val missed = r.missed(now)
         val kicker = when {
-            missed -> "Пропущено · в архиве ещё " + Fmt.until(r.start + r.archiveDays * 86400L - now)
-            r.start <= now -> "Напоминание · уже идёт"
-            else -> "Напоминание · через " + Fmt.until(r.start - now)
+            missed -> L.t("Пропущено · в архиве ещё ") + Fmt.until(r.start + r.archiveDays * 86400L - now)
+            r.start <= now -> L.t("Напоминание · уже идёт")
+            else -> L.t("Напоминание · через ") + Fmt.until(r.start - now)
         } + if (r.playlistName.isNotEmpty()) " · " + r.playlistName else ""
 
         val head = LinearLayout(ctx).apply {
@@ -88,7 +89,7 @@ class ReminderLayer(
             // счётчик и подсказка листания
             val cnt = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
             cnt.addView(U.text(ctx, 1.3f, bold = true).apply { text = "${index + 1} / ${items.size}"; gravity = Gravity.END })
-            cnt.addView(U.text(ctx, 0.85f, 0.55f).apply { text = "↑/↓ — другие"; gravity = Gravity.END })
+            cnt.addView(U.text(ctx, 0.85f, 0.55f).apply { text = L.t("↑/↓ — другие"); gravity = Gravity.END })
             head.addView(cnt, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = U.pxi(1f) })
         }
         box.addView(head)
@@ -102,15 +103,15 @@ class ReminderLayer(
 
         val list = ArrayList<Pair<String, String>>()
         if (missed) {
-            list.add("Смотреть из архива" to "archive")
-            list.add("Позже" to "later")
-            list.add("Удалить" to "close")
+            list.add(L.t("Смотреть из архива") to "archive")
+            list.add(L.t("Позже") to "later")
+            list.add(L.t("Удалить") to "close")
         } else {
-            list.add("Смотреть" to "watch")
-            list.add("Отложить на 5 мин" to "snooze")
-            list.add("Закрыть" to "close")
+            list.add(L.t("Смотреть") to "watch")
+            list.add(L.t("Отложить на 5 мин") to "snooze")
+            list.add(L.t("Закрыть") to "close")
         }
-        if (items.size > 1) list.add("Закрыть все" to "close_all")
+        if (items.size > 1) list.add(L.t("Закрыть все") to "close_all")
         buttons = list
         button = button.coerceIn(0, list.size - 1)
         val bar = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(1.4f)) }

@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -268,7 +269,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             drawHead(c, now)
             val list = channels
             if (list.isEmpty()) {
-                U.drawText(c, if (tv.catalog?.channels?.isEmpty() != false) "Каналы загружаются…" else "Нет каналов", padX + em, bodyTop + 2 * em, width - 2 * padX, pEmpty)
+                U.drawText(c, if (tv.catalog?.channels?.isEmpty() != false) L.t("Каналы загружаются…") else L.t("Нет каналов"), padX + em, bodyTop + 2 * em, width - 2 * padX, pEmpty)
                 return
             }
             val rows = visibleRows()
@@ -302,7 +303,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val cell = Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
             U.drawText(c, "${ch.num}. ${ch.name}", x, t + 0.7f * em, w, pChannel)
-            U.drawText(c, p?.title ?: "Нет программы", x, t + 2.3f * em, w, pTitle)
+            U.drawText(c, p?.title ?: L.t("Нет программы"), x, t + 2.3f * em, w, pTitle)
             U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 3.9f * em, w, pTime)
             val desc = p?.desc ?: ""
             if (desc.isNotEmpty()) {
@@ -318,9 +319,12 @@ class GuideLayer(private val tv: Tv) : Layer {
                 c.restore()
             }
             val clock = Fmt.hhmm(now)
-            c.drawText(clock, width - padX - pClock.measureText(clock), t + 1.4f * em, pClock)
+            // на сенсорных (не ТВ) — ✕ закрыть, часы левее
+            val closeW = if (U.touch) 2.6f * em else 0f
+            if (U.touch) c.drawText("✕", width - padX - pClock.measureText("✕"), t + 1.4f * em, pClock)
+            c.drawText(clock, width - padX - closeW - pClock.measureText(clock), t + 1.4f * em, pClock)
             if (tv.repo.epgLoading()) {
-                val s = "Программа загружается…"
+                val s = L.t("Программа загружается…")
                 c.drawText(s, width - padX - pCount.measureText(s), t + 2.8f * em, pCount)
             }
         }
@@ -387,7 +391,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 U.drawText(c, ch.name, x, y + 1.05f * em, r - x - 0.8f * em - iw, pn)
                 val p = tv.repo.at(ch, now)
                 pCellTime.color = if (chFocus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, p?.title ?: "Нет программы", x, y + 2.05f * em, r - x - 0.8f * em, pCellTime)
+                U.drawText(c, p?.title ?: L.t("Нет программы"), x, y + 2.05f * em, r - x - 0.8f * em, pCellTime)
                 if (p != null) {
                     val bw = r - x - 0.8f * em
                     U.roundRect(c, x, y + 2.6f * em, x + bw, y + 2.8f * em, 0.1f * em, if (chFocus) 0x33000000 else U.FILL_MARKED)
@@ -441,7 +445,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             var y = bodyTop
             val list = tv.repo.programmes(ch).filter { it.stop > now }.take(visibleRows() + 2)
             if (list.isEmpty()) {
-                U.drawText(c, "Нет программы", l, y + rowH / 2, r - l, pEmpty)
+                U.drawText(c, L.t("Нет программы"), l, y + rowH / 2, r - l, pEmpty)
                 return
             }
             for (p in list) {
@@ -456,27 +460,110 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
         }
 
-        @SuppressLint("ClickableViewAccessibility")
-        override fun onTouchEvent(e: MotionEvent): Boolean {
-            if (e.action != MotionEvent.ACTION_UP) return true
-            val y = e.y
-            if (y < bodyTop) return true
+        // ---------------------------------------------------------- тач и мышь
+
+        private fun rowAt(y: Float): Int {
             val rows = visibleRows()
-            var first = index - rows / 2
-            first = first.coerceIn(0, maxOf(0, channels.size - rows))
-            val i = first + ((y - bodyTop) / (rowH + gap)).toInt()
-            if (i !in channels.indices) return true
+            val first = (index - rows / 2).coerceIn(0, maxOf(0, channels.size - rows))
+            return first + ((y - bodyTop) / (rowH + gap)).toInt()
+        }
+
+        private val gridL get() = padX + chW + gap
+
+        /** Тап: ‹ › — категория, ✕ — закрыть, канал — смотреть, передача — карточка */
+        private fun tap(x: Float, y: Float) {
+            val headY = padTop + topH + em
+            if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
+            if (y in headY..headY + headH && x < padX + chW) {
+                if (x < padX + 3 * em) changeGroup(-1) else if (x > padX + chW - 3 * em) changeGroup(1)
+                return
+            }
+            if (y < bodyTop) return
+            val i = rowAt(y)
+            if (i !in channels.indices) return
             index = i
-            if (e.x < padX + chW || !grid) {
+            if (x < gridL || !grid) {
                 zone = Zone.CHANNELS
                 enter()
             } else {
                 zone = Zone.GRID
                 live = false
-                val gl = padX + chW + gap
-                focusTime = winStart + ((e.x - gl) / (width - padX - gl) * SPAN).toLong()
+                focusTime = winStart + ((x - gridL) / (width - padX - gridL) * SPAN).toLong()
                 enter()
             }
+            invalidate()
+        }
+
+        private var dragY = 0f
+        private var dragX = 0f
+
+        private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                dragY = 0f
+                dragX = 0f
+                return true
+            }
+
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                tap(e.x, e.y)
+                return true
+            }
+
+            override fun onLongPress(e: MotionEvent) {
+                if (e.y < bodyTop) return
+                val i = rowAt(e.y)
+                if (i !in channels.indices) return
+                index = i
+                invalidate()
+                long()
+            }
+
+            // вертикально — каналы (по строке за высоту строки), горизонтально в сетке — время
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                dragY += dy
+                val step = rowH + gap
+                while (dragY > step) { dragY -= step; moveClamped(1) }
+                while (dragY < -step) { dragY += step; moveClamped(-1) }
+                if (grid && (e1?.x ?: 0f) > gridL) {
+                    dragX += dx
+                    val sec = (dragX / (width - padX - gridL) * SPAN).toLong()
+                    if (Math.abs(sec) >= 60) {
+                        live = false
+                        winStart += sec
+                        dragX = 0f
+                    }
+                }
+                invalidate()
+                return true
+            }
+        })
+
+        private fun moveClamped(d: Int) {
+            index = (index + d).coerceIn(0, maxOf(0, channels.size - 1))
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            // правый клик мышью — меню канала
+            if (e.action == MotionEvent.ACTION_DOWN && e.buttonState and MotionEvent.BUTTON_SECONDARY != 0 && e.y >= bodyTop) {
+                val i = rowAt(e.y)
+                if (i in channels.indices) { index = i; invalidate(); long() }
+                return true
+            }
+            return gestures.onTouchEvent(e)
+        }
+
+        /** Колесо мыши: каналы; с Shift — время сетки */
+        override fun onGenericMotionEvent(e: MotionEvent): Boolean {
+            if (e.action != MotionEvent.ACTION_SCROLL) return super.onGenericMotionEvent(e)
+            val v = e.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            val h = e.getAxisValue(MotionEvent.AXIS_HSCROLL)
+            if (e.metaState and android.view.KeyEvent.META_SHIFT_ON != 0 || h != 0f) {
+                if (grid) {
+                    live = false
+                    winStart += (if ((if (h != 0f) h else v) > 0) -1 else 1) * Cells.SLOT
+                }
+            } else if (v != 0f) moveClamped(if (v > 0) -1 else 1)
             invalidate()
             return true
         }

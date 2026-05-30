@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.content.Context
 import android.graphics.Canvas
 import android.os.Handler
@@ -46,6 +47,8 @@ class InfoPanel(context: Context) {
     var more = false
         private set
     var onHide: (() -> Unit)? = null
+    /** Кнопки панели на сенсорных устройствах: prev, pause, next, more, guide, menu, history */
+    var onAction: ((String) -> Unit)? = null
 
     private var channel: Channel? = null
 
@@ -68,7 +71,13 @@ class InfoPanel(context: Context) {
     private val timeEnd = U.text(context, 0.95f, 0.7f)
     private val bar = Bar(context)
     private val next = U.text(context, 1f, 0.65f)
-    private val moreBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val moreBox = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+    private val moreBody = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val banner = ImageView(context).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        background = U.bg(U.FILL_SOFT, U.RADIUS)
+        clipToOutline = true
+    }
     private val moreTitle = U.text(context, 1.2f, bold = true, lines = 2)
     private val moreTags = U.text(context, 0.95f, 0.6f)
     private val moreText = U.text(context, 1f, 0.8f, lines = 7)
@@ -89,13 +98,30 @@ class InfoPanel(context: Context) {
         prog.addView(timeEnd, LinearLayout.LayoutParams(-2, -2))
         body.addView(prog, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.5f) })
         body.addView(next, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.45f) })
+        if (U.touch) {
+            // тач (не ТВ): кнопки под «Далее», как в плагине
+            val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+            for ((label, a) in listOf("◀" to "prev", "❚❚" to "pause", "▶" to "next", L.t("О передаче") to "more", L.t("Гид") to "guide", L.t("Меню") to "menu", L.t("Недавние") to "history")) {
+                bar.addView(U.text(context, 1f).apply {
+                    text = label
+                    background = U.bg(U.FILL_BTN, U.RADIUS_S)
+                    setPadding(U.pxi(0.9f), U.pxi(0.45f), U.pxi(0.9f), U.pxi(0.45f))
+                    setOnClickListener { onAction?.invoke(a) }
+                }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = U.pxi(0.5f) })
+            }
+            body.addView(bar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.7f) })
+        }
         top.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
         view.addView(top)
-        moreBox.addView(moreTitle)
-        moreBox.addView(moreTags, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.3f) })
-        moreBox.addView(moreText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.5f) })
+        view.isClickable = true   // тап по панели не уходит в жесты видео
+        // баннер TMDB (или логотип канала) слева, справа — название, теги, описание
+        moreBox.addView(banner, LinearLayout.LayoutParams(U.pxi(22f), U.pxi(12.4f)).apply { rightMargin = U.pxi(1.5f) })
+        moreBody.addView(moreTitle)
+        moreBody.addView(moreTags, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.3f) })
+        moreBody.addView(moreText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.5f) })
+        moreBox.addView(moreBody, LinearLayout.LayoutParams(0, -2, 1f))
         moreText.gravity = Gravity.TOP
-        view.addView(moreBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1f); leftMargin = U.pxi(9.2f) })
+        view.addView(moreBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1f) })
         U.show(moreBox, false)
     }
 
@@ -121,7 +147,7 @@ class InfoPanel(context: Context) {
         set(badges, badgesOf(m))
         val p = m.program
         val ref = m.seek ?: m.position
-        set(title, p?.title ?: if (m.archive || m.seek != null) "Архив " + Fmt.hhmm(ref) else "Нет программы")
+        set(title, p?.title ?: if (m.archive || m.seek != null) L.t("Архив ") + Fmt.hhmm(ref) else L.t("Нет программы"))
         // шкала: передача, а без EPG — получасовой слот вокруг позиции
         val from = p?.start ?: (ref - ref % SLOT)
         val to = p?.stop ?: (from + SLOT)
@@ -136,7 +162,7 @@ class InfoPanel(context: Context) {
         } else {
             var s = ""
             if (m.archive) s = hhmmss(m.position) + " (−" + Fmt.duration(now - m.position) + ") · "
-            s += "Далее: " + (m.next?.let { Fmt.hhmm(it.start) + " " + it.title } ?: "нет программы")
+            s += L.t("Далее: ") + (m.next?.let { Fmt.hhmm(it.start) + " " + it.title } ?: L.t("нет программы"))
             set(next, s)
         }
     }
@@ -150,11 +176,11 @@ class InfoPanel(context: Context) {
             sb.setSpan(BackgroundColorSpan(bg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             sb.setSpan(ForegroundColorSpan(fg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
-        if (m.error) badge("Ошибка", U.LIVE)
+        if (m.error) badge(L.t("Ошибка"), U.LIVE)
         if (m.paused) badge("❚❚", U.FILL_ACTIVE)
-        if (m.archive) badge("Архив", U.WHITE, U.BLACK) else badge("Эфир", U.LIVE)
+        if (m.archive) badge(L.t("Архив"), U.WHITE, U.BLACK) else badge(L.t("Эфир"), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
-        if (m.channel.hasArchive) badge("⟲ ${m.channel.archiveDays} дн.", U.FILL_ACTIVE)
+        if (m.channel.hasArchive) badge("⟲ " + L.f("%s дн.", m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
     }
 
@@ -163,14 +189,32 @@ class InfoPanel(context: Context) {
         return Fmt.hhmm(sec) + ":" + (if (s < 10) "0$s" else s.toString())
     }
 
-    /** Раскрытое описание: null — свернуть */
-    fun setMore(t: String?, tags: String, text: String) {
+    private var bannerUrl: String? = null
+
+    /**
+     * Раскрытое описание: null — свернуть. [image] — баннер TMDB; пусто — логотип канала [ch]
+     * в области баннера.
+     */
+    fun setMore(t: String?, tags: String, text: String, image: String = "", ch: Channel? = null) {
         more = t != null
         if (t != null) {
             moreTitle.text = t
             moreTags.text = tags
             moreText.text = text
             U.show(moreText, text.isNotEmpty())
+            if (image.isNotEmpty()) {
+                if (bannerUrl != image) {
+                    bannerUrl = image
+                    banner.scaleType = ImageView.ScaleType.CENTER_CROP
+                    banner.setPadding(0, 0, 0, 0)
+                    Logos.banner(banner, image)
+                }
+            } else if (ch != null) {
+                bannerUrl = null
+                banner.scaleType = ImageView.ScaleType.FIT_CENTER
+                banner.setPadding(U.pxi(3f), U.pxi(2f), U.pxi(3f), U.pxi(2f))
+                Logos.into(banner, ch)
+            }
         }
         U.show(moreBox, more)
     }

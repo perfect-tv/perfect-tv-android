@@ -1,5 +1,6 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.core.L
 import android.content.Context
 import android.graphics.Canvas
 import android.view.Gravity
@@ -68,7 +69,7 @@ class ListLayer(
     private val onSelect: (Item) -> Unit,
     private val onLong: ((Item) -> Unit)? = null,
     private val onBack: () -> Unit,
-    empty: String = "Пусто",
+    empty: String = L.t("Пусто"),
     start: Int = 0
 ) : PopupLayer(context, 34f) {
 

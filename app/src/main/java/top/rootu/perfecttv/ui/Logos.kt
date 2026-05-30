@@ -67,6 +67,12 @@ object Logos {
         if (bm != null) view.setImageBitmap(bm)
     }
 
+    /** Баннер передачи (TMDB) в ImageView: без кэша битмапов для Canvas, только дисковый кэш Coil */
+    fun banner(view: ImageView, url: String) {
+        view.setImageDrawable(null)
+        loader.enqueue(ImageRequest.Builder(view.context).data(url).target(view).build())
+    }
+
     private val dst = RectF()
 
     /** Тёмная подложка логотипа на белом (строка в фокусе): белые логотипы иначе не видно */

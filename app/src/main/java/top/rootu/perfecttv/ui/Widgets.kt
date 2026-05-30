@@ -125,7 +125,14 @@ class MessageLayer(
  */
 class FormView(context: Context, title: String, hint: String) : LinearLayout(context) {
     private val fields = ArrayList<EditText>()
-    private val buttonsRow = LinearLayout(context).apply { orientation = HORIZONTAL }
+    private var buttonsRow = LinearLayout(context).apply { orientation = HORIZONTAL }
+    private var buttonRows = 0
+
+    /** Следующие кнопки — новым рядом */
+    fun newRow() {
+        if (buttonsRow.parent == null) return
+        buttonsRow = LinearLayout(context).apply { orientation = HORIZONTAL }
+    }
 
     init {
         orientation = VERTICAL
@@ -159,7 +166,7 @@ class FormView(context: Context, title: String, hint: String) : LinearLayout(con
     }
 
     fun button(title: String, onClick: () -> Unit): TextView {
-        if (buttonsRow.parent == null) addView(buttonsRow, LayoutParams(-1, -2).apply { topMargin = U.pxi(1.4f) })
+        if (buttonsRow.parent == null) addView(buttonsRow, LayoutParams(-1, -2).apply { topMargin = U.pxi(if (buttonRows++ == 0) 1.4f else 0.6f) })
         val b = U.text(context, 1.05f).apply {
             text = title
             isFocusable = true
