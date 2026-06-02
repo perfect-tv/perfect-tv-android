@@ -1,5 +1,7 @@
 package top.rootu.perfecttv.core
 
+import top.rootu.perfecttv.R
+
 import android.os.Handler
 import android.os.Looper
 import okhttp3.Request
@@ -167,7 +169,7 @@ object Tmdb {
     }
 
     private fun search(key: String, query: String, year: Int): Result? {
-        val lang = if (L.en) "en-US" else "ru-RU"
+        val lang = if (Lang.isEn) "en-US" else "ru-RU"
         val v4 = key.length > 40
         val api = Prefs.tmdbApi.trimEnd('/')
         var url = "$api/search/multi?query=" + URLEncoder.encode(query, "UTF-8") + "&language=$lang&include_adult=false"
@@ -209,15 +211,15 @@ object Tmdb {
     /** Проверка ключа из настроек: [done] в главном потоке, null — работает, иначе текст ошибки */
     fun test(done: (String?) -> Unit) {
         val key = Prefs.tmdbKey.trim()
-        if (key.isEmpty()) return done(L.t("ключ не задан"))
+        if (key.isEmpty()) return done(str(R.string.no_key))
         pool.execute {
             val err = try {
                 search(key, "Ирония судьбы", 1975)
                 null
             } catch (e: Net.HttpError) {
-                if (e.code == 401) L.t("неверный ключ") else L.f("ошибка %s", e.code)
+                if (e.code == 401) str(R.string.invalid_key) else str(R.string.error_x, e.code)
             } catch (e: Exception) {
-                L.f("нет связи: %s", e.message)
+                str(R.string.no_connection_x, e.message)
             }
             main.post { done(err) }
         }

@@ -1,6 +1,6 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.core.Lang
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -90,12 +90,13 @@ class TvActivity : Activity() {
     }
 
     // язык, с которым построен экран: сменили в настройках — пересоздать
-    private var builtEn = L.en
+    override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Lang.wrap(base))
+
+    private val builtLocale by lazy { resources.configuration.locales[0] }
 
     override fun onStart() {
         super.onStart()
-        if (builtEn != L.en) {
-            builtEn = L.en
+        if (builtLocale != Lang.locale) {
             recreate()
             return
         }

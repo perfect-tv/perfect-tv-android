@@ -1,6 +1,7 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
 import android.content.Context
 import android.graphics.Canvas
 import android.os.Handler
@@ -98,7 +99,7 @@ class InfoPanel(context: Context) {
         if (U.touch) {
             // тач (не ТВ): кнопки под «Далее», как в плагине
             val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-            for ((label, a) in listOf("◀" to "prev", "❚❚" to "pause", "▶" to "next", L.t("О передаче") to "more", L.t("Гид") to "guide", L.t("Меню") to "menu", L.t("Недавние") to "history")) {
+            for ((label, a) in listOf("◀" to "prev", "❚❚" to "pause", "▶" to "next", str(R.string.about) to "more", str(R.string.guide) to "guide", str(R.string.menu) to "menu", str(R.string.recent) to "history")) {
                 bar.addView(U.text(context, 1f).apply {
                     text = label
                     background = U.bg(U.FILL_BTN, U.RADIUS_S)
@@ -144,7 +145,7 @@ class InfoPanel(context: Context) {
         set(badges, badgesOf(m))
         val p = m.program
         val ref = m.seek ?: m.position
-        set(title, p?.title ?: if (m.archive || m.seek != null) L.t("Архив ") + Fmt.hhmm(ref) else L.t("Нет программы"))
+        set(title, p?.title ?: if (m.archive || m.seek != null) str(R.string.archive) + Fmt.hhmm(ref) else str(R.string.no_programme))
         // шкала: передача, а без EPG — получасовой слот вокруг позиции
         val from = p?.start ?: (ref - ref % SLOT)
         val to = p?.stop ?: (from + SLOT)
@@ -159,7 +160,7 @@ class InfoPanel(context: Context) {
         } else {
             var s = ""
             if (m.archive) s = hhmmss(m.position) + " (−" + Fmt.duration(now - m.position) + ") · "
-            s += L.t("Далее: ") + (m.next?.let { Fmt.hhmm(it.start) + " " + it.title } ?: L.t("нет программы"))
+            s += str(R.string.next) + (m.next?.let { Fmt.hhmm(it.start) + " " + it.title } ?: str(R.string.no_programme_2))
             set(next, s)
         }
     }
@@ -173,11 +174,11 @@ class InfoPanel(context: Context) {
             sb.setSpan(BackgroundColorSpan(bg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             sb.setSpan(ForegroundColorSpan(fg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
-        if (m.error) badge(L.t("Ошибка"), U.LIVE)
+        if (m.error) badge(str(R.string.error), U.LIVE)
         if (m.paused) badge("❚❚", U.FILL_ACTIVE)
-        if (m.archive) badge(L.t("Архив"), U.WHITE, U.BLACK) else badge(L.t("Эфир"), U.LIVE)
+        if (m.archive) badge(str(R.string.archive_2), U.WHITE, U.BLACK) else badge(str(R.string.live), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
-        if (m.channel.hasArchive) badge("⟲ " + L.f("%s дн.", m.channel.archiveDays), U.FILL_ACTIVE)
+        if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
     }
 

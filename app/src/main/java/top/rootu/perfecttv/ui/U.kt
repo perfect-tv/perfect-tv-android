@@ -1,6 +1,7 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -112,8 +113,9 @@ object U {
 
 /** Форматирование времени (порт core/time.js плагина) */
 object Fmt {
-    private val WEEK = arrayOf(L.t("Вс"), L.t("Пн"), L.t("Вт"), L.t("Ср"), L.t("Чт"), L.t("Пт"), L.t("Сб"))
-    private val MONTH = arrayOf(L.t("янв."), L.t("февр."), L.t("мар."), L.t("апр."), L.t("мая"), L.t("июн."), L.t("июл."), L.t("авг."), L.t("сент."), L.t("окт."), L.t("нояб."), L.t("дек."))
+    // дни недели и месяцы — на текущем языке (после смены языка — новые)
+    private val WEEK get() = top.rootu.perfecttv.core.Lang.res.getStringArray(R.array.week_short)
+    private val MONTH get() = top.rootu.perfecttv.core.Lang.res.getStringArray(R.array.month_short)
     private val cal = Calendar.getInstance()
 
     private fun at(sec: Long): Calendar {
@@ -145,9 +147,9 @@ object Fmt {
     fun dayLabel(sec: Long): String {
         val diff = dayIndex(sec) - dayIndex(Clock.now())
         return when (diff) {
-            0L -> L.t("Сегодня")
-            -1L -> L.t("Вчера")
-            1L -> L.t("Завтра")
+            0L -> str(R.string.today)
+            -1L -> str(R.string.yesterday)
+            1L -> str(R.string.tomorrow)
             else -> {
                 val c = at(sec)
                 WEEK[c.get(Calendar.DAY_OF_WEEK) - 1] + ", " + pad2(c.get(Calendar.DAY_OF_MONTH)) + "." + pad2(c.get(Calendar.MONTH) + 1)
@@ -184,9 +186,9 @@ object Fmt {
         val h = sec % 86400 / 3600
         val m = (sec % 3600 + 59) / 60
         val out = ArrayList<String>()
-        if (d > 0) out.add(L.f("%sд", d))
-        if (h > 0) out.add(L.f("%sч", h))
-        if (m > 0 || out.isEmpty()) out.add(L.f("%sм", m))
+        if (d > 0) out.add(str(R.string.x_d_2, d))
+        if (h > 0) out.add(str(R.string.x_h_2, h))
+        if (m > 0 || out.isEmpty()) out.add(str(R.string.x_m, m))
         return out.joinToString(" ")
     }
 }

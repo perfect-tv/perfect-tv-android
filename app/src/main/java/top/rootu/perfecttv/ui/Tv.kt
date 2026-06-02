@@ -1,6 +1,8 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
+import top.rootu.perfecttv.core.plural
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -190,7 +192,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     fun open(p: Playlist) {
         playlist = p
         Prefs.lastPlaylist = p.id
-        catalog = repo.loadCatalog(p, L.t("Избранное"))
+        catalog = repo.loadCatalog(p, str(R.string.favourites))
         val cat = catalog!!
         if (cat.channels.isEmpty() || repo.isStale(p)) {
             if (cat.channels.isEmpty()) {
@@ -230,7 +232,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         // первая загрузка: каналы появляются по мере разбора — перечитать каталог
         val p = playlist ?: return
         if (state.channel == null && (catalog?.channels?.size ?: 0) < e.channels) {
-            catalog = repo.loadCatalog(p, L.t("Избранное"))
+            catalog = repo.loadCatalog(p, str(R.string.favourites))
             if (layers.contains(guide)) guide.reload()
         }
     }
@@ -241,11 +243,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         playlist = p
         if (err != null) {
             if ((catalog?.channels?.size ?: 0) == 0) return showError(err)
-            toast.show(L.t("Плейлист не обновился: ") + errorText(err))
+            toast.show(str(R.string.the_playlist_was_not_updated) + errorText(err))
             return
         }
         val cur = state.channel
-        catalog = repo.loadCatalog(p, L.t("Избранное"))
+        catalog = repo.loadCatalog(p, str(R.string.favourites))
         // тот же канал в новом каталоге (по ключу)
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
@@ -264,7 +266,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     private fun showError(code: String) {
         layers.toList().forEach { remove(it) }
-        push(MessageLayer(activity, L.t("Плейлист не загрузился"), errorText(code), listOf(L.t("Повторить") to "retry", L.t("Настройки") to "settings")) { a ->
+        push(MessageLayer(activity, str(R.string.the_playlist_did_not_load), errorText(code), listOf(str(R.string.retry) to "retry", str(R.string.settings) to "settings")) { a ->
             when (a) {
                 "retry" -> {
                     layers.toList().forEach { remove(it) }
@@ -277,11 +279,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     fun errorText(code: String) = when {
-        code == "no_url" -> L.t("Неверный адрес плейлиста")
-        code == "network" -> L.t("Нет связи с сервером")
-        code.startsWith("http_") -> L.t("Сервер ответил ошибкой ") + code.removePrefix("http_")
-        code == "format" -> L.t("Файл не похож на M3U-плейлист")
-        code == "empty" -> L.t("В плейлисте нет каналов")
+        code == "no_url" -> str(R.string.invalid_playlist_address)
+        code == "network" -> str(R.string.no_connection_to_the_server)
+        code.startsWith("http_") -> str(R.string.server_error) + code.removePrefix("http_")
+        code == "format" -> str(R.string.the_file_does_not_look_like_an_m3u)
+        code == "empty" -> str(R.string.the_playlist_has_no_channels)
         else -> code
     }
 
@@ -383,7 +385,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             return
         }
         backTime = t
-        toast.show(L.t("Нажмите «Назад» ещё раз для выхода"))
+        toast.show(str(R.string.press_back_again_to_exit))
     }
 
     // ================================================================== воспроизведение
@@ -437,7 +439,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (archive != null && ch.hasArchive) {
             val tpl = CatchupUrl.template(ch.url, ch.catchupType ?: "", ch.catchupSource)
             if (tpl == null) {
-                toast.show(L.t("Канал не поддерживает архив"))
+                toast.show(str(R.string.the_channel_has_no_archive))
                 return
             }
             val now = Clock.now()
@@ -492,7 +494,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private fun ensurePin(ok: () -> Unit) {
         if (Prefs.pin.isNotEmpty()) return ok()
         var layer: PinLayer? = null
-        layer = PinLayer(activity, PinLayer.Mode.CREATE, L.t("Новый PIN"), onDone = { remove(layer!!); toast.show(L.t("PIN задан. Сменить или убрать — в настройках")); ok() },
+        layer = PinLayer(activity, PinLayer.Mode.CREATE, str(R.string.new_pin), onDone = { remove(layer!!); toast.show(str(R.string.pin_set_change_or_remove_it_in)); ok() },
             onCancel = { remove(layer!!) })
         push(layer)
     }
@@ -506,7 +508,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     fun playArchive(ch: Channel, start0: Long, programEnd: Long = 0) {
-        if (!ch.hasArchive) return toast.show(L.t("Канал не поддерживает архив"))
+        if (!ch.hasArchive) return toast.show(str(R.string.the_channel_has_no_archive))
         val start = maxOf(start0, Clock.now() - ch.archiveDays * 86400L)
         val gk = if (state.channel === ch) state.groupKey else null
         if (start >= Clock.now() - 30) return playChannel(ch, gk)
@@ -863,7 +865,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val key = ch.key + ":" + (p?.start ?: 0)
         moreKey = key
         if (p == null) {
-            info.setMore(L.t("Нет программы"), ch.name, "", ch = ch)
+            info.setMore(str(R.string.no_programme), ch.name, "", ch = ch)
             return
         }
         val tags = arrayListOf(Fmt.dayTimeRange(p.start, p.stop), p.category, p.subTitle).filter { it.isNotEmpty() }.toMutableList()
@@ -907,11 +909,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val p = repo.at(ch, now)
             ListLayer.Item(ch.title(), p?.title ?: "", ch, p?.let { Fmt.progress(it.start, it.stop, now) } ?: -1f)
         }
-        layer = ListLayer(activity, L.t("Недавние каналы"), items,
+        layer = ListLayer(activity, str(R.string.recent_channels), items,
             onSelect = { it.channel?.let { ch -> remove(layer!!); playChannel(ch) } },
             onLong = { it.channel?.let { ch -> openMenu(ch) } },
             onBack = { remove(layer!!) },
-            empty = L.t("История пуста"))
+            empty = str(R.string.history_is_empty))
         push(layer)
     }
 
@@ -957,9 +959,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         return ScheduleLayer.Content(
             channel = null,
             icon = Icons.Kind.REMIND,
-            title = L.t("Напоминания"),
-            subtitle = L.t("Передачи, о которых напомнить"),
-            empty = L.t("Напоминаний нет. Добавьте их в карточке будущей передачи."),
+            title = str(R.string.reminders),
+            subtitle = str(R.string.programmes_to_remind_about),
+            empty = str(R.string.no_reminders_add_them_in_the_card_of),
             build = build,
             sub = { reminders.all().size.toString() },
             onSelect = { row -> reminderDetails(row.payload as Reminders.Reminder) },
@@ -979,9 +981,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val now = Clock.now()
         val left = r.start - now
         return when {
-            r.missed(now) -> L.t("пропущено · смотреть из архива")
-            left > 0 -> L.t("до начала ") + Fmt.until(left)
-            else -> L.t("уже идёт")
+            r.missed(now) -> str(R.string.missed_watch_from_archive)
+            left > 0 -> str(R.string.starts_in) + Fmt.until(left)
+            else -> str(R.string.on_air)
         }
     }
 
@@ -989,12 +991,12 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private fun reminderDetails(r: Reminders.Reminder) {
         val buttons = ArrayList<Pair<String, String>>()
         val now = Clock.now()
-        if (r.missed(now)) buttons.add(L.t("Смотреть из архива") to "watch")
-        else if (r.start <= now) buttons.add(L.t("Смотреть") to "watch")
-        buttons.add(L.t("Удалить напоминание") to "remove")
+        if (r.missed(now)) buttons.add(str(R.string.watch_from_archive) to "watch")
+        else if (r.start <= now) buttons.add(str(R.string.watch) to "watch")
+        buttons.add(str(R.string.delete_reminder) to "remove")
         var layer: DetailsLayer? = null
         layer = DetailsLayer(activity, Channel.stub(r.chName, r.chNum, r.logo),
-            kicker = (if (r.missed(now)) L.t("Пропущено · в архиве ещё ") + Fmt.until(r.start + r.archiveDays * 86400L - now) else L.t("Напоминание · ") + whenText(r)) +
+            kicker = (if (r.missed(now)) str(R.string.missed_in_archive_for) + Fmt.until(r.start + r.archiveDays * 86400L - now) else str(R.string.reminder) + whenText(r)) +
                 if (r.playlistName.isNotEmpty()) " · " + r.playlistName else "",
             title = r.title, time = Fmt.dayTimeRange(r.start, r.stop), desc = r.desc, buttons = buttons,
             onAction = { a ->
@@ -1036,13 +1038,13 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     /** Включить передачу: идёт — эфир, закончилась — из архива. Другой плейлист — сменить */
     fun launch(r: Reminders.Reminder) {
-        val p = repo.playlist(r.playlistId) ?: return toast.show(L.t("Плейлист удалён"))
+        val p = repo.playlist(r.playlistId) ?: return toast.show(str(R.string.the_playlist_was_deleted))
         if (playlist?.id != p.id) {
             pendingPlay = r
             switchPlaylist(p)
             return
         }
-        val ch = catalog?.byKey?.get(r.chKey) ?: return toast.show(L.t("Канала больше нет в плейлисте"))
+        val ch = catalog?.byKey?.get(r.chKey) ?: return toast.show(str(R.string.the_channel_is_no_longer_in_the))
         layers.toList().reversed().forEach { if (it !== guide && it !== reminderLayer) remove(it) }
         if (r.missed(Clock.now())) playArchive(ch, r.start, r.stop) else playChannel(ch)
     }
@@ -1103,8 +1105,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             channel = ch,
             icon = null,
             title = ch.title(),
-            subtitle = ch.group + if (ch.hasArchive) " · " + L.f("Архив %s дн.", ch.archiveDays) else "",
-            empty = L.t("Нет программы"),
+            subtitle = ch.group + if (ch.hasArchive) " · " + str(R.string.archive_x_d, ch.archiveDays) else "",
+            empty = str(R.string.no_programme),
             build = build,
             sub = { if (repo.epgLoading()) "…" else "" },
             onSelect = { r ->
@@ -1126,19 +1128,19 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val buttons = ArrayList<Pair<String, String>>()
         val inArchive = ch.hasArchive && cell.start >= now - ch.archiveDays * 86400L
         if (cell.end <= now) {
-            if (inArchive) buttons.add(L.t("Смотреть") to "archive")
+            if (inArchive) buttons.add(str(R.string.watch) to "archive")
         } else if (cell.start <= now) {
-            if (ch.hasArchive) buttons.add(L.t("Смотреть сначала") to "archive")
-            if (state.channel === ch && state.archive != null) buttons.add(L.t("Смотреть эфир") to "live")
-            else if (state.channel !== ch) buttons.add(L.t("Смотреть") to "live")
+            if (ch.hasArchive) buttons.add(str(R.string.watch_from_start) to "archive")
+            if (state.channel === ch && state.archive != null) buttons.add(str(R.string.watch_live) to "live")
+            else if (state.channel !== ch) buttons.add(str(R.string.watch) to "live")
         } else if (cell.program != null) {
             // будущая передача — напоминание
-            buttons.add(if (reminders.has(ch, cell.start)) L.t("Удалить напоминание") to "unremind" else L.t("Напомнить") to "remind")
+            buttons.add(if (reminders.has(ch, cell.start)) str(R.string.delete_reminder) to "unremind" else str(R.string.remind_2) to "remind")
         }
         val p = cell.program
         var layer: DetailsLayer? = null
         layer = DetailsLayer(activity, ch,
-            kicker = listOfNotNull(p?.category?.takeIf { it.isNotEmpty() }, if (cell.start <= now && now < cell.end) L.t("Сейчас в эфире") else null).joinToString(" · "),
+            kicker = listOfNotNull(p?.category?.takeIf { it.isNotEmpty() }, if (cell.start <= now && now < cell.end) str(R.string.on_air_now) else null).joinToString(" · "),
             title = cell.label(),
             time = Fmt.dayTimeRange(cell.start, cell.end),
             desc = listOf(p?.subTitle ?: "", p?.desc ?: "").filter { it.isNotEmpty() }.joinToString("\n\n"),
@@ -1152,7 +1154,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                         remove(layer!!)
                         playlist?.let { reminders.add(it, ch, cell.program!!) }
                         activity.askNotifications()
-                        toast.show(L.t("Напомню ") + (if (Prefs.remindBefore > 0) L.f("за %s мин до начала", Prefs.remindBefore) else L.t("в начале передачи")))
+                        toast.show(str(R.string.i_will_remind) + (if (Prefs.remindBefore > 0) str(R.string.x_min_before_the_start, Prefs.remindBefore) else str(R.string.when_the_programme_starts)))
                     }
                     "unremind" -> {
                         remove(layer!!)
@@ -1170,35 +1172,35 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val now = Clock.now()
         val p = repo.at(ch, now)
         val items = ArrayList<ListLayer.Item>()
-        if (guide) items.add(ListLayer.Item(L.t("Смотреть"), action = "play"))
-        if (p != null) items.add(ListLayer.Item(L.t("О передаче"), p.title, action = "about"))
+        if (guide) items.add(ListLayer.Item(str(R.string.watch), action = "play"))
+        if (p != null) items.add(ListLayer.Item(str(R.string.about), p.title, action = "about"))
         if (ch.hasArchive) {
-            if (p != null) items.add(ListLayer.Item(L.t("Смотреть сначала"), action = "restart"))
-            items.add(ListLayer.Item(L.t("Архив"), L.f("%s дн.", ch.archiveDays), action = "archive"))
+            if (p != null) items.add(ListLayer.Item(str(R.string.watch_from_start), action = "restart"))
+            items.add(ListLayer.Item(str(R.string.archive_2), str(R.string.x_d, ch.archiveDays), action = "archive"))
         }
-        if (state.channel === ch && state.archive != null) items.add(ListLayer.Item(L.t("Смотреть эфир"), action = "live"))
-        if (!guide) items.add(ListLayer.Item(L.t("ТВ-гид"), action = "guide"))
-        items.add(ListLayer.Item(L.t("Недавние каналы"), action = "history"))
-        items.add(ListLayer.Item(L.t("Напоминания"), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", action = "reminders"))
-        items.add(ListLayer.Item(if (cat.isFavorite(ch)) L.t("Удалить из избранного") else L.t("Добавить в избранное"), action = "fav"))
+        if (state.channel === ch && state.archive != null) items.add(ListLayer.Item(str(R.string.watch_live), action = "live"))
+        if (!guide) items.add(ListLayer.Item(str(R.string.tv_guide), action = "guide"))
+        items.add(ListLayer.Item(str(R.string.recent_channels), action = "history"))
+        items.add(ListLayer.Item(str(R.string.reminders), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", action = "reminders"))
+        items.add(ListLayer.Item(if (cat.isFavorite(ch)) str(R.string.remove_from_favourites) else str(R.string.add_to_favourites), action = "fav"))
         if (cat.isFavorite(ch) && this.guide.groupKey() == Catalog.FAV_KEY && layers.contains(this.guide)) {
-            items.add(ListLayer.Item(L.t("Сдвинуть вверх"), action = "fav_up"))
-            items.add(ListLayer.Item(L.t("Сдвинуть вниз"), action = "fav_down"))
+            items.add(ListLayer.Item(str(R.string.move_up), action = "fav_up"))
+            items.add(ListLayer.Item(str(R.string.move_down), action = "fav_down"))
         }
-        items.add(ListLayer.Item(L.t("Скрыть канал"), action = "hide"))
-        if (ch.group.isNotEmpty()) items.add(ListLayer.Item(L.t("Скрыть категорию"), ch.group, action = "hide_group"))
+        items.add(ListLayer.Item(str(R.string.hide_channel), action = "hide"))
+        if (ch.group.isNotEmpty()) items.add(ListLayer.Item(str(R.string.hide_category), ch.group, action = "hide_group"))
         val pinOn = Prefs.pin.isNotEmpty()
-        items.add(ListLayer.Item(if (pinOn && cat.isChannelLocked(ch)) L.t("Разблокировать канал") else L.t("Заблокировать канал"), L.t("по PIN"), action = if (pinOn && cat.isChannelLocked(ch)) "unlock" else "lock"))
-        items.add(ListLayer.Item(if (pinOn && cat.isGroupLocked(ch.groupKey)) L.t("Разблокировать категорию") else L.t("Заблокировать категорию"), ch.groupKey,
+        items.add(ListLayer.Item(if (pinOn && cat.isChannelLocked(ch)) str(R.string.unlock_channel) else str(R.string.lock_channel), str(R.string.by_pin), action = if (pinOn && cat.isChannelLocked(ch)) "unlock" else "lock"))
+        items.add(ListLayer.Item(if (pinOn && cat.isGroupLocked(ch.groupKey)) str(R.string.unlock_category) else str(R.string.lock_category), ch.groupKey,
             action = if (pinOn && cat.isGroupLocked(ch.groupKey)) "unlock_group" else "lock_group"))
-        if (cat.hiddenCount() > 0) items.add(ListLayer.Item(L.t("Скрытое"), cat.hiddenCount().toString(), action = "hidden"))
-        items.add(ListLayer.Item(L.t("Адаптивная сортировка"), if (Prefs.adaptiveSort) L.t("Вкл.") else L.t("Выкл."), action = "adaptive"))
-        items.add(ListLayer.Item(L.t("Вид"), if (Prefs.guideGrid) L.t("ТВ-гид") else L.t("Список"), action = "view"))
-        if (repo.playlists().size > 1) items.add(ListLayer.Item(L.t("Плейлист"), playlist?.name ?: "", action = "playlist"))
-        items.add(ListLayer.Item(L.t("Обновить плейлист"), action = "reload"))
-        items.add(ListLayer.Item(L.t("Обновить программу"), action = "reload_epg"))
-        items.add(ListLayer.Item(L.t("Управление"), action = "help"))
-        items.add(ListLayer.Item(L.t("Настройки"), action = "settings"))
+        if (cat.hiddenCount() > 0) items.add(ListLayer.Item(str(R.string.hidden_2), cat.hiddenCount().toString(), action = "hidden"))
+        items.add(ListLayer.Item(str(R.string.adaptive_sorting), if (Prefs.adaptiveSort) str(R.string.on) else str(R.string.off), action = "adaptive"))
+        items.add(ListLayer.Item(str(R.string.view), if (Prefs.guideGrid) str(R.string.tv_guide) else str(R.string.list), action = "view"))
+        if (repo.playlists().size > 1) items.add(ListLayer.Item(str(R.string.playlist), playlist?.name ?: "", action = "playlist"))
+        items.add(ListLayer.Item(str(R.string.reload_playlist), action = "reload"))
+        items.add(ListLayer.Item(str(R.string.reload_programme), action = "reload_epg"))
+        items.add(ListLayer.Item(str(R.string.controls), action = "help"))
+        items.add(ListLayer.Item(str(R.string.settings), action = "settings"))
         var layer: ListLayer? = null
         layer = ListLayer(activity, ch.title(), items, onSelect = { it ->
             remove(layer!!)
@@ -1222,41 +1224,41 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "fav" -> { cat.toggleFavorite(ch); guide.reload() }
             "fav_up" -> { cat.moveFavorite(ch, -1); guide.reload() }
             "fav_down" -> { cat.moveFavorite(ch, 1); guide.reload() }
-            "hide" -> { cat.hideChannel(ch); guide.reload(); toast.show(L.t("Канал скрыт")) }
-            "hide_group" -> { cat.hideGroup(ch.group); guide.reload(); toast.show(L.t("Категория скрыта")) }
+            "hide" -> { cat.hideChannel(ch); guide.reload(); toast.show(str(R.string.channel_hidden)) }
+            "hide_group" -> { cat.hideGroup(ch.group); guide.reload(); toast.show(str(R.string.category_hidden)) }
             "hidden" -> openHidden()
-            "lock" -> ensurePin { cat.setLocked("channel", ch.key, true); unlockedKeys.remove(ch.key); guide.refresh(); toast.show(L.t("Канал заблокирован")) }
-            "lock_group" -> ensurePin { cat.setLocked("group", ch.groupKey, true); unlockedKeys.remove("g:" + ch.groupKey); guide.refresh(); toast.show(L.t("Категория заблокирована")) }
-            "unlock" -> askPin(L.t("Разблокировать канал"), { cat.setLocked("channel", ch.key, false); guide.refresh() })
-            "unlock_group" -> askPin(L.t("Разблокировать категорию"), { cat.setLocked("group", ch.groupKey, false); guide.refresh() })
+            "lock" -> ensurePin { cat.setLocked("channel", ch.key, true); unlockedKeys.remove(ch.key); guide.refresh(); toast.show(str(R.string.channel_locked)) }
+            "lock_group" -> ensurePin { cat.setLocked("group", ch.groupKey, true); unlockedKeys.remove("g:" + ch.groupKey); guide.refresh(); toast.show(str(R.string.category_locked)) }
+            "unlock" -> askPin(str(R.string.unlock_channel), { cat.setLocked("channel", ch.key, false); guide.refresh() })
+            "unlock_group" -> askPin(str(R.string.unlock_category), { cat.setLocked("group", ch.groupKey, false); guide.refresh() })
             "adaptive" -> { Prefs.adaptiveSort = !Prefs.adaptiveSort; cat.applyView(); guide.reload() }
             "view" -> { Prefs.guideGrid = !Prefs.guideGrid; guide.setView(Prefs.guideGrid) }
             "playlist" -> openPlaylists()
-            "reload" -> playlist?.let { p -> toast.show(L.t("Обновляю плейлист…")); repo.refresh(p, true) { err -> onRefreshed(p, err) } }
-            "reload_epg" -> playlist?.let { p -> toast.show(L.t("Обновляю программу…")); repo.refreshEpg(p, true) }
+            "reload" -> playlist?.let { p -> toast.show(str(R.string.reloading_playlist)); repo.refresh(p, true) { err -> onRefreshed(p, err) } }
+            "reload_epg" -> playlist?.let { p -> toast.show(str(R.string.reloading_programme)); repo.refreshEpg(p, true) }
             "settings" -> activity.openSettings()
         }
     }
 
     private fun openHidden() {
         val cat = catalog ?: return
-        val items = cat.hiddenGroups.map { ListLayer.Item(L.t("Категория: ") + it.value, L.t("OK — вернуть"), action = "group:" + it.key) } +
-            cat.hiddenChannels.map { ListLayer.Item(it.value, L.t("OK — вернуть"), action = "channel:" + it.key) }
+        val items = cat.hiddenGroups.map { ListLayer.Item(str(R.string.category_2) + it.value, str(R.string.ok_restore), action = "group:" + it.key) } +
+            cat.hiddenChannels.map { ListLayer.Item(it.value, str(R.string.ok_restore), action = "channel:" + it.key) }
         var layer: ListLayer? = null
-        layer = ListLayer(activity, L.t("Скрытое"), items, onSelect = {
+        layer = ListLayer(activity, str(R.string.hidden_2), items, onSelect = {
             val kind = it.action.substringBefore(':')
             cat.unhide(kind, it.action.substringAfter(':'))
             guide.reload()
             remove(layer!!)
             if (cat.hiddenCount() > 0) openHidden()
-        }, onBack = { remove(layer!!) }, empty = L.t("Ничего не скрыто"))
+        }, onBack = { remove(layer!!) }, empty = str(R.string.nothing_is_hidden))
         push(layer)
     }
 
     private fun openPlaylists() {
         val list = repo.playlists()
         var layer: ListLayer? = null
-        layer = ListLayer(activity, L.t("Плейлист"), list.map { ListLayer.Item(it.name, if (it.channelsCount > 0) L.f("%s каналов", it.channelsCount) else it.url, action = it.id.toString()) },
+        layer = ListLayer(activity, str(R.string.playlist), list.map { ListLayer.Item(it.name, if (it.channelsCount > 0) plural(R.plurals.channels, it.channelsCount, it.channelsCount) else it.url, action = it.id.toString()) },
             onSelect = { it ->
                 remove(layer!!)
                 val p = list.first { p -> p.id.toString() == it.action }
@@ -1273,7 +1275,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val p = repo.playlist(playlist?.id ?: return) ?: return
         playlist = p
         val cur = state.channel
-        catalog = repo.loadCatalog(p, L.t("Избранное"))
+        catalog = repo.loadCatalog(p, str(R.string.favourites))
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
     }

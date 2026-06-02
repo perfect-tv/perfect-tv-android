@@ -1,6 +1,9 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
+import top.rootu.perfecttv.core.Lang
+import top.rootu.perfecttv.core.plural
 import android.app.Activity
 import android.os.Bundle
 import android.view.Gravity
@@ -30,6 +33,8 @@ class SettingsActivity : Activity() {
     private lateinit var frame: FrameLayout
     private var editing: Long? = null
     private val onData: (DataEvent) -> Unit = { if (editing == null) showMain() }
+
+    override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Lang.wrap(base))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,74 +104,74 @@ class SettingsActivity : Activity() {
 
     private fun showMain() {
         editing = null
-        val col = page(L.t("Настройки"))
-        section(col, L.t("Плейлисты"))
+        val col = page(str(R.string.settings))
+        section(col, str(R.string.playlists))
         var first: View? = null
         for (p in repo.playlists()) {
             val status = when {
-                p.error.isNotEmpty() -> L.t("ошибка: ") + p.error
-                p.channelsCount > 0 -> L.f("%s каналов", p.channelsCount)
-                else -> L.t("не загружен")
+                p.error.isNotEmpty() -> str(R.string.error_2) + p.error
+                p.channelsCount > 0 -> plural(R.plurals.channels, p.channelsCount, p.channelsCount)
+                else -> str(R.string.not_loaded)
             }
             val v = item(col, p.name, if (p.id == Prefs.lastPlaylist) "●" else "", p.url + " · " + status) { showEdit(p) }
             if (first == null) first = v
         }
-        val add = item(col, L.t("+ Добавить плейлист"), "") { showEdit(null) }
+        val add = item(col, str(R.string.plus_add_playlist), "") { showEdit(null) }
         if (first == null) first = add
-        section(col, L.t("Просмотр"))
-        item(col, "Язык / Language", when (Prefs.language) { "ru" -> "Русский"; "en" -> "English"; else -> L.t("Системный") }) {
+        section(col, str(R.string.viewing))
+        item(col, "Язык / Language", when (Prefs.language) { "ru" -> "Русский"; "en" -> "English"; else -> str(R.string.system) }) {
             Prefs.language = cycle(listOf("", "ru", "en"), Prefs.language)
-            L.init()
-            showMain()
+            Lang.init(applicationContext)
+            recreate()
         }
-        item(col, L.t("Глубина архива по умолчанию"), L.f("%s дн.", Prefs.archiveDays), L.t("если в плейлисте не указана")) {
+        item(col, str(R.string.default_archive_depth), str(R.string.x_d, Prefs.archiveDays), str(R.string.if_the_playlist_does_not_set_it)) {
             Prefs.archiveDays = cycle(listOf(1, 2, 3, 4, 5, 7, 10, 14), Prefs.archiveDays); showMain()
         }
-        item(col, L.t("Клавиша ↑ в плеере"), if (Prefs.upArchive) L.t("Программа и архив") else L.t("Недавние каналы")) {
+        item(col, str(R.string.up_key_in_the_player), if (Prefs.upArchive) str(R.string.programme_and_archive) else str(R.string.recent_channels)) {
             Prefs.upArchive = !Prefs.upArchive; showMain()
         }
-        item(col, L.t("Напоминать о передаче"), if (Prefs.remindBefore == 0) L.t("Когда начнётся") else L.f("За %s мин", Prefs.remindBefore)) {
+        item(col, str(R.string.remind_about_a_programme), if (Prefs.remindBefore == 0) str(R.string.when_it_starts) else str(R.string.x_min_before, Prefs.remindBefore)) {
             Prefs.remindBefore = cycle(listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore); showMain()
         }
-        item(col, L.t("Номер канала"), NUMBER_MODES[Prefs.numberMode.coerceIn(0, 2)].let { L.t(it) }, L.t("без логотипа номер всегда на плашке вместо него")) {
+        item(col, str(R.string.channel_number), listOf(str(R.string.hidden), str(R.string.next_to_the_name), str(R.string.badge_on_the_logo))[Prefs.numberMode.coerceIn(0, 2)], str(R.string.without_a_logo_the_number_is_always)) {
             Prefs.numberMode = (Prefs.numberMode + 1) % 3; showMain()
         }
-        item(col, L.t("Скрывать инфопанель через"), L.f("%s с", Prefs.infoHide)) {
+        item(col, str(R.string.hide_info_panel_after), str(R.string.x_s, Prefs.infoHide)) {
             Prefs.infoHide = cycle(listOf(3, 5, 7, 10), Prefs.infoHide); showMain()
         }
-        item(col, L.t("Плавные анимации"), if (Prefs.animations) L.t("Вкл.") else L.t("Выкл."), L.t("выключить на слабых приставках")) {
+        item(col, str(R.string.smooth_animations), if (Prefs.animations) str(R.string.on) else str(R.string.off), str(R.string.turn_off_on_weak_boxes)) {
             Prefs.animations = !Prefs.animations; Anim.on = Prefs.animations; showMain()
         }
-        item(col, L.t("Запускать последний канал"), if (Prefs.autoplayLast) L.t("Вкл.") else L.t("Выкл."), L.t("выключено — при запуске открывается гид")) {
+        item(col, str(R.string.start_with_the_last_channel), if (Prefs.autoplayLast) str(R.string.on) else str(R.string.off), str(R.string.off_the_guide_opens_on_start)) {
             Prefs.autoplayLast = !Prefs.autoplayLast; showMain()
         }
-        item(col, L.t("Адаптивная сортировка"), if (Prefs.adaptiveSort) L.t("Вкл.") else L.t("Выкл."), L.t("часто смотримые каналы — выше")) {
+        item(col, str(R.string.adaptive_sorting), if (Prefs.adaptiveSort) str(R.string.on) else str(R.string.off), str(R.string.frequently_watched_channels_go_up)) {
             Prefs.adaptiveSort = !Prefs.adaptiveSort; showMain()
         }
-        item(col, L.t("Сбросить очки сортировки"), "", L.t("все плейлисты: порядок снова по номерам")) {
+        item(col, str(R.string.reset_sorting_scores), "", str(R.string.all_playlists_order_by_numbers_again)) {
             repo.resetAllScores()
-            android.widget.Toast.makeText(this, L.t("Очки сброшены"), android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this, str(R.string.scores_reset), android.widget.Toast.LENGTH_SHORT).show()
         }
         val hiddenCount = repo.allHidden().size
-        item(col, L.t("Скрытые категории и каналы"), if (hiddenCount > 0) hiddenCount.toString() else L.t("нет"), L.t("все плейлисты; OK — вернуть")) { showHidden() }
-        item(col, L.t("Обновлять программу каждые"), L.f("%s ч", Prefs.epgRefreshHours)) {
+        item(col, str(R.string.hidden_categories_and_channels), if (hiddenCount > 0) hiddenCount.toString() else str(R.string.none), str(R.string.all_playlists_ok_restore)) { showHidden() }
+        item(col, str(R.string.reload_programme_every), str(R.string.x_h, Prefs.epgRefreshHours)) {
             Prefs.epgRefreshHours = cycle(listOf(6, 12, 24), Prefs.epgRefreshHours); showMain()
         }
-        section(col, L.t("Описания передач (TMDB)"))
-        item(col, L.t("Ключ TMDB"), if (Prefs.tmdbKey.isEmpty()) L.t("не задан") else L.t("задан"),
-            L.t("баннер и описание передачи по ↓↓ в плеере; без ключа — только из программы")) { showTmdb() }
-        section(col, L.t("Блокировка"))
+        section(col, str(R.string.programme_descriptions_tmdb))
+        item(col, str(R.string.tmdb_key), if (Prefs.tmdbKey.isEmpty()) str(R.string.not_set) else str(R.string.set),
+            str(R.string.programme_banner_and_description_on)) { showTmdb() }
+        section(col, str(R.string.parental_lock))
         if (Prefs.pin.isEmpty()) {
-            item(col, L.t("PIN-код"), L.t("не задан"), L.t("каналы и категории блокируются в меню канала (удерж. OK)")) { showPin(null) }
+            item(col, str(R.string.pin_code), str(R.string.not_set), str(R.string.channels_and_categories_are_locked)) { showPin(null) }
         } else {
-            item(col, L.t("Сменить PIN"), "") { showPin(Prefs.pin) }
-            item(col, L.t("Спрашивать PIN"), if (Prefs.pinEveryTime) L.t("Каждый раз") else L.t("Один раз до выхода")) {
+            item(col, str(R.string.change_pin), "") { showPin(Prefs.pin) }
+            item(col, str(R.string.ask_for_pin), if (Prefs.pinEveryTime) str(R.string.every_time) else str(R.string.once_until_exit)) {
                 Prefs.pinEveryTime = !Prefs.pinEveryTime; showMain()
             }
-            item(col, L.t("Ввод PIN"), PIN_INPUTS[Prefs.pinInput.coerceIn(0, 2)], L.t("кольцо и ряды не показывают, какая цифра набрана")) {
+            item(col, str(R.string.pin_input), PIN_INPUTS[Prefs.pinInput.coerceIn(0, 2)], str(R.string.ring_and_rows_do_not_show_which)) {
                 Prefs.pinInput = (Prefs.pinInput + 1) % 3; showMain()
             }
-            item(col, L.t("Убрать PIN"), "", L.t("блокировки перестанут действовать, отметки сохранятся")) { showPin(Prefs.pin, remove = true) }
+            item(col, str(R.string.remove_pin), "", str(R.string.locks_stop_working_marks_are_kept)) { showPin(Prefs.pin, remove = true) }
         }
         first?.requestFocus()
     }
@@ -175,12 +180,12 @@ class SettingsActivity : Activity() {
 
     private fun showHidden() {
         editing = -4
-        val col = page(L.t("Скрытые категории и каналы"))
+        val col = page(str(R.string.hidden_categories_and_channels))
         val list = repo.allHidden()
-        if (list.isEmpty()) col.addView(U.text(this, 1.1f, 0.6f).apply { text = L.t("Ничего не скрыто") })
+        if (list.isEmpty()) col.addView(U.text(this, 1.1f, 0.6f).apply { text = str(R.string.nothing_is_hidden) })
         var first: View? = null
         for (h in list) {
-            val v = item(col, (if (h.kind == "group") L.t("Категория: ") else "") + h.title, L.t("вернуть"), h.playlistName) {
+            val v = item(col, (if (h.kind == "group") str(R.string.category_2) else "") + h.title, str(R.string.restore), h.playlistName) {
                 repo.setHidden(h.playlistId, h.kind, h.key, "", false)
                 showHidden()
             }
@@ -223,7 +228,7 @@ class SettingsActivity : Activity() {
         }
         val back = editing
         editing = -5
-        val col = page(L.t("Выбор файла"))
+        val col = page(str(R.string.choose_file))
         val roots = ArrayList<java.io.File>()
         @Suppress("DEPRECATION")
         roots.add(android.os.Environment.getExternalStorageDirectory())
@@ -233,7 +238,7 @@ class SettingsActivity : Activity() {
             d.listFiles()?.filter { it.isFile && (it.name.endsWith(".m3u", true) || it.name.endsWith(".m3u8", true)) }?.let { found.addAll(it) }
         }
         if (found.isEmpty()) col.addView(U.text(this, 1.05f, 0.7f, lines = 3).apply {
-            text = L.t("Плейлисты (.m3u, .m3u8) не найдены в памяти, «Загрузках» и на USB. Укажите путь вручную.")
+            text = str(R.string.no_playlists_m3u_m3u8_found_in)
         })
         var first: View? = null
         for (f in found.distinctBy { it.absolutePath }) {
@@ -273,25 +278,25 @@ class SettingsActivity : Activity() {
     private fun showTmdb() {
         editing = -3
         val col = page("TMDB")
-        val form = FormView(this, L.t("Ключ TMDB"),
-            L.t("Ключ API v3 (32 символа) или токен чтения API v4 — themoviedb.org → Настройки → API. ") +
-            L.t("Адреса можно заменить прокси, если TMDB недоступен."))
-        val key = form.field(L.t("Ключ или токен"), Prefs.tmdbKey)
-        val api = form.field(L.t("Адрес API"), Prefs.tmdbApi, url = true)
-        val img = form.field(L.t("Адрес картинок"), Prefs.tmdbImages, url = true)
+        val form = FormView(this, str(R.string.tmdb_key),
+            str(R.string.api_v3_key_32_characters_or_api_v4) +
+            str(R.string.addresses_can_be_replaced_with_a))
+        val key = form.field(str(R.string.key_or_token), Prefs.tmdbKey)
+        val api = form.field(str(R.string.api_address), Prefs.tmdbApi, url = true)
+        val img = form.field(str(R.string.images_address), Prefs.tmdbImages, url = true)
         val status = U.text(this, 1f, 0.7f, lines = 2)
         val save = {
             Prefs.tmdbKey = key.text.toString()
             Prefs.tmdbApi = api.text.toString().ifBlank { Prefs.TMDB_API }
             Prefs.tmdbImages = img.text.toString().ifBlank { Prefs.TMDB_IMAGES }
         }
-        form.button(L.t("Сохранить")) { save(); showMain() }
-        form.button(L.t("Проверить")) {
+        form.button(str(R.string.save)) { save(); showMain() }
+        form.button(str(R.string.check)) {
             save()
-            status.text = L.t("Проверяю…")
-            top.rootu.perfecttv.core.Tmdb.test { err -> status.text = if (err == null) L.t("Работает") else L.f("Не работает: %s", err) }
+            status.text = str(R.string.checking)
+            top.rootu.perfecttv.core.Tmdb.test { err -> status.text = if (err == null) str(R.string.works) else str(R.string.not_working_x, err) }
         }
-        form.button(L.t("Убрать ключ")) { Prefs.tmdbKey = ""; showMain() }
+        form.button(str(R.string.remove_key)) { Prefs.tmdbKey = ""; showMain() }
         form.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1f) })
         col.addView(form)
         key.requestFocus()
@@ -305,17 +310,17 @@ class SettingsActivity : Activity() {
      */
     private fun showPin(current: String?, remove: Boolean = false) {
         editing = -2
-        val col = page(if (remove) L.t("Убрать PIN") else if (current == null) L.t("Новый PIN") else L.t("Сменить PIN"))
-        val form = FormView(this, L.t("PIN-код"), L.t("От 4 до 6 цифр. Спрашивается при включении заблокированного канала или категории."))
-        val old = if (current != null) form.field(L.t("Текущий PIN"), "", pin = true) else null
-        val new1 = if (!remove) form.field(L.t("Новый PIN"), "", pin = true) else null
-        val new2 = if (!remove) form.field(L.t("Повторите"), "", pin = true) else null
-        form.button(if (remove) L.t("Убрать") else L.t("Сохранить")) {
-            if (old != null && old.text.toString() != current) { old.error = L.t("Неверный PIN"); old.requestFocus(); return@button }
+        val col = page(if (remove) str(R.string.remove_pin) else if (current == null) str(R.string.new_pin) else str(R.string.change_pin))
+        val form = FormView(this, str(R.string.pin_code), str(R.string.n4_to_6_digits_asked_when_a_locked))
+        val old = if (current != null) form.field(str(R.string.current_pin), "", pin = true) else null
+        val new1 = if (!remove) form.field(str(R.string.new_pin), "", pin = true) else null
+        val new2 = if (!remove) form.field(str(R.string.repeat), "", pin = true) else null
+        form.button(if (remove) str(R.string.remove) else str(R.string.save)) {
+            if (old != null && old.text.toString() != current) { old.error = str(R.string.wrong_pin); old.requestFocus(); return@button }
             if (remove) { Prefs.pin = ""; showMain(); return@button }
             val p = new1!!.text.toString()
             if (!Regex("^\\d{4,6}$").matches(p)) { new1.error = "Нужно от 4 до 6 цифр"; new1.requestFocus(); return@button }
-            if (new2!!.text.toString() != p) { new2.error = L.t("Не совпадает"); new2.requestFocus(); return@button }
+            if (new2!!.text.toString() != p) { new2.error = str(R.string.does_not_match); new2.requestFocus(); return@button }
             Prefs.pin = p
             showMain()
         }
@@ -327,57 +332,57 @@ class SettingsActivity : Activity() {
 
     private fun showEdit(p: Playlist?) {
         editing = p?.id ?: -1
-        val col = page(if (p == null) L.t("Новый плейлист") else p.name)
-        val form = FormView(this, L.t("Плейлист"), L.t("Адрес M3U/M3U8 (http, https) или путь к файлу на устройстве."))
-        val name = form.field(L.t("Название"), p?.name ?: L.t("ТВ"))
-        val url = form.field(L.t("Адрес плейлиста"), p?.url ?: "", url = true)
+        val col = page(if (p == null) str(R.string.new_playlist) else p.name)
+        val form = FormView(this, str(R.string.playlist), str(R.string.m3u_m3u8_address_http_https_or_a))
+        val name = form.field(str(R.string.name), p?.name ?: str(R.string.tv))
+        val url = form.field(str(R.string.playlist_address), p?.url ?: "", url = true)
         col.addView(form)
 
         var mode = p?.epgMode ?: Playlist.EPG_PLAYLIST
-        val userEpg = form.field(L.t("Свои источники программы (XMLTV, через запятую)"), p?.userEpg?.joinToString(", ") ?: "", url = true)
+        val userEpg = form.field(str(R.string.own_programme_sources_xmltv_comma), p?.userEpg?.joinToString(", ") ?: "", url = true)
         lateinit var modeBtn: TextView
-        val modeText = { m: Int -> when (m) { Playlist.EPG_BOTH -> L.t("Программа: плейлист + свои"); Playlist.EPG_USER_ONLY -> L.t("Программа: только свои"); else -> L.t("Программа: из плейлиста") } }
-        form.button(L.t("Сохранить")) { save(p, name, url, userEpg, mode) }
+        val modeText = { m: Int -> when (m) { Playlist.EPG_BOTH -> str(R.string.programme_playlist_plus_own); Playlist.EPG_USER_ONLY -> str(R.string.programme_own_only); else -> str(R.string.programme_from_playlist) } }
+        form.button(str(R.string.save)) { save(p, name, url, userEpg, mode) }
         modeBtn = form.button(modeText(mode)) {
             mode = (mode + 1) % 3
             modeBtn.text = modeText(mode)
         }
         form.newRow()
-        form.button(L.t("Выбрать файл…")) {
+        form.button(str(R.string.choose_file_2)) {
             editRoot = frame.getChildAt(0)
             pickFile(url)
         }
         if (p != null) {
-            form.button(L.t("Выше")) { repo.movePlaylist(p.id, -1); android.widget.Toast.makeText(this, L.t("Плейлист выше"), android.widget.Toast.LENGTH_SHORT).show() }
-            form.button(L.t("Ниже")) { repo.movePlaylist(p.id, 1); android.widget.Toast.makeText(this, L.t("Плейлист ниже"), android.widget.Toast.LENGTH_SHORT).show() }
-            form.button(L.t("Обновить")) {
+            form.button(str(R.string.up)) { repo.movePlaylist(p.id, -1); android.widget.Toast.makeText(this, str(R.string.playlist_moved_up), android.widget.Toast.LENGTH_SHORT).show() }
+            form.button(str(R.string.down)) { repo.movePlaylist(p.id, 1); android.widget.Toast.makeText(this, str(R.string.playlist_moved_down), android.widget.Toast.LENGTH_SHORT).show() }
+            form.button(str(R.string.reload)) {
                 save(p, name, url, userEpg, mode, back = false)
                 repo.playlist(p.id)?.let { fresh -> repo.refresh(fresh, true) { showEdit(repo.playlist(p.id)) } }
             }
-            form.button(L.t("Удалить")) {
+            form.button(str(R.string.delete)) {
                 repo.deletePlaylist(p.id)
                 if (Prefs.lastPlaylist == p.id) Prefs.lastPlaylist = 0
                 showMain()
             }
         }
         if (p != null) {
-            section(col, L.t("Источники программы"))
-            if (p.headerEpg.isEmpty()) col.addView(U.text(this, 1f, 0.6f).apply { text = L.t("В плейлисте источник программы не указан (url-tvg)") })
-            for (u in p.headerEpg) epgRow(col, u, L.t("из плейлиста"))
-            for (u in p.userEpg) epgRow(col, u, L.t("свой"))
+            section(col, str(R.string.programme_sources))
+            if (p.headerEpg.isEmpty()) col.addView(U.text(this, 1f, 0.6f).apply { text = str(R.string.the_playlist_has_no_programme_source) })
+            for (u in p.headerEpg) epgRow(col, u, str(R.string.from_playlist))
+            for (u in p.userEpg) epgRow(col, u, str(R.string.own))
         }
         (if (p == null) url else name).requestFocus()
     }
 
     private fun epgRow(col: LinearLayout, url: String, kind: String) {
         val id = repo.db.sourceId(url)
-        var status = L.t("не загружен")
+        var status = str(R.string.not_loaded)
         repo.db.readableDatabase.rawQuery("SELECT status, error, programmes_count, loaded_at FROM epg_source WHERE id=?", arrayOf(id.toString())).use {
             if (it.moveToFirst()) status = when (it.getInt(0)) {
-                Loaders.STATUS_LOADING -> L.t("загружается…")
-                Loaders.STATUS_READY -> L.f("%s передач · %s назад", it.getInt(2), Fmt.until(Clock.now() - it.getLong(3)))
-                Loaders.STATUS_ERROR -> L.t("ошибка: ") + it.getString(1)
-                else -> L.t("не загружен")
+                Loaders.STATUS_LOADING -> str(R.string.loading)
+                Loaders.STATUS_READY -> plural(R.plurals.programmes_ago, it.getInt(2), it.getInt(2), Fmt.until(Clock.now() - it.getLong(3)))
+                Loaders.STATUS_ERROR -> str(R.string.error_2) + it.getString(1)
+                else -> str(R.string.not_loaded)
             }
         }
         item(col, url, "", "$kind · $status") {}
@@ -386,7 +391,7 @@ class SettingsActivity : Activity() {
     private fun save(p: Playlist?, name: EditText, url: EditText, userEpg: EditText, mode: Int, back: Boolean = true) {
         val u = url.text.toString().trim()
         if (u.isEmpty()) {
-            url.error = L.t("Укажите адрес")
+            url.error = str(R.string.enter_the_address)
             url.requestFocus()
             return
         }
@@ -395,7 +400,7 @@ class SettingsActivity : Activity() {
             checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 2)
         }
-        val n = name.text.toString().trim().ifEmpty { L.t("ТВ") }
+        val n = name.text.toString().trim().ifEmpty { str(R.string.tv) }
         val epg = userEpg.text.toString().split(',', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }
         val id = if (p == null) repo.addPlaylist(n, u) else p.id
         repo.updatePlaylist(id, n, u, mode, epg)
@@ -425,9 +430,8 @@ class SettingsActivity : Activity() {
     companion object {
         const val EXTRA_FIRST = "first"
         const val PICK_FILE = 10
-        val NUMBER_MODES = listOf("Не показывать", "Рядом с названием", "Бейдж на логотипе")
         const val PICK_PERMISSION = 11
-        val PIN_INPUTS = listOf(L.t("Кольцо (как Fire TV)"), L.t("Ряды (как Google)"), L.t("Клавиатура"))
+        val PIN_INPUTS = listOf(str(R.string.ring_like_fire_tv), str(R.string.rows_like_google), str(R.string.keypad))
     }
 }
 

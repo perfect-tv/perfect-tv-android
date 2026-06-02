@@ -1,6 +1,7 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
 import android.content.Context
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -16,7 +17,7 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
     private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
 
     init {
-        head(null, L.t("Управление"))
+        head(null, str(R.string.controls))
         val col = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(U.pxi(1.5f), 0, U.pxi(1.5f), U.pxi(1.2f))
@@ -56,52 +57,53 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
     override fun back() = onClose()
 
     companion object {
-        val TEXT: List<Pair<String, List<Pair<String, String>>>> = listOf(
-            L.t("Плеер") to listOf(
-                "← / →" to L.t("Предыдущий / следующий канал категории (в архиве — перемотка)"),
-                "PG+ / PG−" to L.t("Следующий / предыдущий канал"),
-                "0–9" to L.t("Канал по номеру; ниже — подсказки для следующей цифры"),
-                "OK" to L.t("ТВ-гид; при открытой инфопанели — пауза / продолжить"),
-                L.t("удерж. OK, Меню") to L.t("Меню канала"),
-                "↓" to L.t("Инфопанель; ещё раз — описание передачи"),
-                L.t("удерж. ↓") to L.t("Недавние каналы"),
-                "↑" to L.t("Программа и архив канала (в настройках — недавние каналы); при открытой инфопанели — свернуть описание / закрыть"),
-                L.t("удерж. ↑") to L.t("Напоминания"),
-                "⏯ ⏪ ⏩" to L.t("Пауза, перемотка (из эфира — уход в архив)"),
-                L.t("Гид, Инфо") to L.t("ТВ-гид, инфопанель"),
-                L.t("Назад ×2") to L.t("Выход из приложения")
+        // функция, а не поле: строки — на текущем языке
+        val TEXT: List<Pair<String, List<Pair<String, String>>>> get() = listOf(
+            str(R.string.player) to listOf(
+                "← / →" to str(R.string.previous_next_channel_of_the),
+                "PG+ / PG−" to str(R.string.next_previous_channel),
+                "0–9" to str(R.string.channel_by_number_below_hints_for),
+                "OK" to str(R.string.tv_guide_with_the_info_panel_open),
+                str(R.string.hold_ok_menu) to str(R.string.channel_menu),
+                "↓" to str(R.string.info_panel_again_programme),
+                str(R.string.hold_down) to str(R.string.recent_channels),
+                "↑" to str(R.string.channel_programme_and_archive_in),
+                str(R.string.hold_up) to str(R.string.reminders),
+                "⏯ ⏪ ⏩" to str(R.string.pause_seek_from_live_into_the),
+                str(R.string.guide_info) to str(R.string.tv_guide_info_panel),
+                str(R.string.back_twice) to str(R.string.exit_the_app)
             ),
-            L.t("ТВ-гид") to listOf(
-                "↑ / ↓" to L.t("Канал"),
-                "← / →" to L.t("Категория"),
-                L.t("удерж. ←") to L.t("Программа и архив канала"),
-                L.t("удерж. →") to L.t("Перейти в сетку программы"),
-                L.t("OK / удерж. OK") to L.t("Смотреть / меню канала"),
-                L.t("В сетке") to L.t("Стрелки — по передачам, OK — карточка передачи, Назад — к списку каналов"),
-                L.t("Назад") to L.t("Закрыть гид")
+            str(R.string.tv_guide) to listOf(
+                "↑ / ↓" to str(R.string.channel),
+                "← / →" to str(R.string.category),
+                str(R.string.hold_left) to str(R.string.channel_programme_and_archive),
+                str(R.string.hold_right) to str(R.string.go_to_the_programme_grid),
+                str(R.string.ok_hold_ok) to str(R.string.watch_channel_menu),
+                str(R.string.in_the_grid) to str(R.string.arrows_programmes_ok_programme_card),
+                str(R.string.back) to str(R.string.close_the_guide)
             ),
-            L.t("Программа и архив") to listOf(
-                "↑ / ↓" to L.t("Передача"),
-                "→" to L.t("К датам: ↑/↓ — день, ← — обратно в список"),
-                "←" to L.t("К вкладкам Архив / Напоминания: ↑/↓ — переключить, → — обратно в список"),
-                "OK" to L.t("Прошедшая — из архива, текущая — эфир, будущая — карточка"),
-                L.t("удерж. OK") to L.t("Карточка передачи («Смотреть сначала», «Напомнить»)")
+            str(R.string.programme_and_archive) to listOf(
+                "↑ / ↓" to str(R.string.programme),
+                "→" to str(R.string.to_dates_up_down_day_left_back_to),
+                "←" to str(R.string.to_archive_reminders_tabs_up_down),
+                "OK" to str(R.string.past_from_archive_current_live),
+                str(R.string.hold_ok) to str(R.string.programme_card_watch_from_start)
             ),
-            L.t("Карточка передачи") to listOf(
-                "← / →" to L.t("Кнопки"),
-                "↑ / ↓" to L.t("Прокрутка описания"),
-                "OK" to L.t("Действие кнопки")
+            str(R.string.programme_card) to listOf(
+                "← / →" to str(R.string.buttons),
+                "↑ / ↓" to str(R.string.scroll_description),
+                "OK" to str(R.string.button_action)
             ),
-            L.t("Блокировка") to listOf(
-                L.t("Меню канала") to L.t("«Заблокировать канал / категорию» — по PIN (при первой блокировке PIN задаётся)"),
-                L.t("Окно PIN") to L.t("Цифры пульта или способ из настроек: кольцо — ↑→↓← = 1–4, OK = 0, «Меню»/удерж. OK — 5–9; ряды — ←/OK/→ по ряду, ↑/↓ — ряд, на 7·8·9 ↓ = 0; клавиатура. «Назад» — стереть"),
-                "PIN" to L.t("4–6 цифр, видны только набранные точки; сменить или убрать — в настройках")
+            str(R.string.parental_lock) to listOf(
+                str(R.string.channel_menu) to str(R.string.lock_channel_category_by_pin_the_pin),
+                str(R.string.pin_window) to str(R.string.remote_digits_or_the_method_from),
+                "PIN" to str(R.string.n4_6_digits_only_entered_dots_are)
             ),
-            L.t("Напоминания") to listOf(
-                L.t("«Напомнить»") to L.t("В карточке будущей передачи"),
-                L.t("Окно напоминания") to L.t("«Смотреть», «Отложить на 5 мин», «Закрыть»; несколько сразу — счётчик «1 / 3», ↑/↓ — другие, «Закрыть все»"),
-                L.t("Пропустили") to L.t("Передача с архивом остаётся в списке: «Смотреть из архива», «Позже», «Удалить»"),
-                L.t("Приложение закрыто") to L.t("Системное уведомление; OK по нему — включить передачу")
+            str(R.string.reminders) to listOf(
+                str(R.string.remind) to str(R.string.in_the_card_of_an_upcoming_programme),
+                str(R.string.reminder_window) to str(R.string.watch_snooze_5_min_close_several_at),
+                str(R.string.missed) to str(R.string.a_programme_with_an_archive_stays_in),
+                str(R.string.app_closed) to str(R.string.system_notification_ok_on_it_play)
             )
         )
     }

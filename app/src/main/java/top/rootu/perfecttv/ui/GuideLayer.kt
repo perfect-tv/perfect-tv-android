@@ -1,6 +1,7 @@
 package top.rootu.perfecttv.ui
 
-import top.rootu.perfecttv.core.L
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -269,7 +270,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             drawHead(c, now)
             val list = channels
             if (list.isEmpty()) {
-                U.drawText(c, if (tv.catalog?.channels?.isEmpty() != false) L.t("Каналы загружаются…") else L.t("Нет каналов"), padX + em, bodyTop + 2 * em, width - 2 * padX, pEmpty)
+                U.drawText(c, if (tv.catalog?.channels?.isEmpty() != false) str(R.string.loading_channels) else str(R.string.no_channels), padX + em, bodyTop + 2 * em, width - 2 * padX, pEmpty)
                 return
             }
             val rows = visibleRows()
@@ -302,7 +303,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val cell = Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
             U.drawText(c, ch.title(), x, t + 0.7f * em, w, pChannel)
-            U.drawText(c, p?.title ?: L.t("Нет программы"), x, t + 2.3f * em, w, pTitle)
+            U.drawText(c, p?.title ?: str(R.string.no_programme), x, t + 2.3f * em, w, pTitle)
             U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 3.9f * em, w, pTime)
             val desc = p?.desc ?: ""
             if (desc.isNotEmpty()) {
@@ -323,7 +324,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (U.touch) c.drawText("✕", width - padX - pClock.measureText("✕"), t + 1.4f * em, pClock)
             c.drawText(clock, width - padX - closeW - pClock.measureText(clock), t + 1.4f * em, pClock)
             if (tv.repo.epgLoading()) {
-                val s = L.t("Программа загружается…")
+                val s = str(R.string.programme_is_loading)
                 c.drawText(s, width - padX - pCount.measureText(s), t + 2.8f * em, pCount)
             }
         }
@@ -393,7 +394,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 U.drawText(c, ch.name, x, y + 1.05f * em, r - x - 0.8f * em - iw, pn)
                 val p = tv.repo.at(ch, now)
                 pCellTime.color = if (chFocus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, p?.title ?: L.t("Нет программы"), x, y + 2.05f * em, r - x - 0.8f * em, pCellTime)
+                U.drawText(c, p?.title ?: str(R.string.no_programme), x, y + 2.05f * em, r - x - 0.8f * em, pCellTime)
                 if (p != null) {
                     val bw = r - x - 0.8f * em
                     U.roundRect(c, x, y + 2.6f * em, x + bw, y + 2.8f * em, 0.1f * em, if (chFocus) 0x33000000 else U.FILL_MARKED)
@@ -447,7 +448,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             var y = bodyTop
             val list = tv.repo.programmes(ch).filter { it.stop > now }.take(visibleRows() + 2)
             if (list.isEmpty()) {
-                U.drawText(c, L.t("Нет программы"), l, y + rowH / 2, r - l, pEmpty)
+                U.drawText(c, str(R.string.no_programme), l, y + rowH / 2, r - l, pEmpty)
                 return
             }
             for (p in list) {

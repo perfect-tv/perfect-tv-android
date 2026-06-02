@@ -9,7 +9,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
-        top.rootu.perfecttv.core.L.init()
+        top.rootu.perfecttv.core.Lang.init(this)
         Net.init(this)
         repo = Repo(this)
     }
