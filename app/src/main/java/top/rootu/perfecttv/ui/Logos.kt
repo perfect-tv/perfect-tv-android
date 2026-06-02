@@ -115,8 +115,9 @@ object Logos {
     }
 
     /** Бейдж номера в левом верхнем углу подложки высотой [h] (угол — как у подложки) */
-    private val badgeBg = Color.argb(240, 12, 13, 14)
-    private val badgePaint = U.paint(1f, Color.WHITE, bold = true)
+    // полупрозрачный, в цвет панелей интерфейса: на сером не «дыра», а пометка
+    private val badgeBg = Color.argb(195, 26, 27, 28)
+    private val badgePaint = U.paint(1f, U.wa(0.92f), bold = true)
 
     private fun drawBadge(c: Canvas, num: Int, l: Float, t: Float, h: Float, radius: Float) {
         val text = num.toString()
