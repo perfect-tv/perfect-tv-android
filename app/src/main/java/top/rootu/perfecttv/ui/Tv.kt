@@ -7,8 +7,10 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.media3.common.C
@@ -59,11 +61,12 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     val state = State()
     private val layers = ArrayList<Layer>()
-    private val overlay = FrameLayout(activity)
-    val info = InfoPanel(activity)
-    private val toast: Toast
-    private val osd = Osd()
-    private val carousel = Carousel(activity)
+    // разметка — activity_tv.xml: overlay с каруселью, инфопанелью и номером, поверх — тост
+    private val overlay: FrameLayout = root.findViewById(R.id.overlay)
+    val info = InfoPanel(root.findViewById(R.id.info_panel))
+    private val toast = Toast(root.findViewById(R.id.toast))
+    private val osd = Osd(root.findViewById(R.id.osd))
+    private val carousel = Carousel(root.findViewById(R.id.carousel))
     val guide = GuideLayer(this)
     private val keys = Keys({ top() })
 
@@ -74,11 +77,6 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private var retry = 0
 
     init {
-        root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
-        carousel.attach(overlay)
-        info.attach(overlay)
-        osd.attach(overlay)
-        toast = Toast(root)
         overlay.setOnTouchListener { _, e -> android.util.Log.d("IPTV", "touch ${e.action} layers=${layers.size}"); layers.isEmpty() && gestures.onTouchEvent(e) }
         info.onAction = { a ->
             info.show(if (info.sticky) 0 else Prefs.infoHide)
@@ -1299,38 +1297,30 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     // ================================================================== набор номера
 
-    private inner class Osd {
-        private val box = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = U.bg(U.PANEL, U.RADIUS_L)
-            setPadding(U.pxi(1.2f), U.pxi(1f), U.pxi(1.2f), U.pxi(1f))
-            visibility = View.GONE
-        }
-
-        fun attach(root: FrameLayout) {
-            root.addView(box, FrameLayout.LayoutParams(U.pxi(26f), -2, Gravity.TOP or Gravity.START).apply { leftMargin = U.pxi(2f); topMargin = U.pxi(2f) })
-        }
+    /** Набор номера (osd_number.xml): номер, логотип и название, подсказки для следующей цифры */
+    private inner class Osd(private val box: View) {
+        private val num: TextView = box.findViewById(R.id.osd_num)
+        private val logo: ImageView = box.findViewById(R.id.osd_logo)
+        private val name: TextView = box.findViewById(R.id.osd_name)
+        private val hints: LinearLayout = box.findViewById(R.id.osd_hints)
 
         fun bringToFront() = box.bringToFront()
 
         fun show(buf: String, cat: Catalog) {
-            box.removeAllViews()
-            val num = buf.toIntOrNull() ?: 0
-            val ch = cat.byNum(num)
-            val head = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            head.addView(U.text(activity, 2.6f, bold = true).apply { text = buf }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = U.pxi(1f) })
-            if (ch != null) {
-                val logo = ImageView(activity)
-                Logos.into(logo, ch)
-                head.addView(logo, LinearLayout.LayoutParams(U.pxi(4f), U.pxi(2.8f)).apply { rightMargin = U.pxi(0.8f) })
-            }
-            head.addView(U.text(activity, 1.2f, if (ch != null) 1f else 0.5f).apply { text = ch?.name ?: "—" }, LinearLayout.LayoutParams(0, -2, 1f))
-            box.addView(head)
+            val n = buf.toIntOrNull() ?: 0
+            val ch = cat.byNum(n)
+            num.text = buf
+            if (ch != null) Logos.into(logo, ch)
+            U.show(logo, ch != null)
+            name.text = ch?.name ?: "—"
+            name.alpha = if (ch != null) 1f else 0.5f
             // подсказки: каналы, которые выберутся следующей цифрой
-            if (num > 0 && buf.length < 4) {
-                for (n in num * 10..num * 10 + 9) {
-                    val h = cat.byNum(n) ?: continue
-                    box.addView(U.text(activity, 1f, 0.7f).apply { text = "${h.num}  ${h.name}" }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.35f) })
+            hints.removeAllViews()
+            if (n > 0 && buf.length < 4) {
+                val inflater = LayoutInflater.from(activity)
+                for (k in n * 10..n * 10 + 9) {
+                    val h = cat.byNum(k) ?: continue
+                    hints.addView((inflater.inflate(R.layout.osd_hint, hints, false) as TextView).apply { text = str(R.string.num_name, h.num, h.name) })
                 }
             }
             box.visibility = View.VISIBLE

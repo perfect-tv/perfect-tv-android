@@ -76,8 +76,7 @@
     <string name="create_a_pin_of_4_6_digits">Придумайте PIN из 4–6 цифр</string>
     <string name="enter_pin">Введите PIN</string>
     <string name="done_when_entered_back_delete">«Готово» — когда набрали; «Назад» — стереть</string>
-    <string name="menu_or_hold_ok_digits">"«Меню» или удерж. OK — цифры "</string>
-    <string name="back_delete">\n«Назад» — стереть</string>
+    <string name="pin_ring_help">«Меню» или удерж. OK — цифры %1$s\n«Назад» — стереть</string>
     <string name="repeat_the_pin">Повторите PIN</string>
     <string name="wrong_pin">Неверный PIN</string>
     <string name="x_to_x_digits_required">Нужно от %1$s до %2$s цифр</string>

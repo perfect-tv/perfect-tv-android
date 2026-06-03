@@ -214,7 +214,7 @@ class Repo(context: Context) {
             db.readableDatabase.rawQuery("SELECT id FROM epg_source WHERE url=?", arrayOf(url)).use { if (it.moveToFirst()) sid = it.getLong(0) }
             if (sid < 0) continue
             db.readableDatabase.rawQuery("SELECT ch_key, xml_id FROM epg_map WHERE source_id=?", arrayOf(sid.toString())).use { c ->
-                while (c.moveToNext()) out.putIfAbsent(c.getString(0), sid to c.getString(1))
+                while (c.moveToNext()) out.getOrPut(c.getString(0)) { sid to c.getString(1) }
             }
         }
         mapFor[playlistId] = out

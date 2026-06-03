@@ -6,13 +6,11 @@ import top.rootu.perfecttv.core.Lang
 import top.rootu.perfecttv.core.plural
 import android.app.Activity
 import android.os.Bundle
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import top.rootu.perfecttv.App
 import top.rootu.perfecttv.core.Clock
@@ -39,8 +37,8 @@ class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         U.init(this)
-        frame = FrameLayout(this).apply { setBackgroundColor(U.argbGuide()) }
-        setContentView(frame)
+        setContentView(R.layout.activity_settings)
+        frame = findViewById(R.id.frame)
         if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null) else showMain()
         Bus.on(onData)
     }
@@ -50,51 +48,33 @@ class SettingsActivity : Activity() {
         super.onDestroy()
     }
 
+    /** Новая страница (settings_page.xml) с заголовком; вернёт список для пунктов */
     private fun page(title: String): LinearLayout {
         frame.removeAllViews()
-        val scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
-        val col = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(U.pxi(4f), U.pxi(2f), U.pxi(4f), U.pxi(2f))
-        }
-        col.addView(U.text(this, 2f, bold = true).apply { text = title }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = U.pxi(1f) })
-        scroll.addView(col)
-        frame.addView(scroll, FrameLayout.LayoutParams(minOf(U.pxi(60f), resources.displayMetrics.widthPixels), -1, Gravity.CENTER_HORIZONTAL))
-        return col
+        val scroll = layoutInflater.inflate(R.layout.settings_page, frame, false)
+        scroll.findViewById<TextView>(R.id.settings_title).text = title
+        frame.addView(scroll)
+        return scroll.findViewById(R.id.settings_list)
     }
 
     private fun section(col: LinearLayout, title: String) {
-        col.addView(U.text(this, 1f, 0.5f, bold = true).apply { text = title.uppercase() }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1.4f); bottomMargin = U.pxi(0.4f) })
+        col.addView((layoutInflater.inflate(R.layout.settings_section, col, false) as TextView).apply { text = title })
     }
 
-    /** Пункт: название, значение справа (или подпись снизу), OK — [onClick] */
+    /** Пояснение на странице (settings_note.xml) */
+    private fun note(col: LinearLayout, text: String) {
+        col.addView((layoutInflater.inflate(R.layout.settings_note, col, false) as TextView).apply { this.text = text })
+    }
+
+    /** Пункт (settings_item.xml): название, значение справа, подпись снизу; OK — [onClick] */
     private fun item(col: LinearLayout, title: String, value: String, sub: String = "", onClick: () -> Unit): View {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isFocusable = true
-            setPadding(U.pxi(1f), U.pxi(0.7f), U.pxi(1f), U.pxi(0.7f))
-        }
-        val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val t = U.text(this, 1.15f).apply { text = title }
-        val s = U.text(this, 0.9f, 0.6f, lines = 2).apply { text = sub }
-        texts.addView(t)
-        if (sub.isNotEmpty()) texts.addView(s, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.2f) })
-        row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
-        val v = U.text(this, 1.05f, 0.7f).apply { text = value }
-        row.addView(v, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = U.pxi(1f) })
-        fun paint(f: Boolean) {
-            row.background = U.bg(if (f) U.WHITE else U.FILL, U.RADIUS_S)
-            val c = if (f) U.BLACK else U.WHITE
-            t.setTextColor(c)
-            s.setTextColor(if (f) U.BLACK else U.wa(0.6f))
-            v.setTextColor(if (f) U.BLACK else U.wa(0.7f))
-        }
-        paint(false)
-        row.setOnFocusChangeListener { _, f -> paint(f) }
+        val row = layoutInflater.inflate(R.layout.settings_item, col, false)
+        row.findViewById<TextView>(R.id.item_title).text = title
+        row.findViewById<TextView>(R.id.item_value).text = value
+        row.findViewById<TextView>(R.id.item_sub).apply { text = sub; U.show(this, sub.isNotEmpty()) }
         row.setOnClickListener { onClick() }
         row.setOnKeyListener { _, code, e -> if (e.action == KeyEvent.ACTION_UP && Keys.isOk(code)) { onClick(); true } else false }
-        col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = U.pxi(0.3f) })
+        col.addView(row)
         return row
     }
 
@@ -119,10 +99,16 @@ class SettingsActivity : Activity() {
         val add = item(col, str(R.string.plus_add_playlist), "") { showEdit(null) }
         if (first == null) first = add
         section(col, str(R.string.viewing))
-        item(col, "Язык / Language", when (Prefs.language) { "ru" -> "Русский"; "en" -> "English"; else -> str(R.string.system) }) {
+        val lang = item(col, "Язык / Language", when (Prefs.language) { "ru" -> "Русский"; "en" -> "English"; else -> getString(R.string.system) }) {
             Prefs.language = cycle(listOf("", "ru", "en"), Prefs.language)
             Lang.init(applicationContext)
+            // экран пересоздаётся на новом языке — фокус вернуть на «Язык»
+            intent.putExtra(EXTRA_FOCUS_LANG, true)
             recreate()
+        }
+        if (intent.getBooleanExtra(EXTRA_FOCUS_LANG, false)) {
+            intent.removeExtra(EXTRA_FOCUS_LANG)
+            first = lang
         }
         item(col, str(R.string.default_archive_depth), str(R.string.x_d, Prefs.archiveDays), str(R.string.if_the_playlist_does_not_set_it)) {
             Prefs.archiveDays = cycle(listOf(1, 2, 3, 4, 5, 7, 10, 14), Prefs.archiveDays); showMain()
@@ -182,7 +168,7 @@ class SettingsActivity : Activity() {
         editing = -4
         val col = page(str(R.string.hidden_categories_and_channels))
         val list = repo.allHidden()
-        if (list.isEmpty()) col.addView(U.text(this, 1.1f, 0.6f).apply { text = str(R.string.nothing_is_hidden) })
+        if (list.isEmpty()) note(col, str(R.string.nothing_is_hidden))
         var first: View? = null
         for (h in list) {
             val v = item(col, (if (h.kind == "group") str(R.string.category_2) else "") + h.title, str(R.string.restore), h.playlistName) {
@@ -237,9 +223,7 @@ class SettingsActivity : Activity() {
         for (r in roots) for (d in listOf(r, java.io.File(r, "Download"), java.io.File(r, "Downloads"))) {
             d.listFiles()?.filter { it.isFile && (it.name.endsWith(".m3u", true) || it.name.endsWith(".m3u8", true)) }?.let { found.addAll(it) }
         }
-        if (found.isEmpty()) col.addView(U.text(this, 1.05f, 0.7f, lines = 3).apply {
-            text = str(R.string.no_playlists_m3u_m3u8_found_in)
-        })
+        if (found.isEmpty()) note(col, str(R.string.no_playlists_m3u_m3u8_found_in))
         var first: View? = null
         for (f in found.distinctBy { it.absolutePath }) {
             val v = item(col, f.name, "", f.parent ?: "") {
@@ -278,18 +262,18 @@ class SettingsActivity : Activity() {
     private fun showTmdb() {
         editing = -3
         val col = page("TMDB")
-        val form = FormView(this, str(R.string.tmdb_key),
+        val form = FormView.create(col, str(R.string.tmdb_key),
             str(R.string.api_v3_key_32_characters_or_api_v4) +
             str(R.string.addresses_can_be_replaced_with_a))
         val key = form.field(str(R.string.key_or_token), Prefs.tmdbKey)
         val api = form.field(str(R.string.api_address), Prefs.tmdbApi, url = true)
         val img = form.field(str(R.string.images_address), Prefs.tmdbImages, url = true)
-        val status = U.text(this, 1f, 0.7f, lines = 2)
         val save = {
             Prefs.tmdbKey = key.text.toString()
             Prefs.tmdbApi = api.text.toString().ifBlank { Prefs.TMDB_API }
             Prefs.tmdbImages = img.text.toString().ifBlank { Prefs.TMDB_IMAGES }
         }
+        lateinit var status: TextView
         form.button(str(R.string.save)) { save(); showMain() }
         form.button(str(R.string.check)) {
             save()
@@ -297,8 +281,7 @@ class SettingsActivity : Activity() {
             top.rootu.perfecttv.core.Tmdb.test { err -> status.text = if (err == null) str(R.string.works) else str(R.string.not_working_x, err) }
         }
         form.button(str(R.string.remove_key)) { Prefs.tmdbKey = ""; showMain() }
-        form.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1f) })
-        col.addView(form)
+        status = form.note()
         key.requestFocus()
     }
 
@@ -311,7 +294,7 @@ class SettingsActivity : Activity() {
     private fun showPin(current: String?, remove: Boolean = false) {
         editing = -2
         val col = page(if (remove) str(R.string.remove_pin) else if (current == null) str(R.string.new_pin) else str(R.string.change_pin))
-        val form = FormView(this, str(R.string.pin_code), str(R.string.n4_to_6_digits_asked_when_a_locked))
+        val form = FormView.create(col, str(R.string.pin_code), str(R.string.n4_to_6_digits_asked_when_a_locked))
         val old = if (current != null) form.field(str(R.string.current_pin), "", pin = true) else null
         val new1 = if (!remove) form.field(str(R.string.new_pin), "", pin = true) else null
         val new2 = if (!remove) form.field(str(R.string.repeat), "", pin = true) else null
@@ -319,12 +302,11 @@ class SettingsActivity : Activity() {
             if (old != null && old.text.toString() != current) { old.error = str(R.string.wrong_pin); old.requestFocus(); return@button }
             if (remove) { Prefs.pin = ""; showMain(); return@button }
             val p = new1!!.text.toString()
-            if (!Regex("^\\d{4,6}$").matches(p)) { new1.error = "Нужно от 4 до 6 цифр"; new1.requestFocus(); return@button }
+            if (!Regex("^\\d{4,6}$").matches(p)) { new1.error = str(R.string.x_to_x_digits_required, 4, 6); new1.requestFocus(); return@button }
             if (new2!!.text.toString() != p) { new2.error = str(R.string.does_not_match); new2.requestFocus(); return@button }
             Prefs.pin = p
             showMain()
         }
-        col.addView(form)
         (old ?: new1)?.requestFocus()
     }
 
@@ -333,10 +315,9 @@ class SettingsActivity : Activity() {
     private fun showEdit(p: Playlist?) {
         editing = p?.id ?: -1
         val col = page(if (p == null) str(R.string.new_playlist) else p.name)
-        val form = FormView(this, str(R.string.playlist), str(R.string.m3u_m3u8_address_http_https_or_a))
+        val form = FormView.create(col, str(R.string.playlist), str(R.string.m3u_m3u8_address_http_https_or_a))
         val name = form.field(str(R.string.name), p?.name ?: str(R.string.tv))
         val url = form.field(str(R.string.playlist_address), p?.url ?: "", url = true)
-        col.addView(form)
 
         var mode = p?.epgMode ?: Playlist.EPG_PLAYLIST
         val userEpg = form.field(str(R.string.own_programme_sources_xmltv_comma), p?.userEpg?.joinToString(", ") ?: "", url = true)
@@ -367,7 +348,7 @@ class SettingsActivity : Activity() {
         }
         if (p != null) {
             section(col, str(R.string.programme_sources))
-            if (p.headerEpg.isEmpty()) col.addView(U.text(this, 1f, 0.6f).apply { text = str(R.string.the_playlist_has_no_programme_source) })
+            if (p.headerEpg.isEmpty()) note(col, str(R.string.the_playlist_has_no_programme_source))
             for (u in p.headerEpg) epgRow(col, u, str(R.string.from_playlist))
             for (u in p.userEpg) epgRow(col, u, str(R.string.own))
         }
@@ -429,10 +410,9 @@ class SettingsActivity : Activity() {
 
     companion object {
         const val EXTRA_FIRST = "first"
+        private const val EXTRA_FOCUS_LANG = "focus_lang"
         const val PICK_FILE = 10
         const val PICK_PERMISSION = 11
-        val PIN_INPUTS = listOf(str(R.string.ring_like_fire_tv), str(R.string.rows_like_google), str(R.string.keypad))
+        val PIN_INPUTS get() = listOf(str(R.string.ring_like_fire_tv), str(R.string.rows_like_google), str(R.string.keypad))
     }
 }
-
-private fun U.argbGuide() = android.graphics.Color.argb(255, 18, 19, 20)

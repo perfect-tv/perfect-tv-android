@@ -1,5 +1,7 @@
 package top.rootu.perfecttv.ui
 
+import top.rootu.perfecttv.R
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
@@ -68,13 +70,11 @@ class ScheduleLayer(
     private var tabIndex = 0
     private var zone = Zone.LIST
     private var unwatch: (() -> Unit)? = null
-    private val headBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val headBox: LinearLayout = add<View>(R.layout.schedule_head).findViewById(R.id.schedule_head)
     private var subView: android.widget.TextView? = null
     private val list = ListView(context)
 
     init {
-        box.addView(headBox)
-        box.addView(View(context).apply { setBackgroundColor(U.LINE) }, LinearLayout.LayoutParams(-1, U.pxi(0.1f)))
         box.addView(list, LinearLayout.LayoutParams(-1, 0, 1f))
         setContent(makeContent(viewIndex))
     }

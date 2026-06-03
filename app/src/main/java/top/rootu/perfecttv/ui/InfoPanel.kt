@@ -10,9 +10,8 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
-import android.view.Gravity
+import android.util.AttributeSet
 import android.view.View
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -25,7 +24,7 @@ import top.rootu.perfecttv.data.Programme
  * шкала с буфером и маркером перемотки, «Далее». show(сек) — с автоскрытием,
  * show(0) — закреплена (↓). setMore() — раскрытое описание под основной строкой.
  */
-class InfoPanel(context: Context) {
+class InfoPanel(val view: View) {
 
     class Model(
         val channel: Channel,
@@ -53,81 +52,30 @@ class InfoPanel(context: Context) {
 
     private var channel: Channel? = null
 
-    val view = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        background = U.bg(U.PANEL, U.RADIUS_L)
-        setPadding(U.pxi(1.2f), U.pxi(1f), U.pxi(1.5f), U.pxi(1f))
-        visibility = View.GONE
-    }
     // подложку, отступ и бейдж номера рисует сам логотип (Logos)
-    private val logo = ImageView(context)
-    private val chName = U.text(context, 1.1f, 0.75f)
-    private val badges = U.text(context, 0.85f)
-    private val clock = U.text(context, 1.25f, 0.9f)
-    private val title = U.text(context, 1.6f, bold = true)
-    private val timeStart = U.text(context, 0.95f, 0.7f)
-    private val timeEnd = U.text(context, 0.95f, 0.7f)
-    private val bar = Bar(context)
-    private val next = U.text(context, 1f, 0.65f)
-    private val moreBox = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-    private val moreBody = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-    private val banner = ImageView(context).apply {
-        scaleType = ImageView.ScaleType.CENTER_CROP
-        background = U.bg(U.FILL_SOFT, U.RADIUS)
-        clipToOutline = true
-    }
-    private val moreTitle = U.text(context, 1.2f, bold = true, lines = 2)
-    private val moreTags = U.text(context, 0.95f, 0.6f)
-    private val moreText = U.text(context, 1f, 0.8f, lines = 7)
+    private val logo: ImageView = view.findViewById(R.id.info_logo)
+    private val chName: TextView = view.findViewById(R.id.info_channel)
+    private val badges: TextView = view.findViewById(R.id.info_badges)
+    private val clock: TextView = view.findViewById(R.id.info_clock)
+    private val title: TextView = view.findViewById(R.id.info_title)
+    private val timeStart: TextView = view.findViewById(R.id.info_start)
+    private val timeEnd: TextView = view.findViewById(R.id.info_end)
+    private val bar: InfoBar = view.findViewById(R.id.info_bar)
+    private val next: TextView = view.findViewById(R.id.info_next)
+    private val moreBox: View = view.findViewById(R.id.info_more)
+    private val banner: ImageView = view.findViewById(R.id.info_banner)
+    private val moreTitle: TextView = view.findViewById(R.id.info_more_title)
+    private val moreTags: TextView = view.findViewById(R.id.info_more_tags)
+    private val moreText: TextView = view.findViewById(R.id.info_more_text)
 
     init {
-        val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        top.addView(logo, LinearLayout.LayoutParams(U.pxi(8f), U.pxi(5.6f)).apply { rightMargin = U.pxi(1.2f) })
-        val body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        line.addView(chName, LinearLayout.LayoutParams(0, -2, 1f))
-        line.addView(badges, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = U.pxi(0.6f) })
-        line.addView(clock, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = U.pxi(1.2f) })
-        body.addView(line)
-        body.addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.25f) })
-        val prog = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        prog.addView(timeStart, LinearLayout.LayoutParams(-2, -2))
-        prog.addView(bar, LinearLayout.LayoutParams(0, U.pxi(0.35f), 1f).apply { leftMargin = U.pxi(0.7f); rightMargin = U.pxi(0.7f) })
-        prog.addView(timeEnd, LinearLayout.LayoutParams(-2, -2))
-        body.addView(prog, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.5f) })
-        body.addView(next, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.45f) })
+        banner.clipToOutline = true
         if (U.touch) {
-            // тач (не ТВ): кнопки под «Далее», как в плагине
-            val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-            for ((label, a) in listOf("◀" to "prev", "❚❚" to "pause", "▶" to "next", str(R.string.about) to "more", str(R.string.guide) to "guide", str(R.string.menu) to "menu", str(R.string.recent) to "history")) {
-                bar.addView(U.text(context, 1f).apply {
-                    text = label
-                    background = U.bg(U.FILL_BTN, U.RADIUS_S)
-                    setPadding(U.pxi(0.9f), U.pxi(0.45f), U.pxi(0.9f), U.pxi(0.45f))
-                    setOnClickListener { onAction?.invoke(a) }
-                }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = U.pxi(0.5f) })
-            }
-            body.addView(bar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.7f) })
+            // тач (не ТВ): кнопки под «Далее», как в плагине; tag кнопки — действие
+            val touch = view.findViewById<LinearLayout>(R.id.info_touch)
+            touch.visibility = View.VISIBLE
+            for (i in 0 until touch.childCount) touch.getChildAt(i).let { b -> b.setOnClickListener { onAction?.invoke(b.tag as String) } }
         }
-        top.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
-        view.addView(top)
-        view.isClickable = true   // тап по панели не уходит в жесты видео
-        // баннер TMDB (или логотип канала) слева, справа — название, теги, описание
-        moreBox.addView(banner, LinearLayout.LayoutParams(U.pxi(22f), U.pxi(12.4f)).apply { rightMargin = U.pxi(1.5f) })
-        moreBody.addView(moreTitle)
-        moreBody.addView(moreTags, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.3f) })
-        moreBody.addView(moreText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.5f) })
-        moreBox.addView(moreBody, LinearLayout.LayoutParams(0, -2, 1f))
-        moreText.gravity = Gravity.TOP
-        view.addView(moreBox, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(1f) })
-        U.show(moreBox, false)
-    }
-
-    /** Разместить в корне: внизу, с отступами */
-    fun attach(root: FrameLayout) {
-        root.addView(view, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-            leftMargin = U.pxi(2f); rightMargin = U.pxi(2f); bottomMargin = U.pxi(1.5f)
-        })
     }
 
     private fun set(v: TextView, s: CharSequence) {
@@ -205,7 +153,7 @@ class InfoPanel(context: Context) {
                     bannerUrl = image
                     banner.scaleType = ImageView.ScaleType.CENTER_CROP
                     banner.setPadding(0, 0, 0, 0)
-                    banner.background = U.bg(U.FILL_SOFT, U.RADIUS)
+                    banner.setBackgroundResource(R.drawable.bg_soft)
                     Logos.banner(banner, image)
                 }
             } else if (ch != null) {
@@ -253,34 +201,34 @@ class InfoPanel(context: Context) {
         Anim.hide(view)
     }
 
-    /** Шкала прогресса: подложка, буфер, значение, маркер перемотки */
-    private class Bar(context: Context) : View(context) {
-        private var value = 0f
-        private var buffer = 0f
-        private var seek: Float? = null
-
-        fun set(v: Float, b: Float, s: Float?) {
-            if (v == value && b == buffer && s == seek) return
-            value = v; buffer = b; seek = s
-            invalidate()
-        }
-
-        override fun onDraw(c: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val r = h / 2
-            U.roundRect(c, 0f, 0f, w, h, r, U.FILL_MARKED)
-            U.roundRect(c, 0f, 0f, w * buffer, h, r, U.wa(0.35f))
-            U.roundRect(c, 0f, 0f, w * value, h, r, if (seek != null) U.wa(0.6f) else U.WHITE)
-            seek?.let {
-                val x = w * it
-                U.roundRect(c, x - h * 0.6f, -h * 0.8f, x + h * 0.6f, h * 1.8f, h * 0.3f, U.WHITE)
-            }
-        }
-    }
-
     companion object {
         const val SLOT = 1800L
+    }
+}
+
+/** Шкала прогресса: подложка, буфер, значение, маркер перемотки */
+class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+    private var value = 0f
+    private var buffer = 0f
+    private var seek: Float? = null
+
+    fun set(v: Float, b: Float, s: Float?) {
+        if (v == value && b == buffer && s == seek) return
+        value = v; buffer = b; seek = s
+        invalidate()
+    }
+
+    override fun onDraw(c: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val r = h / 2
+        U.roundRect(c, 0f, 0f, w, h, r, U.FILL_MARKED)
+        U.roundRect(c, 0f, 0f, w * buffer, h, r, U.wa(0.35f))
+        U.roundRect(c, 0f, 0f, w * value, h, r, if (seek != null) U.wa(0.6f) else U.WHITE)
+        seek?.let {
+            val x = w * it
+            U.roundRect(c, x - h * 0.6f, -h * 0.8f, x + h * 0.6f, h * 1.8f, h * 0.3f, U.WHITE)
+        }
     }
 }
 

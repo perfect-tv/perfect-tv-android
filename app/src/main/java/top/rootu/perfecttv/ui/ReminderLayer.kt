@@ -3,9 +3,7 @@ package top.rootu.perfecttv.ui
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.str
 import android.content.Context
-import android.view.Gravity
-import android.widget.ImageView
-import android.widget.LinearLayout
+import android.view.View
 import android.widget.TextView
 import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.data.Channel
@@ -63,7 +61,6 @@ class ReminderLayer(
 
     private fun render() {
         val r = items.getOrNull(index) ?: return
-        val ctx = root.context
         box.removeAllViews()
         btnViews.clear()
         val now = Clock.now()
@@ -74,33 +71,16 @@ class ReminderLayer(
             else -> str(R.string.reminder_in) + Fmt.until(r.start - now)
         } + if (r.playlistName.isNotEmpty()) " · " + r.playlistName else ""
 
-        val head = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(0.8f))
-        }
-        val logo = ImageView(ctx)
-        Logos.into(logo, Channel.stub(r.chName, r.chNum, r.logo))
-        head.addView(logo, LinearLayout.LayoutParams(U.pxi(3.4f), U.pxi(2.4f)).apply { rightMargin = U.pxi(1f) })
-        val col = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-        col.addView(U.text(ctx, 1.4f, bold = true).apply { text = r.chName })
-        col.addView(U.text(ctx, 0.95f, 0.6f).apply { text = kicker }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = U.pxi(0.15f) })
-        head.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
+        head(Channel.stub(r.chName, r.chNum, r.logo), r.chName, kicker)
         if (items.size > 1) {
             // счётчик и подсказка листания
-            val cnt = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
-            cnt.addView(U.text(ctx, 1.3f, bold = true).apply { text = "${index + 1} / ${items.size}"; gravity = Gravity.END })
-            cnt.addView(U.text(ctx, 0.85f, 0.55f).apply { text = str(R.string.up_down_others); gravity = Gravity.END })
-            head.addView(cnt, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = U.pxi(1f) })
+            box.findViewById<View>(R.id.head_counter).visibility = View.VISIBLE
+            box.findViewById<TextView>(R.id.head_counter_text).text = str(R.string.counter, index + 1, items.size)
         }
-        box.addView(head)
-
-        val body = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(U.pxi(1.5f), 0, U.pxi(1.5f), 0) }
-        body.addView(U.text(ctx, 1f, 0.7f).apply { text = Fmt.dayTimeRange(r.start, r.stop) })
-        body.addView(U.text(ctx, 1.5f, bold = true, lines = 2).apply { text = r.title }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.3f) })
-        if (r.desc.isNotEmpty()) body.addView(U.text(ctx, 1.05f, 0.8f, lines = 4).apply { text = r.desc; gravity = Gravity.TOP },
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.6f) })
-        box.addView(body)
+        val body = add<View>(R.layout.reminder_body)
+        body.findViewById<TextView>(R.id.reminder_time).text = Fmt.dayTimeRange(r.start, r.stop)
+        body.findViewById<TextView>(R.id.reminder_title).text = r.title
+        body.findViewById<TextView>(R.id.reminder_desc).apply { text = r.desc; U.show(this, r.desc.isNotEmpty()) }
 
         val list = ArrayList<Pair<String, String>>()
         if (missed) {
@@ -115,25 +95,11 @@ class ReminderLayer(
         if (items.size > 1) list.add(str(R.string.close_all) to "close_all")
         buttons = list
         button = button.coerceIn(0, list.size - 1)
-        val bar = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(1.4f)) }
-        list.forEachIndexed { i, b ->
-            val v = U.text(ctx, 1.05f).apply {
-                text = b.first
-                setPadding(U.pxi(1.1f), U.pxi(0.55f), U.pxi(1.1f), U.pxi(0.55f))
-                setOnClickListener { button = i; enter() }
-            }
-            btnViews.add(v)
-            bar.addView(v, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = U.pxi(0.6f) })
-        }
-        box.addView(bar)
+        btnViews.addAll(buttons(list.map { it.first }) { button = it; enter() })
         focus()
     }
 
-    private fun focus() = btnViews.forEachIndexed { i, v ->
-        v.background = U.bg(if (i == button) U.WHITE else U.FILL_BTN, U.RADIUS_S)
-        v.setTextColor(if (i == button) U.BLACK else U.WHITE)
-    }
-
+    private fun focus() = select(btnViews, button)
     override fun key(name: String, long: Boolean, digit: Int) {
         touched = true
         when (name) {

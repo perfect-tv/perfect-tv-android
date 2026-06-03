@@ -11,10 +11,10 @@ class EpgMatcher {
 
     fun addChannel(c: EpgChannelRaw) {
         ids.add(c.id)
-        idsLower.putIfAbsent(c.id.lowercase(), c.id)
+        idsLower.getOrPut(c.id.lowercase()) { c.id }
         for (n in c.names) {
             val k = Names.matchKey(n)
-            if (k.isNotEmpty()) byName.putIfAbsent(k, c.id)
+            if (k.isNotEmpty()) byName.getOrPut(k) { c.id }
         }
     }
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ряд кнопок окна; кнопки — popup_button, фокус — isSelected -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/buttons"
+    style="@style/PopupButtons"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />

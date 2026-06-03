@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Палитра интерфейса (styles/_vars.scss плагина); в коде — U.* (читается отсюда) -->
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <!-- белый с прозрачностью: фоны строк, ячеек, кнопок -->
+    <color name="fill">#0DFFFFFF</color>          <!-- строка гида, пункт настроек -->
+    <color name="fill_soft">#0FFFFFFF</color>     <!-- подложка логотипа -->
+    <color name="fill_cell">#17FFFFFF</color>     <!-- ячейка передачи -->
+    <color name="fill_btn">#1FFFFFFF</color>      <!-- кнопка в окнах -->
+    <color name="fill_now">#2BFFFFFF</color>      <!-- текущая передача -->
+    <color name="fill_marked">#2EFFFFFF</color>   <!-- отмечено (играет), подложка шкалы -->
+    <color name="fill_active">#38FFFFFF</color>   <!-- строка в фокусе вне активной зоны -->
+    <color name="line">#14FFFFFF</color>
+    <!-- панели и окна -->
+    <color name="panel">#EB1A1B1C</color>
+    <color name="panel_card">#D91A1B1C</color>
+    <color name="panel_card_on">#F21A1B1C</color>
+    <color name="popup">#F01E1F20</color>
+    <color name="overlay">#73000000</color>
+    <color name="guide_top">#F70C0D0E</color>
+    <color name="guide_bottom">#CC0C0D0E</color>
+    <color name="settings_bg">#FF121314</color>
+    <color name="logo_plate">#FF2A2C2F</color>
+    <color name="live">#FFE53935</color>
+    <!-- текст: белый с прозрачностью -->
+    <color name="text_95">#F2FFFFFF</color>
+    <color name="text_90">#E6FFFFFF</color>
+    <color name="text_85">#D9FFFFFF</color>
+    <color name="text_80">#CCFFFFFF</color>
+    <color name="text_75">#BFFFFFFF</color>
+    <color name="text_70">#B3FFFFFF</color>
+    <color name="text_65">#A6FFFFFF</color>
+    <color name="text_60">#99FFFFFF</color>
+    <color name="text_55">#8CFFFFFF</color>
+    <color name="text_50">#80FFFFFF</color>
+    <color name="text_40">#66FFFFFF</color>
+</resources>

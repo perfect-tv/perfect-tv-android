@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кнопка окна и поле формы: в фокусе — белая -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:drawable="@drawable/bg_white_s" />
+    <item android:state_focused="true" android:drawable="@drawable/bg_white_s" />
+    <item android:drawable="@drawable/bg_key" />
+</selector>

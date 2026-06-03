@@ -27,7 +27,7 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
     private var groupMap: Map<String, Group> = emptyMap()
 
     init {
-        for (ch in channels) byKey.putIfAbsent(ch.key, ch)
+        for (ch in channels) byKey.getOrPut(ch.key) { ch }
         val map = LinkedHashMap<String, ArrayList<Channel>>()
         for (ch in channels) map.getOrPut(ch.group) { ArrayList() }.add(ch)
         for ((k, list) in map) allGroups.add(Group(k, k, list))

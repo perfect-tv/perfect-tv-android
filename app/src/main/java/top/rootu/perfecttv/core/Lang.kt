@@ -6,6 +6,7 @@ import android.content.res.Resources
 import android.os.Build
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import androidx.core.os.ConfigurationCompat
 import java.util.Locale
 
 /**
@@ -22,14 +23,17 @@ object Lang {
     lateinit var res: Resources
         private set
 
-    val locale: Locale get() = res.configuration.locales[0]
+    val locale: Locale get() = localeOf(res)
+
+    /** Язык ресурсов (Configuration.locales — только с API 24) */
+    fun localeOf(r: Resources): Locale = ConfigurationCompat.getLocales(r.configuration)[0] ?: Locale.ENGLISH
     val isEn get() = locale.language != "ru"
 
     private fun pick(base: Context): Locale = when (Prefs.language) {
         "ru" -> Locale("ru")
         "en" -> Locale.ENGLISH
         else -> {
-            val sys = base.resources.configuration.locales[0]
+            val sys = localeOf(base.resources)
             if (sys.language in listOf("ru", "uk", "be", "kk")) Locale("ru") else Locale.ENGLISH
         }
     }

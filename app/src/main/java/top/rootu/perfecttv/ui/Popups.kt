@@ -2,9 +2,11 @@ package top.rootu.perfecttv.ui
 
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.str
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
-import android.view.Gravity
+import android.util.AttributeSet
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -14,49 +16,60 @@ import android.widget.TextView
 import top.rootu.perfecttv.data.Channel
 
 /**
- * Окно поверх плеера: затемнение и коробка по центру (PopupLayer плагина).
- * Тап вне коробки — back().
+ * Окно поверх плеера: затемнение и коробка по центру (layer_popup.xml, PopupLayer плагина).
+ * Тап вне коробки — back(). Содержимое — разметки окна, вставленные в [box].
  */
 abstract class PopupLayer(context: Context, widthEm: Float, heightFraction: Float = 0f) : Layer {
-    protected val root = FrameLayout(context).apply { setBackgroundColor(U.OVERLAY) }
-    protected val box = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        background = U.bg(U.POPUP, U.RADIUS_L)
-        isClickable = true
-    }
+    protected val inflater: LayoutInflater = LayoutInflater.from(context)
+    // корень окна вставляет Tv в overlay со своими параметрами — родителя при разборе нет
+    @SuppressLint("InflateParams")
+    protected val root = inflater.inflate(R.layout.layer_popup, null) as FrameLayout
+    protected val box: LinearLayout = root.findViewById(R.id.box)
     override val view: View get() = root
 
     init {
-        val h = if (heightFraction > 0) Math.round(context.resources.displayMetrics.heightPixels * heightFraction) else -2
-        root.addView(box, FrameLayout.LayoutParams(minOf(U.pxi(widthEm), context.resources.displayMetrics.widthPixels - U.pxi(2f)), h, Gravity.CENTER))
+        val dm = context.resources.displayMetrics
+        box.layoutParams.width = minOf(U.pxi(widthEm), dm.widthPixels - U.pxi(2f))
+        if (heightFraction > 0) box.layoutParams.height = Math.round(dm.heightPixels * heightFraction)
         root.setOnClickListener { back() }
     }
 
-    /** Шапка окна: логотип канала (или null), заголовок, подзаголовок, справа — подпись */
-    protected fun head(ch: Channel?, title: String, subtitle: String = "", side: String = "", icon: Icons.Kind? = null): TextView {
-        val ctx = root.context
-        val row = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(0.8f))
-        }
-        if (icon != null) {
-            val v = ImageView(ctx).apply { setImageDrawable(Icons.drawable(icon).constantState?.newDrawable()?.mutate()); setColorFilter(U.WHITE) }
-            row.addView(v, LinearLayout.LayoutParams(U.pxi(2.4f), U.pxi(2.4f)).apply { rightMargin = U.pxi(1f) })
-        } else if (ch != null) {
-            val logo = ImageView(ctx)
-            Logos.into(logo, ch)
-            row.addView(logo, LinearLayout.LayoutParams(U.pxi(3.4f), U.pxi(2.4f)).apply { rightMargin = U.pxi(1f) })
-        }
-        val col = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-        col.addView(U.text(ctx, 1.4f, bold = true).apply { text = title })
-        if (subtitle.isNotEmpty()) col.addView(U.text(ctx, 0.95f, 0.6f).apply { text = subtitle }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = U.pxi(0.15f) })
-        row.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
-        val sub = U.text(ctx, 1f, 0.6f).apply { text = side }
-        row.addView(sub)
-        box.addView(row)
-        return sub
+    /** Вставить разметку в коробку окна и вернуть её */
+    protected fun <T : View> add(layout: Int): T {
+        @Suppress("UNCHECKED_CAST")
+        val v = inflater.inflate(layout, box, false) as T
+        box.addView(v)
+        return v
     }
+
+    /** Шапка окна (popup_head.xml): логотип канала или значок, заголовок, подзаголовок; вернёт подпись справа */
+    protected fun head(ch: Channel?, title: String, subtitle: String = "", side: String = "", icon: Icons.Kind? = null): TextView {
+        val row = add<View>(R.layout.popup_head)
+        if (icon != null) row.findViewById<ImageView>(R.id.head_icon).apply {
+            setImageDrawable(Icons.drawable(icon).constantState?.newDrawable()?.mutate())
+            visibility = View.VISIBLE
+        } else if (ch != null) row.findViewById<ImageView>(R.id.head_logo).apply {
+            Logos.into(this, ch)
+            visibility = View.VISIBLE
+        }
+        row.findViewById<TextView>(R.id.head_title).text = title
+        row.findViewById<TextView>(R.id.head_subtitle).apply { text = subtitle; U.show(this, subtitle.isNotEmpty()) }
+        return row.findViewById<TextView>(R.id.head_side).apply { text = side }
+    }
+
+    /** Ряд кнопок внизу окна (popup_buttons.xml); фокус — [select] */
+    protected fun buttons(labels: List<String>, onClick: (Int) -> Unit): List<TextView> {
+        val bar = add<LinearLayout>(R.layout.popup_buttons)
+        return labels.mapIndexed { i, label ->
+            (inflater.inflate(R.layout.popup_button, bar, false) as TextView).also {
+                it.text = label
+                it.setOnClickListener { onClick(i) }
+                bar.addView(it)
+            }
+        }
+    }
+
+    protected fun select(views: List<View>, index: Int) = views.forEachIndexed { i, v -> v.isSelected = i == index }
 }
 
 /**
@@ -84,58 +97,34 @@ class ListLayer(
     )
 
     private val rows = ArrayList<View>()
-    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
+    private val scroll: ScrollView
     private var index = start.coerceIn(0, maxOf(0, items.size - 1))
 
     init {
         head(null, title)
-        val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(U.pxi(0.7f), 0, U.pxi(0.7f), U.pxi(0.8f)) }
-        if (items.isEmpty()) list.addView(U.text(context, 1.1f, 0.6f).apply { text = empty; setPadding(U.pxi(0.8f), U.pxi(0.8f), 0, U.pxi(1f)) })
-        items.forEachIndexed { i, it -> list.addView(row(context, it, i)); }
-        scroll.addView(list)
+        scroll = add(R.layout.list_body)
+        val list = scroll.findViewById<LinearLayout>(R.id.list)
+        if (items.isEmpty()) list.addView((inflater.inflate(R.layout.list_empty, list, false) as TextView).apply { text = empty })
+        items.forEachIndexed { i, it -> list.addView(row(list, it, i)) }
         val maxH = Math.round(context.resources.displayMetrics.heightPixels * 0.7f)
-        box.addView(scroll, LinearLayout.LayoutParams(-1, -2))
-        scroll.layoutParams.height = -2
-        scroll.viewTreeObserver.addOnGlobalLayoutListener { if (scroll.height > maxH) scroll.layoutParams = LinearLayout.LayoutParams(-1, maxH) }
+        scroll.viewTreeObserver.addOnGlobalLayoutListener { if (scroll.height > maxH) scroll.layoutParams = scroll.layoutParams.apply { height = maxH } }
         applyFocus()
     }
 
-    private fun row(ctx: Context, it: Item, i: Int): View {
-        val r = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(U.pxi(0.8f), U.pxi(0.55f), U.pxi(0.8f), U.pxi(0.55f))
-            setOnClickListener { index = i; applyFocus(); enter() }
-        }
-        if (it.channel != null) {
-            val logo = ImageView(ctx)
-            Logos.into(logo, it.channel)
-            r.addView(logo, LinearLayout.LayoutParams(U.pxi(3f), U.pxi(2.1f)).apply { rightMargin = U.pxi(0.8f) })
-        }
-        val col = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-        col.addView(U.text(ctx, 1.1f, if (it.enabled) 1f else 0.5f).apply { text = it.title })
-        if (it.sub.isNotEmpty()) col.addView(U.text(ctx, 0.9f, 0.6f).apply { text = it.sub }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.15f) })
-        if (it.progress >= 0) col.addView(ProgressLine(ctx, it.progress), LinearLayout.LayoutParams(-1, U.pxi(0.2f)).apply { topMargin = U.pxi(0.35f) })
-        r.addView(col, LinearLayout.LayoutParams(0, -2, 1f))
+    private fun row(list: LinearLayout, it: Item, i: Int): View {
+        val r = inflater.inflate(R.layout.list_item, list, false)
+        r.setOnClickListener { index = i; applyFocus(); enter() }
+        if (it.channel != null) r.findViewById<ImageView>(R.id.item_logo).apply { Logos.into(this, it.channel); visibility = View.VISIBLE }
+        r.findViewById<TextView>(R.id.item_title).apply { text = it.title; if (!it.enabled) alpha = 0.5f }
+        r.findViewById<TextView>(R.id.item_sub).apply { text = it.sub; U.show(this, it.sub.isNotEmpty()) }
+        if (it.progress >= 0) r.findViewById<ProgressLine>(R.id.item_progress).apply { value = it.progress; visibility = View.VISIBLE }
         rows.add(r)
         return r
     }
 
     private fun applyFocus() {
-        rows.forEachIndexed { i, r ->
-            val f = i == index
-            r.background = if (f) U.bg(U.WHITE, 0.5f) else null
-            tint(r, if (f) U.BLACK else U.WHITE)
-            // белые логотипы на белой строке — на тёмной плашке
-            (r as? LinearLayout)?.getChildAt(0)?.let { if (it is ImageView) it.background = if (f) U.bg(Logos.PLATE, U.RADIUS_S) else null }
-        }
+        select(rows, index)
         rows.getOrNull(index)?.let { r -> r.post { scroll.smoothScrollTo(0, maxOf(0, r.top - scroll.height / 2 + r.height / 2)) } }
-    }
-
-    private fun tint(v: View, color: Int) {
-        if (v is TextView) v.setTextColor((v.currentTextColor and 0xFF000000.toInt()) or (color and 0xFFFFFF))
-        if (v is ProgressLine) v.dark = color == U.BLACK
-        if (v is LinearLayout) for (k in 0 until v.childCount) tint(v.getChildAt(k), color)
     }
 
     override fun key(name: String, long: Boolean, digit: Int) {
@@ -160,16 +149,23 @@ class ListLayer(
     }
 
     override fun back() = onBack()
+}
 
-    private class ProgressLine(ctx: Context, val value: Float) : View(ctx) {
-        var dark = false
-            set(v) { field = v; invalidate() }
+/** Шкала просмотра в строке списка (list_item.xml); в выбранной (белой) строке — тёмная */
+class ProgressLine(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
+    var value = 0f
+        set(v) { field = v; invalidate() }
 
-        override fun onDraw(c: Canvas) {
-            val h = height.toFloat()
-            U.roundRect(c, 0f, 0f, width.toFloat(), h, h / 2, if (dark) 0x33000000 else U.FILL_MARKED)
-            U.roundRect(c, 0f, 0f, width * value, h, h / 2, if (dark) U.BLACK else U.WHITE)
-        }
+    override fun drawableStateChanged() {
+        super.drawableStateChanged()
+        invalidate()
+    }
+
+    override fun onDraw(c: Canvas) {
+        val h = height.toFloat()
+        val dark = android.R.attr.state_selected in drawableState
+        U.roundRect(c, 0f, 0f, width.toFloat(), h, h / 2, if (dark) 0x33000000 else U.FILL_MARKED)
+        U.roundRect(c, 0f, 0f, width * value, h, h / 2, if (dark) U.BLACK else U.WHITE)
     }
 }
 
@@ -189,44 +185,28 @@ class DetailsLayer(
     private val onBack: () -> Unit
 ) : PopupLayer(context, 46f) {
 
-    private val btnViews = ArrayList<TextView>()
     private var index = 0
-    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
+    private val scroll: ScrollView
+    private val btnViews: List<TextView>
 
     init {
         head(ch, ch.name, kicker)
-        val body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(U.pxi(1.5f), 0, U.pxi(1.5f), 0) }
-        body.addView(U.text(context, 1f, 0.7f).apply { text = time })
-        body.addView(U.text(context, 1.5f, bold = true, lines = 3).apply { text = title }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.3f) })
+        val body = add<View>(R.layout.details_body)
+        body.findViewById<TextView>(R.id.details_time).text = time
+        body.findViewById<TextView>(R.id.details_title).text = title
+        scroll = body.findViewById(R.id.details_scroll)
         if (desc.isNotEmpty()) {
-            val d = U.text(context, 1.05f, 0.8f, lines = 0).apply { text = desc; gravity = Gravity.TOP; setLineSpacing(0f, 1.15f) }
-            scroll.addView(d)
-            body.addView(scroll, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.7f) })
+            body.findViewById<TextView>(R.id.details_desc).text = desc
+            scroll.visibility = View.VISIBLE
             val maxH = Math.round(context.resources.displayMetrics.heightPixels * 0.4f)
-            scroll.viewTreeObserver.addOnGlobalLayoutListener { if (scroll.height > maxH) scroll.layoutParams = LinearLayout.LayoutParams(-1, maxH).apply { topMargin = U.pxi(0.7f) } }
+            scroll.viewTreeObserver.addOnGlobalLayoutListener { if (scroll.height > maxH) scroll.layoutParams = scroll.layoutParams.apply { height = maxH } }
         }
-        box.addView(body)
-        val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; setPadding(U.pxi(1.5f), U.pxi(1.2f), U.pxi(1.5f), U.pxi(1.4f)) }
-        buttons.forEachIndexed { i, b ->
-            val v = U.text(context, 1.05f).apply {
-                text = b.first
-                setPadding(U.pxi(1.1f), U.pxi(0.55f), U.pxi(1.1f), U.pxi(0.55f))
-                setOnClickListener { index = i; enter() }
-            }
-            btnViews.add(v)
-            bar.addView(v, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = U.pxi(0.6f) })
-        }
-        if (buttons.isNotEmpty()) box.addView(bar)
-        else box.addView(View(context), LinearLayout.LayoutParams(-1, U.pxi(1.4f)))
+        btnViews = if (buttons.isNotEmpty()) buttons(buttons.map { it.first }) { index = it; enter() }
+        else { box.setPadding(0, 0, 0, U.pxi(1.4f)); emptyList() }
         applyFocus()
     }
 
-    private fun applyFocus() {
-        btnViews.forEachIndexed { i, v ->
-            v.background = U.bg(if (i == index) U.WHITE else U.FILL_BTN, U.RADIUS_S)
-            v.setTextColor(if (i == index) U.BLACK else U.WHITE)
-        }
-    }
+    private fun applyFocus() = select(btnViews, index)
 
     override fun key(name: String, long: Boolean, digit: Int) {
         when (name) {
@@ -245,18 +225,9 @@ class DetailsLayer(
     override fun back() = onBack()
 }
 
-/** Простой тост внизу экрана */
-class Toast(private val root: FrameLayout) {
-    private val v = U.text(root.context, 1.1f).apply {
-        background = U.bg(U.PANEL, U.RADIUS)
-        setPadding(U.pxi(1.2f), U.pxi(0.7f), U.pxi(1.2f), U.pxi(0.7f))
-        visibility = View.GONE
-    }
+/** Простой тост вверху экрана (toast.xml в activity_tv.xml) */
+class Toast(private val v: TextView) {
     private val hide = Runnable { Anim.hide(v) }
-
-    init {
-        root.addView(v, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = U.pxi(2f) })
-    }
 
     fun show(text: String) {
         v.text = text

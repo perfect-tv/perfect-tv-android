@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">Perfect TV</string>
+    <!-- без перевода: счётчик «1 / 3», подсказка набора номера «110  НТС» -->
+    <string name="counter" translatable="false">%1$d / %2$d</string>
+    <string name="num_name" translatable="false">%1$d  %2$s</string>
     <string name="loading_channels">Loading channels…</string>
     <string name="no_channels">No channels</string>
     <string name="no_programme">No programme</string>
@@ -77,8 +80,7 @@
     <string name="create_a_pin_of_4_6_digits">Create a PIN of 4–6 digits</string>
     <string name="enter_pin">Enter PIN</string>
     <string name="done_when_entered_back_delete">Done — when entered; Back — delete</string>
-    <string name="menu_or_hold_ok_digits">"Menu or hold OK — digits "</string>
-    <string name="back_delete">\nBack — delete</string>
+    <string name="pin_ring_help">Menu or hold OK — digits %1$s\nBack — delete</string>
     <string name="repeat_the_pin">Repeat the PIN</string>
     <string name="wrong_pin">Wrong PIN</string>
     <string name="x_to_x_digits_required">%1$s to %2$s digits required</string>

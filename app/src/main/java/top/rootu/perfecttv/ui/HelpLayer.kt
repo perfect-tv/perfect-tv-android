@@ -3,7 +3,7 @@ package top.rootu.perfecttv.ui
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.str
 import android.content.Context
-import android.view.Gravity
+import android.widget.TextView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 
@@ -14,33 +14,21 @@ import android.widget.ScrollView
  */
 class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(context, 56f, 0.86f) {
 
-    private val scroll = ScrollView(context).apply { isVerticalScrollBarEnabled = false; Fade.scroll(this) }
+    private val scroll: ScrollView
 
     init {
         head(null, str(R.string.controls))
-        val col = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(U.pxi(1.5f), 0, U.pxi(1.5f), U.pxi(1.2f))
-        }
+        scroll = add(R.layout.help_body)
+        val col = scroll.findViewById<LinearLayout>(R.id.help_list)
         for ((title, rows) in TEXT) {
-            col.addView(U.text(context, 1.15f, bold = true).apply { text = title }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.9f); bottomMargin = U.pxi(0.3f) })
+            col.addView((inflater.inflate(R.layout.help_section, col, false) as TextView).apply { text = title })
             for ((key, action) in rows) {
-                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP }
-                row.addView(U.text(context, 1f, 0.95f).apply {
-                    text = key
-                    background = U.bg(U.FILL_BTN, U.RADIUS_S)
-                    setPadding(U.pxi(0.5f), U.pxi(0.2f), U.pxi(0.5f), U.pxi(0.2f))
-                }, LinearLayout.LayoutParams(-2, -2))
-                val keyCol = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-                keyCol.addView(row)
-                val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP }
-                line.addView(keyCol, LinearLayout.LayoutParams(U.pxi(12f), -2))
-                line.addView(U.text(context, 1f, 0.8f, lines = 0).apply { text = action; gravity = Gravity.TOP }, LinearLayout.LayoutParams(0, -2, 1f))
-                col.addView(line, LinearLayout.LayoutParams(-1, -2).apply { topMargin = U.pxi(0.35f) })
+                val line = inflater.inflate(R.layout.help_row, col, false)
+                line.findViewById<TextView>(R.id.help_key).text = key
+                line.findViewById<TextView>(R.id.help_action).text = action
+                col.addView(line)
             }
         }
-        scroll.addView(col)
-        box.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     override fun key(name: String, long: Boolean, digit: Int) {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кнопка формы: фокус Android (стрелки), в фокусе — белая -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Text.Button"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:focusable="true"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp" />

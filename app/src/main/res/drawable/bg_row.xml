@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Строка списка в окне: выбранная — белая, остальные без фона -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:drawable="@drawable/bg_white_row" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

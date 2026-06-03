@@ -35,7 +35,7 @@ class M3uParser(private val defaultGroup: String = "") {
         while (true) {
             var line = reader.readLine() ?: break
             if (first) {
-                line = line.removePrefix("﻿")
+                line = line.removePrefix("\uFEFF")
                 if (line.isBlank()) continue
                 first = false
                 val t = line.trim()

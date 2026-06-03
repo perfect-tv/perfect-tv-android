@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Экран просмотра: видео, над ним слой интерфейса (карусель, инфопанель, номер, окна), тост -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:use_controller="false"
+        app:resize_mode="fit"
+        app:shutter_background_color="@color/black"
+        app:keep_content_on_player_reset="true" />
+
+    <!-- окна (Layer) добавляются сюда поверх панелей -->
+    <FrameLayout
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <include layout="@layout/carousel" />
+
+        <include layout="@layout/info_panel" />
+
+        <include layout="@layout/osd_number" />
+    </FrameLayout>
+
+    <include layout="@layout/toast" />
+</FrameLayout>

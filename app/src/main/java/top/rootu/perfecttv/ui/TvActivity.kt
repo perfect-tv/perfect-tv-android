@@ -10,9 +10,9 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import top.rootu.perfecttv.App
+import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.Alarms
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.player.Playback
@@ -37,19 +37,11 @@ class TvActivity : Activity() {
         Logos.init(this)
         Icons.init(this)
         Anim.on = Prefs.animations
-        root = FrameLayout(this)
-        root.setBackgroundColor(U.BLACK)
+        setContentView(R.layout.activity_tv)
+        root = findViewById(R.id.root)
         val pb = Playback(this)
         playback = pb
-        val pv = PlayerView(this).apply {
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            setShutterBackgroundColor(U.BLACK)
-            setKeepContentOnPlayerReset(true)
-            player = pb.player
-        }
-        root.addView(pv, FrameLayout.LayoutParams(-1, -1))
-        setContentView(root)
+        findViewById<PlayerView>(R.id.player).player = pb.player
         tv = Tv(this, root, pb)
         reminderFromIntent(intent)
     }
@@ -92,7 +84,7 @@ class TvActivity : Activity() {
     // язык, с которым построен экран: сменили в настройках — пересоздать
     override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Lang.wrap(base))
 
-    private val builtLocale by lazy { resources.configuration.locales[0] }
+    private val builtLocale by lazy { Lang.localeOf(resources) }
 
     override fun onStart() {
         super.onStart()
