@@ -5,6 +5,7 @@ import top.rootu.perfecttv.core.str
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
 import android.widget.LinearLayout
@@ -230,6 +231,8 @@ class PinWheel(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
     var high = false
     /** ROWS: текущий ряд 0..2 */
     var row = 0
+    private val frame = Path()
+    private val stem = Path()
 
     private val pDigit = U.paint(1.8f, U.BLACK, bold = true)
     private val pCenter = U.paint(2.1f, U.WHITE, bold = true)
@@ -276,7 +279,15 @@ class PinWheel(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
             ring.strokeWidth = U.px(0.1f)
             ring.color = U.wa(0.7f)
             val top = cy - 1.5f * step + row * step - step / 2
-            c.drawRoundRect(gx - step * 0.7f, top, gx + 2 * step + step * 0.7f, top + step, step / 2, step / 2, ring)
+            frame.reset()
+            frame.addRoundRect(gx - step * 0.7f, top, gx + 2 * step + step * 0.7f, top + step, step / 2, step / 2, Path.Direction.CW)
+            if (row == 2) {
+                // на ряду 7·8·9 ↓ = 0: рамка буквой «Т» — ряд и 0 под 8
+                stem.reset()
+                stem.addRoundRect(gx + step * 0.5f, top + step / 2, gx + step * 1.5f, top + 2 * step, step / 2, step / 2, Path.Direction.CW)
+                frame.op(stem, Path.Op.UNION)
+            }
+            c.drawPath(frame, ring)
             ring.style = Paint.Style.FILL
         }
     }
