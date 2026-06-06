@@ -58,8 +58,6 @@ object CatchupUrl {
         return out
     }
 
-    fun isFlussonic(type: String) = Regex("^(flussonic|fs)", RegexOption.IGNORE_CASE).containsMatchIn(type)
-
     /**
      * Подставить значения в шаблон.
      * @param start unix-секунды начала, duration — секунды; null — без диапазона (эфир: start = сейчас)

@@ -444,9 +444,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val start = archive
             var dur = (now - start).coerceIn(60, 6 * 3600)
             if (programEnd > start) dur = maxOf(dur, minOf(programEnd, now) - start)
-            // для flussonic «архив до текущего момента» — растущий плейлист
-            val ready = if (CatchupUrl.isFlussonic(ch.catchupType ?: "") && now - start < 6 * 3600) tpl.replace("\${duration}", "now") else tpl
-            url = CatchupUrl.prepare(ready, start, dur, now)
+            // flussonic — как в tv_plugin/legacy/tv.js: всегда окно фиксированной длины
+            // (archive-START-DURATION, VOD с концом). «…-now» отдаёт растущий «живой» плейлист:
+            // ExoPlayer ведёт его как эфир (подгоняет скорость к краю), и позиция расходится
+            // со временем передачи. Окно доиграно — новая ссылка с того же места (onStreamEnded).
+            url = CatchupUrl.prepare(tpl, start, dur, now)
             a = Archive(start)
             Log.i(TAG, "archive ${ch.name} $url")
         } else url = CatchupUrl.prepare(ch.url, null, 0, Clock.now())
