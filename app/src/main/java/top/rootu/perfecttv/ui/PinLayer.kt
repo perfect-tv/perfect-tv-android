@@ -238,10 +238,29 @@ class PinWheel(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
     private val pCenter = U.paint(2.1f, U.WHITE, bold = true)
     private val pSmall = U.paint(1.05f, U.wa(0.5f))
     private val pSmallOn = U.paint(1.05f, U.WHITE, bold = true)
+
+    init {
+        // без привязки знаков к целым пикселям: иначе цифра уезжает до пикселя от центра колонки
+        // и в узкой ножке рамки «Т» 0 заметно сдвинут вправо
+        for (p in listOf(pDigit, pCenter, pSmall, pSmallOn)) p.isSubpixelText = true
+    }
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG)
 
+    // середина рисунка знака по горизонтали (точно, по контуру), кэш: знаков и кистей немного
+    private val inkMid = HashMap<Paint, HashMap<String, Float>>()
+    private val inkPath = Path()
+    private val inkBox = android.graphics.RectF()
+
+    private fun mid(s: String, p: Paint): Float = inkMid.getOrPut(p) { HashMap() }.getOrPut(s) {
+        p.getTextPath(s, 0, s.length, 0f, 0f, inkPath)
+        inkPath.computeBounds(inkBox, true)
+        inkBox.centerX()
+    }
+
+    /** Текст по центру точки (x, y): по горизонтали — по самому рисунку знака, а не по ширине
+     *  символа (иначе в узкой ножке рамки «Т» 0 заметно смещён вправо) */
     private fun text(c: Canvas, s: String, x: Float, y: Float, p: Paint) {
-        c.drawText(s, x - p.measureText(s) / 2, y - (p.descent() + p.ascent()) / 2, p)
+        c.drawText(s, x - mid(s, p), y - (p.descent() + p.ascent()) / 2, p)
     }
 
     override fun onDraw(c: Canvas) {
