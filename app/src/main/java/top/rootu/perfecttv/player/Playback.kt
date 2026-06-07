@@ -98,7 +98,11 @@ class Playback(context: Context) {
         headers = h
         val b = MediaItem.Builder().setUri(Uri.parse(url))
         (if (forceHls) MimeTypes.APPLICATION_M3U8 else mimeOf(url))?.let { b.setMimeType(it) }
-        b.setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(C.TIME_UNSET).build())
+        val live = MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(C.TIME_UNSET)
+        // архив с позиции (в т.ч. растущий EVENT-плейлист): играть ровно с неё, без подгонки
+        // скорости к краю эфира — иначе время на шкале расходится с передачей
+        if (positionMs != C.TIME_UNSET) live.setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f)
+        b.setLiveConfiguration(live.build())
         if (positionMs != C.TIME_UNSET) player.setMediaItem(b.build(), positionMs) else player.setMediaItem(b.build())
         player.prepare()
         player.playWhenReady = true
@@ -131,6 +135,18 @@ class Playback(context: Context) {
             tl.getWindow(player.currentMediaItemIndex, window)
             return window.positionInFirstPeriodMs
         }
+
+    /** Реальное время начала окна по EXT-X-PROGRAM-DATE-TIME, мс UTC; нет метки — C.TIME_UNSET */
+    val windowStartTimeMs: Long
+        get() {
+            val tl = player.currentTimeline
+            if (tl.isEmpty) return C.TIME_UNSET
+            tl.getWindow(player.currentMediaItemIndex, window)
+            return window.windowStartTimeMs
+        }
+
+    /** Реальное время текущего кадра, мс UTC (по PROGRAM-DATE-TIME); нет метки — null */
+    val wallClockMs: Long? get() = windowStartTimeMs.takeIf { it != C.TIME_UNSET }?.let { it + player.currentPosition }
 
     /** Позиция от начала периода, мс: не прыгает, когда окно «эфирного» потока сдвигается */
     val periodPositionMs get() = player.currentPosition + windowOffsetMs

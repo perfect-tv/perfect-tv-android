@@ -1,7 +1,9 @@
 package top.rootu.perfecttv.player
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.TimeZone
 
@@ -24,6 +26,16 @@ class CatchupUrlTest {
     @Test fun flussonic_prepare() {
         val tpl = CatchupUrl.template("http://h/ch/index.m3u8?token=1", "flussonic", "")!!
         assertEquals("http://h/ch/archive-1700000000-5400.m3u8?token=1", CatchupUrl.prepare(tpl, 1700000000, 5400, 1700003000))
+    }
+
+    /** EVENT-плейлист (event=true) — только flussonic с HLS-окном START-DURATION */
+    @Test fun flussonic_event() {
+        assertTrue(CatchupUrl.flussonicHls("flussonic", CatchupUrl.template("http://h/ch/index.m3u8?token=1", "flussonic", "")!!))
+        assertTrue(CatchupUrl.flussonicHls("fs", CatchupUrl.template("http://h/ch/mono.m3u8", "fs", "")!!))
+        assertFalse(CatchupUrl.flussonicHls("flussonic", CatchupUrl.template("http://h/ch/mpegts", "flussonic", "")!!))
+        assertFalse(CatchupUrl.flussonicHls("shift", CatchupUrl.template("http://h/ch/index.m3u8", "shift", "")!!))
+        assertEquals("http://h/a.m3u8?token=1&event=true", CatchupUrl.withQuery("http://h/a.m3u8?token=1", "event=true"))
+        assertEquals("http://h/a.m3u8?event=true", CatchupUrl.withQuery("http://h/a.m3u8", "event=true"))
     }
 
     @Test fun xc() {

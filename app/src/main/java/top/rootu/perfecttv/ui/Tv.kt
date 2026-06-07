@@ -34,8 +34,10 @@ import top.rootu.perfecttv.player.Playback
  * стек слоёв, клавиши плеера, переключение каналов, архив и перемотка, пауза эфира.
  *
  * Время — unix-секунды [Clock.now]. Позиция в архиве:
- *   position = archive.start + (periodPosition − archive.base) / 1000,
- * где base — позиция плеера, соответствующая началу ссылки (см. §8).
+ *   HLS с EXT-X-PROGRAM-DATE-TIME (Flussonic и др.) — реальное время кадра из плейлиста
+ *     ([Playback.wallClockMs]): не зависит от того, с какого места плеер начал;
+ *   иначе position = archive.start + (periodPosition − archive.base) / 1000,
+ *     где base — позиция плеера, соответствующая началу ссылки (см. §8).
  */
 class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: Playback) {
 
@@ -48,6 +50,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     class Archive(val start: Long, var base: Long? = null, val timeshift: Boolean = false) {
         var continued = false
+        /** Время кадра берётся из PROGRAM-DATE-TIME плейлиста (а не от base) */
+        var pdt = false
     }
 
     class State {
@@ -393,6 +397,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     /** Текущая позиция воспроизведения (unix-сек) */
     fun position(): Long {
         val a = state.archive ?: return pauseInfo ?: Clock.now()
+        if (a.pdt) playback.wallClockMs?.let { return it / 1000 }
         val base = a.base ?: return a.start
         return a.start + maxOf(0L, (playback.periodPositionMs - base) / 1000)
     }
@@ -444,11 +449,16 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val start = archive
             var dur = (now - start).coerceIn(60, 6 * 3600)
             if (programEnd > start) dur = maxOf(dur, minOf(programEnd, now) - start)
-            // flussonic — как в tv_plugin/legacy/tv.js: всегда окно фиксированной длины
-            // (archive-START-DURATION, VOD с концом). «…-now» отдаёт растущий «живой» плейлист:
-            // ExoPlayer ведёт его как эфир (подгоняет скорость к краю), и позиция расходится
-            // со временем передачи. Окно доиграно — новая ссылка с того же места (onStreamEnded).
+            // Flussonic HLS: окно archive-START-DURATION с концом в будущем и event=true — сервер
+            // отдаёт EVENT-плейлист (от начала до «сейчас», дописывается), поэтому недавнюю передачу
+            // можно смотреть до края эфира без переподключений. Без event=true окно с концом
+            // «сейчас» кончалось бы через время, равное отставанию, и ссылка менялась бы по кругу.
+            // «…-now» не годится: по документации плеер начинает такой плейлист с края эфира.
+            // Окно прошло — плейлист стал VOD, доиграл — новая ссылка с того же места (onStreamEnded).
+            val event = CatchupUrl.flussonicHls(ch.catchupType ?: "", tpl) && now - start < 6 * 3600
+            if (event) dur = maxOf(dur, now - start + EVENT_AHEAD)
             url = CatchupUrl.prepare(tpl, start, dur, now)
+            if (event) url = CatchupUrl.withQuery(url, "event=true")
             a = Archive(start)
             Log.i(TAG, "archive ${ch.name} $url")
         } else url = CatchupUrl.prepare(ch.url, null, 0, Clock.now())
@@ -518,7 +528,32 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     /** Первые данные: привязать позицию плеера к началу ссылки архива */
     private fun onReady() {
         val a = state.archive ?: return
-        if (a.base == null) a.base = playback.periodPositionMs
+        if (a.base != null) return
+        a.base = playback.periodPositionMs
+        if (a.timeshift) return
+        // HLS с PROGRAM-DATE-TIME: время кадра — из плейлиста. Правдоподобно (окно архива
+        // в пределах суток до «сейчас») — пользуемся им и, если плеер начал не с нужного места
+        // (растущий EVENT-плейлист плеер начинает ближе к краю эфира), ставим его на начало.
+        val now = Clock.now()
+        val w = playback.wallClockMs?.takeIf { it / 1000 in (a.start - 86400)..(now + 120) }
+        if (w == null) {
+            // без PROGRAM-DATE-TIME «растущий» (EVENT) плейлист плеер тоже начинает у края эфира:
+            // ставим в начало окна — оно и есть начало ссылки
+            if (playback.live && playback.position > 5000) {
+                Log.i(TAG, "archive: live playlist without PDT, seek to window start")
+                watch = null
+                a.base = playback.windowOffsetMs
+                playback.seekTo(0)
+            }
+            return
+        }
+        a.pdt = true
+        val target = a.start * 1000 - playback.windowStartTimeMs
+        if (Math.abs(w / 1000 - a.start) > 8 && target >= 0 && target < playback.windowDurationMs - 5000) {
+            Log.i(TAG, "archive: start ${w / 1000 - a.start} s off, seek to start")
+            watch = null
+            playback.seekTo(target)
+        }
     }
 
     private fun onStreamEnded() {
@@ -580,7 +615,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (a.base != null && seek == null && position() >= Clock.now() - 3) state.archive = null
     }
 
-    private class Watch(var pos: Long, var at: Long, var moved: Long)
+    /** pos — позиция плеера, shown — показанное время (с) на момент at */
+    private class Watch(var pos: Long, var at: Long, var moved: Long, var shown: Long)
 
     private var watch: Watch? = null
 
@@ -595,19 +631,20 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val t = System.currentTimeMillis()
         val w = watch
         if (w == null || playback.paused) {
-            watch = Watch(pos, t, t)
+            watch = Watch(pos, t, t, position())
             return
         }
         val dWall = t - w.at
         val dPos = pos - w.pos
         if (dPos > dWall + 5000) {
-            val expected = a.start + maxOf(0L, (w.pos - a.base!!) / 1000) + dWall / 1000
+            val expected = w.shown + dWall / 1000
             Log.i(TAG, "stream jumped, restore $expected")
             watch = null
             return restorePosition(expected)
         }
         w.pos = pos
         w.at = t
+        w.shown = position()
         if (dPos != 0L) w.moved = t
         else if (t - w.moved > 15_000 && t - archiveRetry > 15_000) {
             archiveRetry = t
@@ -803,7 +840,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         // внутри окна текущей ссылки — перемотка плеера, иначе новая ссылка на этот момент
         val a = state.archive
         if (a != null && a.base != null && playback.seekable) {
-            val target = (s.target - a.start) * 1000 + a.base!! - playback.windowOffsetMs
+            val target = if (a.pdt && playback.windowStartTimeMs != C.TIME_UNSET) s.target * 1000 - playback.windowStartTimeMs
+            else (s.target - a.start) * 1000 + a.base!! - playback.windowOffsetMs
             if (target >= 0 && target < playback.windowDurationMs - 5000) {
                 watch = null
                 playback.seekTo(target)
@@ -1342,6 +1380,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         const val SWITCH_DELAY = 700L
         const val OSD_NUMBER = 2000L
         const val SEEK_DELAY = 900L
+        /** Flussonic EVENT: конец окна архива — на столько секунд позже «сейчас» */
+        const val EVENT_AHEAD = 3600L
         const val ADAPTIVE_AFTER = 5 * 60 * 1000L
         const val SEEK_TAP = 30L
         const val SEEK_START = 30f
