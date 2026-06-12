@@ -449,16 +449,14 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val start = archive
             var dur = (now - start).coerceIn(60, 6 * 3600)
             if (programEnd > start) dur = maxOf(dur, minOf(programEnd, now) - start)
-            // Flussonic HLS: окно archive-START-DURATION с концом в будущем и event=true — сервер
-            // отдаёт EVENT-плейлист (от начала до «сейчас», дописывается), поэтому недавнюю передачу
-            // можно смотреть до края эфира без переподключений. Без event=true окно с концом
-            // «сейчас» кончалось бы через время, равное отставанию, и ссылка менялась бы по кругу.
-            // «…-now» не годится: по документации плеер начинает такой плейлист с края эфира.
-            // Окно прошло — плейлист стал VOD, доиграл — новая ссылка с того же места (onStreamEnded).
-            val event = CatchupUrl.flussonicHls(ch.catchupType ?: "", tpl) && now - start < 6 * 3600
-            if (event) dur = maxOf(dur, now - start + EVENT_AHEAD)
-            url = CatchupUrl.prepare(tpl, start, dur, now)
-            if (event) url = CatchupUrl.withQuery(url, "event=true")
+            // Flussonic HLS, передача моложе 6 ч: archive-START-now.m3u8 — EVENT-плейлист от начала
+            // до «сейчас», дописывается; недавнюю передачу можно смотреть до края эфира без
+            // переподключений. С окном фиксированной длины (конец — «сейчас») ссылка кончалась бы
+            // через время, равное отставанию, и менялась бы по кругу. «?event=true» из документации
+            // не годится: балансировщики провайдеров отбрасывают параметры и отдают VOD.
+            // Плеер начинает EVENT-плейлист у края эфира — onReady ставит его на начало передачи.
+            val ready = if (CatchupUrl.flussonicHls(ch.catchupType ?: "", tpl) && now - start < 6 * 3600) tpl.replace("\${duration}", "now") else tpl
+            url = CatchupUrl.prepare(ready, start, dur, now)
             a = Archive(start)
             Log.i(TAG, "archive ${ch.name} $url")
         } else url = CatchupUrl.prepare(ch.url, null, 0, Clock.now())
@@ -1380,8 +1378,6 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         const val SWITCH_DELAY = 700L
         const val OSD_NUMBER = 2000L
         const val SEEK_DELAY = 900L
-        /** Flussonic EVENT: конец окна архива — на столько секунд позже «сейчас» */
-        const val EVENT_AHEAD = 3600L
         const val ADAPTIVE_AFTER = 5 * 60 * 1000L
         const val SEEK_TAP = 30L
         const val SEEK_START = 30f

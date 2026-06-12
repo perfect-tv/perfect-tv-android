@@ -59,16 +59,12 @@ object CatchupUrl {
     }
 
     /**
-     * Flussonic с HLS-архивом (archive-/mono-/video-…-START-DURATION.m3u8): можно запросить
-     * EVENT-плейлист (`event=true`) — если конец окна ещё не наступил, сервер отдаёт сегменты от
-     * начала до текущего момента и дописывает новые, а когда конец пройдёт — плейлист станет VOD.
+     * Flussonic с HLS-архивом (archive-/mono-/video-…-START-DURATION.m3u8): вместо длительности
+     * можно подставить `now` — EVENT-плейлист от начала до текущего момента, дописывается.
      */
     fun flussonicHls(type: String, tpl: String) =
         Regex("^(flussonic|fs)", RegexOption.IGNORE_CASE).containsMatchIn(type) &&
             Regex("-\\$\\{start\\}-\\$\\{duration\\}\\.m3u8").containsMatchIn(tpl)
-
-    /** Добавить параметр запроса */
-    fun withQuery(url: String, q: String) = url + (if (url.contains('?')) "&" else "?") + q
 
     /**
      * Подставить значения в шаблон.
