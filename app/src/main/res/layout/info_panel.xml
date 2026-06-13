@@ -103,7 +103,7 @@
                 <top.rootu.perfecttv.ui.InfoBar
                     android:id="@+id/info_bar"
                     android:layout_width="0dp"
-                    android:layout_height="3.5dp"
+                    android:layout_height="14dp"
                     android:layout_marginStart="7dp"
                     android:layout_marginEnd="7dp"
                     android:layout_weight="1" />

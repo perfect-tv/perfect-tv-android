@@ -218,16 +218,27 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
         invalidate()
     }
 
+    /**
+     * Полоса толщиной 0,35 em по центру View; маркер перемотки — на всю высоту View (она больше
+     * толщины полосы: рисовать за границами View нельзя — Android обрезает).
+     */
     override fun onDraw(c: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        val r = h / 2
-        U.roundRect(c, 0f, 0f, w, h, r, U.FILL_MARKED)
-        U.roundRect(c, 0f, 0f, w * buffer, h, r, U.wa(0.35f))
-        U.roundRect(c, 0f, 0f, w * value, h, r, if (seek != null) U.wa(0.6f) else U.WHITE)
+        val t = minOf(h, U.px(0.35f))
+        val top = (h - t) / 2
+        val bottom = top + t
+        val r = t / 2
+        U.roundRect(c, 0f, top, w, bottom, r, U.FILL_MARKED)
+        U.roundRect(c, 0f, top, w * buffer, bottom, r, U.wa(0.35f))
+        U.roundRect(c, 0f, top, w * value, bottom, r, if (seek != null) U.wa(0.6f) else U.WHITE)
         seek?.let {
-            val x = w * it
-            U.roundRect(c, x - h * 0.6f, -h * 0.8f, x + h * 0.6f, h * 1.8f, h * 0.3f, U.WHITE)
+            // маркер: белый с тёмной обводкой — виден и на белой части полосы
+            val half = U.px(0.25f)
+            val x = (w * it).coerceIn(half, w - half)
+            val edge = U.px(0.1f)
+            U.roundRect(c, x - half - edge, 0f, x + half + edge, h, half, U.PANEL)
+            U.roundRect(c, x - half, edge, x + half, h - edge, half, U.WHITE)
         }
     }
 }
