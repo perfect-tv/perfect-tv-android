@@ -162,7 +162,7 @@ class InfoPanel(val view: View) {
                 // логотип со своей подложкой на всю область баннера
                 banner.setPadding(0, 0, 0, 0)
                 banner.background = null
-                Logos.into(banner, ch)
+                Logos.into(banner, ch, badge = false)   // в области баннера номер-бейдж не нужен
             }
         }
         U.show(moreBox, more)
