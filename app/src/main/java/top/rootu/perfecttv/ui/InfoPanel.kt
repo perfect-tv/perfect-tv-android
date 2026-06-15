@@ -165,12 +165,63 @@ class InfoPanel(val view: View) {
                 Logos.into(banner, ch, badge = false)   // в области баннера номер-бейдж не нужен
             }
         }
-        U.show(moreBox, more)
+        animateMore(more)
     }
 
     fun collapse() {
         more = false
-        U.show(moreBox, false)
+        animateMore(false)
+    }
+
+    private var moreAnim: android.animation.ValueAnimator? = null
+
+    /**
+     * Описание выдвигается/сворачивается по высоте с проявлением (как max-height/opacity плагина,
+     * 0,25 с). Без анимаций (настройка) или когда панель скрыта — сразу.
+     */
+    private fun animateMore(show: Boolean) {
+        moreAnim?.cancel()
+        moreAnim = null
+        val lp = moreBox.layoutParams
+        val shown = moreBox.visibility == View.VISIBLE
+        if (!Anim.on || !visible || view.width == 0) {
+            lp.height = LinearLayout.LayoutParams.WRAP_CONTENT
+            moreBox.alpha = 1f
+            U.show(moreBox, show)
+            moreBox.requestLayout()
+            return
+        }
+        if (show == shown && lp.height == LinearLayout.LayoutParams.WRAP_CONTENT) return
+        val from = if (shown) moreBox.height else 0
+        val to = if (show) {
+            val w = view.width - view.paddingLeft - view.paddingRight
+            moreBox.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            moreBox.measuredHeight
+        } else 0
+        val a0 = if (shown) moreBox.alpha else 0f
+        lp.height = from
+        moreBox.visibility = View.VISIBLE
+        val anim = android.animation.ValueAnimator.ofFloat(0f, 1f).setDuration(250)
+        anim.interpolator = android.view.animation.DecelerateInterpolator()
+        anim.addUpdateListener {
+            val f = it.animatedValue as Float
+            lp.height = Math.round(from + (to - from) * f)
+            moreBox.alpha = a0 + ((if (show) 1f else 0f) - a0) * minOf(1f, f * 1.25f)
+            moreBox.requestLayout()
+        }
+        anim.addListener(object : android.animation.AnimatorListenerAdapter() {
+            private var cancelled = false
+            override fun onAnimationCancel(animation: android.animation.Animator) { cancelled = true }
+            override fun onAnimationEnd(animation: android.animation.Animator) {
+                if (cancelled) return
+                lp.height = LinearLayout.LayoutParams.WRAP_CONTENT
+                moreBox.alpha = 1f
+                if (!show) moreBox.visibility = View.GONE
+                moreBox.requestLayout()
+            }
+        })
+        moreAnim = anim
+        anim.start()
     }
 
     private val hideRun = Runnable { hide() }

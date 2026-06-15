@@ -12,6 +12,7 @@
     <color name="fill_marked">#2EFFFFFF</color>   <!-- отмечено (играет), подложка шкалы -->
     <color name="fill_active">#38FFFFFF</color>   <!-- строка в фокусе вне активной зоны -->
     <color name="line">#14FFFFFF</color>
+    <color name="line_strong">#1AFFFFFF</color>  <!-- разделитель инфопанели и описания -->
     <!-- панели и окна -->
     <color name="panel">#EB1A1B1C</color>
     <color name="panel_card">#D91A1B1C</color>
