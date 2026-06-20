@@ -34,7 +34,6 @@ class TvActivity : Activity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         U.init(this)
-        Logos.init(this)
         Icons.init(this)
         Anim.on = Prefs.animations
         setContentView(R.layout.activity_tv)

@@ -191,6 +191,12 @@
     <string name="ring_like_fire_tv">Кольцо (как Fire TV)</string>
     <string name="rows_like_google">Ряды (как Google)</string>
     <string name="keypad">Клавиатура</string>
+    <string name="all_channels">Все каналы</string>
+    <string name="logo_cache">Кэш логотипов каналов</string>
+    <string name="logo_cache_sub">хранится на устройстве, показывается без сети; OK — очистить</string>
+    <string name="logo_cache_cleared">Кэш логотипов очищен</string>
+    <string name="size_kb">%1$d КБ</string>
+    <string name="size_mb">%1$s МБ</string>
     <string name="favourites">Избранное</string>
     <string name="the_playlist_was_not_updated">"Плейлист не обновился: "</string>
     <string name="the_playlist_did_not_load">Плейлист не загрузился</string>

@@ -25,12 +25,43 @@ object Logos {
     private val pending = HashSet<String>()
     private val waiters = HashMap<String, MutableList<() -> Unit>>()
 
+    /**
+     * Загрузчик с собственным дисковым кэшем логотипов (picon): хранится, сколько бы ни разрешал
+     * сервер (respectCacheHeaders = false) — логотипы почти не меняются, а новый логотип
+     * в плейлисте — это новый адрес. При перезапуске логотипы берутся с диска, без сети.
+     * Вызывается один раз на процесс (App.onCreate).
+     */
     fun init(context: Context) {
-        loader = ImageLoader.Builder(context)
+        if (::loader.isInitialized) return
+        val app = context.applicationContext
+        // прежний общий кэш Coil (до своего кэша логотипов) — убрать
+        java.io.File(app.cacheDir, "image_cache").deleteRecursively()
+        loader = ImageLoader.Builder(app)
             .crossfade(false)
             .allowRgb565(true)
+            .respectCacheHeaders(false)
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(java.io.File(app.cacheDir, "picons"))
+                    .maxSizeBytes(CACHE_BYTES)
+                    .build()
+            }
             .build()
     }
+
+    /** Размер кэша логотипов на диске, байт */
+    fun cacheSize(): Long = if (::loader.isInitialized) loader.diskCache?.size ?: 0L else 0L
+
+    /** Очистить кэш логотипов (диск и память): логотипы скачаются заново */
+    fun clearCache() {
+        if (!::loader.isInitialized) return
+        loader.diskCache?.clear()
+        loader.memoryCache?.clear()
+        bitmaps.evictAll()
+        failed.clear()
+    }
+
+    private const val CACHE_BYTES = 64L * 1024 * 1024
 
     /** Битмап логотипа или null (ещё грузится / нет). [ready] — вызвать, когда загрузится */
     fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? {

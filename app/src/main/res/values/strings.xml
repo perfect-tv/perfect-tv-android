@@ -195,6 +195,12 @@
     <string name="ring_like_fire_tv">Ring (like Fire TV)</string>
     <string name="rows_like_google">Rows (like Google)</string>
     <string name="keypad">Keypad</string>
+    <string name="all_channels">All channels</string>
+    <string name="logo_cache">Channel logo cache</string>
+    <string name="logo_cache_sub">kept on the device, shown without network; OK — clear</string>
+    <string name="logo_cache_cleared">Logo cache cleared</string>
+    <string name="size_kb">%1$d KB</string>
+    <string name="size_mb">%1$s MB</string>
     <string name="favourites">Favourites</string>
     <string name="the_playlist_was_not_updated">"The playlist was not updated: "</string>
     <string name="the_playlist_did_not_load">The playlist did not load</string>

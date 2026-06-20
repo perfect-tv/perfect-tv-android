@@ -82,6 +82,29 @@ class GuideLayer(private val tv: Tv) : Layer {
         open(focused, group?.key)
     }
 
+    /**
+     * Скрыть канал или категорию и встать рядом, а не на первую категорию: [hide] скрывает
+     * (меняет каталог), [gone] — канал после этого не виден, [groupGone] — скрыта эта категория.
+     * Канал в фокусе пропал — соседний в той же категории (предыдущий, нет — следующий);
+     * пропала сама категория — соседняя (предыдущая, нет — следующая).
+     */
+    fun reloadAfterHide(gone: (Channel) -> Boolean, groupGone: String?, hide: () -> Unit) {
+        val list = channels
+        var gk = group?.key
+        var ch: Channel? = focused
+        if (gk != null && gk == groupGone) {
+            gk = (groups.getOrNull(groupIndex - 1) ?: groups.getOrNull(groupIndex + 1))?.key
+            ch = null
+        } else if (ch != null && gone(ch)) {
+            ch = list.subList(0, index).lastOrNull { !gone(it) } ?: list.drop(index + 1).firstOrNull { !gone(it) }
+            if (ch == null) {
+                gk = (groups.getOrNull(groupIndex - 1) ?: groups.getOrNull(groupIndex + 1))?.key
+            }
+        }
+        hide()
+        open(ch, gk)
+    }
+
     fun setView(gridView: Boolean) {
         grid = gridView
         zone = Zone.CHANNELS

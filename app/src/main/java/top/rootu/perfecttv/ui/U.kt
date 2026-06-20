@@ -159,6 +159,11 @@ object Fmt {
         return (if (h > 0) "$h:" + pad2(m) else m.toString()) + ":" + pad2(s)
     }
 
+    /** Размер на диске: «850 КБ», «12,4 МБ» */
+    fun size(bytes: Long): String =
+        if (bytes < 1024 * 1024) str(R.string.size_kb, (bytes + 1023) / 1024)
+        else str(R.string.size_mb, String.format(top.rootu.perfecttv.core.Lang.locale, "%.1f", bytes / 1048576.0))
+
     /** «1д 2ч 5м» */
     fun until(sec0: Long): String {
         val sec = maxOf(0L, sec0)

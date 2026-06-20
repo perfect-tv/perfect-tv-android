@@ -7,7 +7,7 @@ import top.rootu.perfecttv.core.Prefs
  * очки адаптивной сортировки (порт tv_plugin/src/playlist/catalog.js).
  * Пользовательские данные хранятся в БД ([Repo]) по ключу канала.
  */
-class Catalog(val playlist: Playlist, val channels: List<Channel>, private val repo: Repo, favoritesTitle: String) {
+class Catalog(val playlist: Playlist, val channels: List<Channel>, private val repo: Repo, favoritesTitle: String, private val allTitle: String) {
 
     class Group(val key: String, val title: String, val channels: List<Channel>, val favorites: Boolean = false)
 
@@ -53,6 +53,15 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
             list.add(v)
             map[g.key] = v
         }
+        // «Все каналы» — первой после избранного: каналы всех видимых категорий в порядке плейлиста
+        // (без скрытых); скрыть или заблокировать её нельзя — это не категория плейлиста
+        if (list.isNotEmpty()) {
+            var all = channels.filter { it.group !in hiddenGroups && it.key !in hiddenChannels }
+            if (adaptive) all = all.sortedWith(compareByDescending<Channel> { scores[it.key] ?: 0 }.thenBy { it.num })
+            val g = Group(ALL_KEY, allTitle, all)
+            list.add(0, g)
+            map[ALL_KEY] = g
+        }
         groupList = list
         groupMap = map
     }
@@ -73,6 +82,7 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
     /** Категория канала: предпочтительно [preferKey], если канал в ней есть, иначе родная */
     fun groupOf(ch: Channel, preferKey: String?): Group {
         group(preferKey)?.let { if (ch in it.channels) return it }
+        groupList.firstOrNull { it.key != ALL_KEY && ch in it.channels }?.let { return it }
         groupList.firstOrNull { ch in it.channels }?.let { return it }
         return groupList.firstOrNull() ?: favGroup
     }
@@ -126,7 +136,7 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
     }
 
     fun hideGroup(key: String) {
-        if (key == FAV_KEY) return
+        if (key == FAV_KEY || key == ALL_KEY) return
         hiddenGroups[key] = key
         repo.setHidden(playlist.id, "group", key, key, true)
         applyView()
@@ -167,6 +177,9 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
 
     companion object {
         const val FAV_KEY = ""
+        /** «Все каналы»: ключ не совпадёт ни с одной категорией плейлиста (символ частной зоны —
+         *  допустим в XML SharedPreferences, куда сохраняется последняя категория) */
+        const val ALL_KEY = "\uE000all"
         const val HISTORY_SIZE = 11
     }
 }

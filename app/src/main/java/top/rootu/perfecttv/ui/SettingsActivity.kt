@@ -11,6 +11,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import top.rootu.perfecttv.App
 import top.rootu.perfecttv.core.Clock
@@ -48,13 +49,43 @@ class SettingsActivity : Activity() {
         super.onDestroy()
     }
 
+    // та же страница перестраивается (изменили настройку, восстановили скрытое) — фокус и прокрутка
+    // остаются на месте: номер пункта в списке и прокрутка старой страницы
+    private var keepIndex = -1
+    private var keepScroll = 0
+
     /** Новая страница (settings_page.xml) с заголовком; вернёт список для пунктов */
     private fun page(title: String): LinearLayout {
+        keepIndex = -1
+        keepScroll = 0
+        (frame.getChildAt(0) as? ScrollView)?.let { old ->
+            if (old.findViewById<TextView>(R.id.settings_title)?.text?.toString() != title) return@let
+            val list = old.findViewById<LinearLayout>(R.id.settings_list) ?: return@let
+            var v: View? = list.findFocus()
+            while (v != null && v.parent !== list) v = v.parent as? View
+            if (v != null) keepIndex = list.indexOfChild(v)
+            keepScroll = old.scrollY
+        }
         frame.removeAllViews()
         val scroll = layoutInflater.inflate(R.layout.settings_page, frame, false)
         scroll.findViewById<TextView>(R.id.settings_title).text = title
         frame.addView(scroll)
         return scroll.findViewById(R.id.settings_list)
+    }
+
+    /** Фокус: на тот же пункт, что до перестройки страницы (или соседний выше), иначе — на [first] */
+    private fun focus(col: LinearLayout, first: View?) {
+        var i = minOf(keepIndex, col.childCount - 1)
+        while (i >= 0 && !col.getChildAt(i).isFocusable) i--
+        val v = if (keepIndex >= 0 && i >= 0) col.getChildAt(i) else null
+        if (v == null) {
+            first?.requestFocus()
+            return
+        }
+        val scroll = col.parent as ScrollView
+        val y = keepScroll
+        scroll.post { scroll.scrollTo(0, y) }
+        v.requestFocus()
     }
 
     private fun section(col: LinearLayout, title: String) {
@@ -138,6 +169,11 @@ class SettingsActivity : Activity() {
             repo.resetAllScores()
             android.widget.Toast.makeText(this, str(R.string.scores_reset), android.widget.Toast.LENGTH_SHORT).show()
         }
+        item(col, str(R.string.logo_cache), Fmt.size(Logos.cacheSize()), str(R.string.logo_cache_sub)) {
+            Logos.clearCache()
+            android.widget.Toast.makeText(this, str(R.string.logo_cache_cleared), android.widget.Toast.LENGTH_SHORT).show()
+            showMain()
+        }
         val hiddenCount = repo.allHidden().size
         item(col, str(R.string.hidden_categories_and_channels), if (hiddenCount > 0) hiddenCount.toString() else str(R.string.none), str(R.string.all_playlists_ok_restore)) { showHidden() }
         item(col, str(R.string.reload_programme_every), str(R.string.x_h, Prefs.epgRefreshHours)) {
@@ -159,7 +195,7 @@ class SettingsActivity : Activity() {
             }
             item(col, str(R.string.remove_pin), "", str(R.string.locks_stop_working_marks_are_kept)) { showPin(Prefs.pin, remove = true) }
         }
-        first?.requestFocus()
+        focus(col, first)
     }
 
     // ------------------------------------------------------------------ скрытое
@@ -177,7 +213,7 @@ class SettingsActivity : Activity() {
             }
             if (first == null) first = v
         }
-        first?.requestFocus()
+        focus(col, first)
     }
 
     // ------------------------------------------------------------------ файл плейлиста
@@ -233,7 +269,7 @@ class SettingsActivity : Activity() {
             }
             if (first == null) first = v
         }
-        first?.requestFocus()
+        focus(col, first)
     }
 
     // форма плейлиста, из которой ушли в выбор файла, — вернуть её (с выбранным путём в поле)

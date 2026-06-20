@@ -194,7 +194,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     fun open(p: Playlist) {
         playlist = p
         Prefs.lastPlaylist = p.id
-        catalog = repo.loadCatalog(p, str(R.string.favourites))
+        catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         val cat = catalog!!
         if (cat.channels.isEmpty() || repo.isStale(p)) {
             if (cat.channels.isEmpty()) {
@@ -234,7 +234,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         // первая загрузка: каналы появляются по мере разбора — перечитать каталог
         val p = playlist ?: return
         if (state.channel == null && (catalog?.channels?.size ?: 0) < e.channels) {
-            catalog = repo.loadCatalog(p, str(R.string.favourites))
+            catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
             if (layers.contains(guide)) guide.reload()
         }
     }
@@ -249,7 +249,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             return
         }
         val cur = state.channel
-        catalog = repo.loadCatalog(p, str(R.string.favourites))
+        catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         // тот же канал в новом каталоге (по ключу)
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
@@ -413,7 +413,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
      */
     fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false, unlocked: Boolean = false) {
         // блокировка: заблокированный канал или категория — только с PIN; играющий повторно не спрашиваем
-        if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch)) {
+        // из закрытого канала, открытого по PIN, в другой закрытый — PIN уже вводили, не спрашиваем
+        if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch) && !pinPassed) {
             main.removeCallbacks(switchRun)
             pending = null
             return askPin(ch.title(), {
@@ -425,6 +426,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         }
         main.removeCallbacks(switchRun)
         pending = null
+        // PIN «действует», пока смотрим закрытые каналы подряд; открытый канал — сброс. Канал,
+        // который заблокировали прямо во время просмотра, PIN не открывал — флаг не ставится.
+        if (ch !== state.channel) pinPassed = catalog?.isLocked(ch) == true && (unlocked || pinPassed || sessionUnlocked(ch))
         stopSeekHold()
         seek = null
         main.removeCallbacks(applySeekRun)
@@ -480,6 +484,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         closeGuide(true)
         showInfo()
     }
+
+    /** Играет закрытый канал, открытый вводом PIN (или переходом из такого же) */
+    private var pinPassed = false
 
     // разблокировано до выхода из приложения (настройка «Спрашивать PIN: один раз»)
     private val unlockedKeys = HashSet<String>()
@@ -1260,8 +1267,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "fav" -> { cat.toggleFavorite(ch); guide.reload() }
             "fav_up" -> { cat.moveFavorite(ch, -1); guide.reload() }
             "fav_down" -> { cat.moveFavorite(ch, 1); guide.reload() }
-            "hide" -> { cat.hideChannel(ch); guide.reload(); toast.show(str(R.string.channel_hidden)) }
-            "hide_group" -> { cat.hideGroup(ch.group); guide.reload(); toast.show(str(R.string.category_hidden)) }
+            "hide" -> { guide.reloadAfterHide({ it.key == ch.key }, null) { cat.hideChannel(ch) }; toast.show(str(R.string.channel_hidden)) }
+            "hide_group" -> { guide.reloadAfterHide({ it.group == ch.group }, ch.group) { cat.hideGroup(ch.group) }; toast.show(str(R.string.category_hidden)) }
             "hidden" -> openHidden()
             "lock" -> ensurePin { cat.setLocked("channel", ch.key, true); unlockedKeys.remove(ch.key); guide.refresh(); toast.show(str(R.string.channel_locked)) }
             "lock_group" -> ensurePin { cat.setLocked("group", ch.groupKey, true); unlockedKeys.remove("g:" + ch.groupKey); guide.refresh(); toast.show(str(R.string.category_locked)) }
@@ -1311,7 +1318,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val p = repo.playlist(playlist?.id ?: return) ?: return
         playlist = p
         val cur = state.channel
-        catalog = repo.loadCatalog(p, str(R.string.favourites))
+        catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
     }

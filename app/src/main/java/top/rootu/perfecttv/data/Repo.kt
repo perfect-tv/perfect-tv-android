@@ -106,7 +106,7 @@ class Repo(context: Context) {
     }
 
     /** Каналы плейлиста из БД (то, что уже записано, — в том числе во время первой загрузки) */
-    fun loadCatalog(p: Playlist, favoritesTitle: String): Catalog {
+    fun loadCatalog(p: Playlist, favoritesTitle: String, allTitle: String): Catalog {
         val list = ArrayList<Channel>()
         db.readableDatabase.rawQuery("SELECT num,key,name,url,grp,logo,tvg_id,tvg_name,tvg_shift,catchup_type,catchup_source,catchup_days," +
             "user_agent,referrer,headers_json FROM channel WHERE playlist_id=? ORDER BY num", arrayOf(p.id.toString())).use { c ->
@@ -124,7 +124,7 @@ class Repo(context: Context) {
         }
         maxArchiveDays = maxOf(maxArchiveDays, list.maxOfOrNull { it.archiveDays } ?: 0)
         mapFor.remove(p.id)
-        return Catalog(p, list, this, favoritesTitle)
+        return Catalog(p, list, this, favoritesTitle, allTitle)
     }
 
     /**

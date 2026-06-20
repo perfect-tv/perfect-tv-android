@@ -12,6 +12,7 @@ class App : Application() {
         top.rootu.perfecttv.core.Lang.init(this)
         Net.init(this)
         repo = Repo(this)
+        top.rootu.perfecttv.ui.Logos.init(this)
     }
 
     companion object {
