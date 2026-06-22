@@ -378,16 +378,49 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         exitRequest()
     }
 
-    /** «Назад» дважды (в течение 2 с) — выход */
+    /**
+     * «Назад» дважды (в течение 2 с) — выход. Смотрим закрытые каналы, открытые по PIN, —
+     * вместо выхода возврат к последнему открытому каналу; недавние каналы — как до закрытых.
+     */
     fun exitRequest() {
         val t = System.currentTimeMillis()
+        val back = lockedReturn()
         if (t - backTime < BACK_EXIT) {
             backTime = 0
+            if (back != null) return leaveLocked(back)
             activity.finish()
             return
         }
         backTime = t
-        toast.show(str(R.string.press_back_again_to_exit))
+        toast.show(if (back != null) str(R.string.press_back_again_to_leave_locked) else str(R.string.press_back_again_to_exit))
+    }
+
+    /**
+     * Куда вернуться из закрытого канала по «Назад» ×2: последний незаблокированный канал перед
+     * закрытыми, а если его нет (запустились сразу на закрытом) — первый незаблокированный
+     * из недавних. Играет не закрытый канал — null (обычный выход).
+     */
+    private fun lockedReturn(): Channel? {
+        val cat = catalog ?: return null
+        val cur = state.channel ?: return null
+        if (!cat.isLocked(cur)) return null
+        beforeLocked?.let { if (!cat.isLocked(it)) return it }
+        return (historyBeforeLocked ?: cat.history).mapNotNull { cat.byKey[it] }.firstOrNull { it !== cur && !cat.isLocked(it) }
+    }
+
+    /** Выйти из закрытых каналов: история — как до них, PIN снова нужен, играет [ch] */
+    private fun leaveLocked(ch: Channel) {
+        val cat = catalog
+        val gk = beforeLockedGroup
+        // история — как до закрытых; если её не запомнили — просто без закрытых каналов
+        val h = historyBeforeLocked ?: cat?.history?.filter { k -> cat.byKey[k]?.let { !cat.isLocked(it) } ?: true }
+        h?.let { cat?.replaceHistory(it) }
+        unlockedKeys.clear()
+        pinPassed = false
+        beforeLocked = null
+        historyBeforeLocked = null
+        closeGuide(true)
+        playChannel(ch, gk)
     }
 
     // ================================================================== воспроизведение
@@ -417,18 +450,35 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch) && !pinPassed) {
             main.removeCallbacks(switchRun)
             pending = null
+            val dir = switchDirection
             return askPin(ch.title(), {
                 if (!Prefs.pinEveryTime) { unlockedKeys.add(ch.key); unlockedKeys.add("g:" + ch.groupKey) }
                 playChannel(ch, groupKey, archive, programEnd, reload, unlocked = true)
             }) {
-                if (!hasVideo()) openGuide() else updateInfo()
+                // листали ←/→ — следующий в ту же сторону канал без PIN (закрытые пропускаем)
+                val skip = if (dir != 0) nextOpen(ch, groupKey, dir) else null
+                if (skip != null) playChannel(skip, groupKey)
+                else if (!hasVideo()) openGuide() else updateInfo()
             }
         }
         main.removeCallbacks(switchRun)
         pending = null
         // PIN «действует», пока смотрим закрытые каналы подряд; открытый канал — сброс. Канал,
         // который заблокировали прямо во время просмотра, PIN не открывал — флаг не ставится.
-        if (ch !== state.channel) pinPassed = catalog?.isLocked(ch) == true && (unlocked || pinPassed || sessionUnlocked(ch))
+        if (ch !== state.channel) {
+            val was = pinPassed
+            pinPassed = catalog?.isLocked(ch) == true && (unlocked || pinPassed || sessionUnlocked(ch))
+            // вошли в закрытые каналы — запомнить, куда вернуться по «Назад» ×2, и историю до них
+            if (pinPassed && !was) {
+                beforeLocked = state.channel?.takeIf { catalog?.isLocked(it) != true }
+                beforeLockedGroup = state.groupKey
+                historyBeforeLocked = catalog?.history?.toList()
+            }
+            if (!pinPassed) {
+                beforeLocked = null
+                historyBeforeLocked = null
+            }
+        }
         stopSeekHold()
         seek = null
         main.removeCallbacks(applySeekRun)
@@ -487,6 +537,24 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     /** Играет закрытый канал, открытый вводом PIN (или переходом из такого же) */
     private var pinPassed = false
+    /** Последний открытый канал перед закрытыми (и его категория), история до закрытых */
+    private var beforeLocked: Channel? = null
+    private var beforeLockedGroup: String? = null
+    private var historyBeforeLocked: List<String>? = null
+
+    /** Следующий от [from] в сторону [dir] канал категории, для которого PIN не нужен; нет — null */
+    private fun nextOpen(from: Channel, groupKey: String?, dir: Int): Channel? {
+        val cat = catalog ?: return null
+        val list = (cat.group(groupKey) ?: cat.groupOf(from, null)).channels
+        val n = list.size
+        val i = list.indexOf(from)
+        if (n == 0 || i < 0) return null
+        for (k in 1 until n) {
+            val c = list[((i + dir * k) % n + n) % n]
+            if (c === state.channel || !cat.isLocked(c) || sessionUnlocked(c)) return c
+        }
+        return null
+    }
 
     // разблокировано до выхода из приложения (настройка «Спрашивать PIN: один раз»)
     private val unlockedKeys = HashSet<String>()
@@ -703,10 +771,15 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val next = pending ?: return@Runnable
         val gk = switchGroup
         pending = null
+        switchDirection = pendingDir
         playChannel(next, gk)
+        switchDirection = 0
         main.postDelayed({ carousel.hide() }, 1500)
     }
     private var switchGroup: String? = null
+    // направление листания ←/→ (для отмены PIN: включить следующий в ту же сторону)
+    private var pendingDir = 0
+    private var switchDirection = 0
 
     private fun switchRelative(dir: Int) {
         val base = pending ?: state.channel ?: return openGuide()
@@ -719,6 +792,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val ni = (i + dir + n) % n
         val next = list[ni]
         pending = next
+        pendingDir = dir
         switchGroup = g.key
         updateInfo()
         info.show(Prefs.infoHide)

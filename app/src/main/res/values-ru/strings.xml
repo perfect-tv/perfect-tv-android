@@ -22,7 +22,7 @@
     <string name="guide_info">Гид, Инфо</string>
     <string name="tv_guide_info_panel">ТВ-гид, инфопанель</string>
     <string name="back_twice">Назад ×2</string>
-    <string name="exit_the_app">Выход из приложения</string>
+    <string name="exit_the_app">Выход из приложения (с закрытого канала — к последнему открытому)</string>
     <string name="tv_guide">ТВ-гид</string>
     <string name="channel">Канал</string>
     <string name="category">Категория</string>
@@ -197,6 +197,7 @@
     <string name="logo_cache_cleared">Кэш логотипов очищен</string>
     <string name="size_kb">%1$d КБ</string>
     <string name="size_mb">%1$s МБ</string>
+    <string name="press_back_again_to_leave_locked">Нажмите «Назад» ещё раз — к последнему открытому каналу</string>
     <string name="favourites">Избранное</string>
     <string name="the_playlist_was_not_updated">"Плейлист не обновился: "</string>
     <string name="the_playlist_did_not_load">Плейлист не загрузился</string>

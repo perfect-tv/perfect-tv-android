@@ -26,7 +26,7 @@
     <string name="guide_info">Guide, Info</string>
     <string name="tv_guide_info_panel">TV guide, info panel</string>
     <string name="back_twice">Back ×2</string>
-    <string name="exit_the_app">Exit the app</string>
+    <string name="exit_the_app">Exit the app (on a locked channel — back to the last unlocked one)</string>
     <string name="tv_guide">TV guide</string>
     <string name="channel">Channel</string>
     <string name="category">Category</string>
@@ -201,6 +201,7 @@
     <string name="logo_cache_cleared">Logo cache cleared</string>
     <string name="size_kb">%1$d KB</string>
     <string name="size_mb">%1$s MB</string>
+    <string name="press_back_again_to_leave_locked">Press Back again to return to the last unlocked channel</string>
     <string name="favourites">Favourites</string>
     <string name="the_playlist_was_not_updated">"The playlist was not updated: "</string>
     <string name="the_playlist_did_not_load">The playlist did not load</string>

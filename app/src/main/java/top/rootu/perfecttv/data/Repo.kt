@@ -302,6 +302,22 @@ class Repo(context: Context) {
 
     fun history(id: Long) = keys("SELECT key FROM history WHERE playlist_id=? ORDER BY at DESC LIMIT ${Catalog.HISTORY_SIZE}", id)
 
+    /** История целиком: первый — самый недавний */
+    fun setHistory(id: Long, keys: List<String>) {
+        val db = db.writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("history", "playlist_id=?", arrayOf(id.toString()))
+            val now = Clock.nowMs()
+            keys.forEachIndexed { i, k ->
+                db.insert("history", null, ContentValues().apply { put("playlist_id", id); put("key", k); put("at", now - i) })
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun addHistory(id: Long, key: String) {
         db.writableDatabase.insertWithOnConflict("history", null, ContentValues().apply {
             put("playlist_id", id); put("key", key); put("at", Clock.nowMs())

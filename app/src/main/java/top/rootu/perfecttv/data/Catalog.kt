@@ -123,6 +123,12 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
         repo.addHistory(playlist.id, ch.key)
     }
 
+    /** Заменить историю целиком (выход из закрытых каналов — история как до них) */
+    fun replaceHistory(keys: List<String>) {
+        history = keys.take(HISTORY_SIZE).toMutableList()
+        repo.setHistory(playlist.id, history)
+    }
+
     /** Недавние каналы без текущего */
     fun recent(current: Channel?): List<Channel> = history.mapNotNull { byKey[it] }.filter { it !== current }.take(HISTORY_SIZE - 1)
 
