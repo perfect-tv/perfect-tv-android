@@ -20,7 +20,7 @@ import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Programme
 
 /**
- * Инфопанель внизу экрана (порт ui/info.js): логотип, канал, бейджи, часы, передача,
+ * Инфопанель внизу экрана: логотип, канал, бейджи, часы, передача,
  * шкала с буфером и маркером перемотки, «Далее». show(сек) — с автоскрытием,
  * show(0) — закреплена (↓). setMore() — раскрытое описание под основной строкой.
  */
@@ -71,7 +71,7 @@ class InfoPanel(val view: View) {
     init {
         banner.clipToOutline = true
         if (U.touch) {
-            // тач (не ТВ): кнопки под «Далее», как в плагине; tag кнопки — действие
+            // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
             val touch = view.findViewById<LinearLayout>(R.id.info_touch)
             touch.visibility = View.VISIBLE
             for (i in 0 until touch.childCount) touch.getChildAt(i).let { b -> b.setOnClickListener { onAction?.invoke(b.tag as String) } }
@@ -176,8 +176,8 @@ class InfoPanel(val view: View) {
     private var moreAnim: android.animation.ValueAnimator? = null
 
     /**
-     * Описание выдвигается/сворачивается по высоте с проявлением (как max-height/opacity плагина,
-     * 0,25 с). Без анимаций (настройка) или когда панель скрыта — сразу.
+     * Описание выдвигается/сворачивается по высоте с проявлением за 0,25 с.
+     * Без анимаций (настройка) или когда панель скрыта — сразу.
      */
     private fun animateMore(show: Boolean) {
         moreAnim?.cancel()

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Палитра интерфейса (styles/_vars.scss плагина); в коде — U.* (читается отсюда) -->
+<!-- Палитра интерфейса; в коде — U.* (читается отсюда) -->
 <resources>
     <color name="white">#FFFFFFFF</color>
     <color name="black">#FF000000</color>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Размеры в dp: плотность подобрана так, что высота экрана — 540 dp (Lang.wrap),
-  поэтому 1 em плагина = 10 dp (U.em на Canvas — то же самое в px).
+  поэтому 1 em = 10 dp (U.em на Canvas — то же самое в px).
 -->
 <resources>
     <dimen name="radius_s">4dp</dimen>

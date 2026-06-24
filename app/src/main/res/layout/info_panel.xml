@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Инфопанель внизу экрана (ui/info.js плагина): логотип, канал, бейджи, часы, передача,
+  Инфопанель внизу экрана: логотип, канал, бейджи, часы, передача,
   шкала, «Далее»; на сенсорных — кнопки; раскрытое описание с баннером TMDB.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -125,7 +125,7 @@
                 android:layout_marginTop="4.5dp"
                 android:textColor="@color/text_65" />
 
-            <!-- кнопки на сенсорных (не ТВ), как в плагине; tag — действие -->
+            <!-- кнопки на сенсорных (не ТВ); tag — действие -->
             <LinearLayout
                 android:id="@+id/info_touch"
                 android:layout_width="match_parent"
@@ -146,7 +146,7 @@
     </LinearLayout>
 
     <!-- раскрытое описание: баннер TMDB (или логотип канала), название, теги, текст -->
-    <!-- выдвигается по высоте (InfoPanel.setMore), сверху — разделительная полоса, как в плагине -->
+    <!-- выдвигается по высоте (InfoPanel.setMore), сверху — разделительная полоса -->
     <LinearLayout
         android:id="@+id/info_more"
         android:layout_width="match_parent"

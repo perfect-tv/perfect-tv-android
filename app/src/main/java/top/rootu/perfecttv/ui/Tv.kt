@@ -30,7 +30,7 @@ import top.rootu.perfecttv.player.CatchupUrl
 import top.rootu.perfecttv.player.Playback
 
 /**
- * Оркестратор полноэкранного ТВ (порт app.js плагина): состояние воспроизведения,
+ * Оркестратор полноэкранного ТВ: состояние воспроизведения,
  * стек слоёв, клавиши плеера, переключение каналов, архив и перемотка, пауза эфира.
  *
  * Время — unix-секунды [Clock.now]. Позиция в архиве:
@@ -1239,7 +1239,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         )
     }
 
-    /** Карточка передачи: кнопки по времени и архиву канала (detailsButtons плагина) */
+    /** Карточка передачи: кнопки по времени и архиву канала */
     fun openDetails(ch: Channel, cell: Cell) {
         val now = Clock.now()
         val buttons = ArrayList<Pair<String, String>>()

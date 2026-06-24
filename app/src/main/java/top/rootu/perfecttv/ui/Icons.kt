@@ -7,7 +7,7 @@ import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Drawable
 import top.rootu.perfecttv.R
 
-/** Значки интерфейса (Material Icons, как ui/icons.js плагина) для рисования на Canvas */
+/** Значки интерфейса (Material Icons) для рисования на Canvas */
 object Icons {
     private lateinit var archive: Drawable
     private lateinit var remind: Drawable

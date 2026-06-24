@@ -8,9 +8,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 
 /**
- * Окно «Управление» (ui/help.js плагина): кнопки по разделам. ↑/↓ — прокрутка,
+ * Окно «Управление»: кнопки по разделам. ↑/↓ — прокрутка,
  * PG± — на страницу, OK/«Назад» — закрыть. Текст держать в согласии с раскладкой
- * (Tv, GuideLayer, ScheduleLayer) и ../tv_plugin/docs/controls.md.
+ * (Tv, GuideLayer, ScheduleLayer).
  */
 class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(context, 56f, 0.86f) {
 

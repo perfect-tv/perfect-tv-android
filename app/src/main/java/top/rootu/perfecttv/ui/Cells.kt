@@ -5,7 +5,7 @@ import top.rootu.perfecttv.data.Programme
 /**
  * Ячейка ленты канала: передача из EPG или получасовой слот в промежутке без программы
  * (так по каналу без EPG можно ходить по сетке и смотреть архив с шагом 30 минут).
- * Порт tv_plugin/src/guide/cells.js.
+ * Ячейки сетки гида: передачи и пустые получасовые слоты в окне времени.
  */
 class Cell(val start: Long, val end: Long, val program: Programme?) {
     val title get() = program?.title ?: ""

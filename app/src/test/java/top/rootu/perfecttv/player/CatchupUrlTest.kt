@@ -16,13 +16,13 @@ class CatchupUrlTest {
     @Test fun flussonic() {
         assertEquals("http://h/ch/archive-\${start}-\${duration}.m3u8?token=1", CatchupUrl.template("http://h/ch/index.m3u8?token=1", "flussonic", ""))
         assertEquals("http://h/ch/timeshift_abs-\${start}.ts?token=1", CatchupUrl.template("http://h/ch/mpegts?token=1", "fs", ""))
-        // примеры из tv_plugin/legacy/tv.js
+        // mono, video, playlist
         assertEquals("http://h/325/mono-\${start}-\${duration}.m3u8?token=s", CatchupUrl.template("http://h/325/mono.m3u8?token=s", "flussonic-hls", ""))
         assertEquals("http://h/325/video-\${start}-\${duration}.ts", CatchupUrl.template("http://h/325/video.ts", "flussonic-ts", ""))
         assertEquals("http://h/325/archive-\${start}-\${duration}.m3u8", CatchupUrl.template("http://h/325/playlist.m3u8", "Flussonic", ""))
     }
 
-    /** Flussonic — окно фиксированной длины в секундах от начала (не «-now»), как в legacy/tv.js */
+    /** Flussonic: начало и длительность окна — в секундах */
     @Test fun flussonic_prepare() {
         val tpl = CatchupUrl.template("http://h/ch/index.m3u8?token=1", "flussonic", "")!!
         assertEquals("http://h/ch/archive-1700000000-5400.m3u8?token=1", CatchupUrl.prepare(tpl, 1700000000, 5400, 1700003000))

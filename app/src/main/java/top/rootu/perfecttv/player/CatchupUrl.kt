@@ -4,7 +4,7 @@ import java.net.URLEncoder
 import java.util.TimeZone
 
 /**
- * Шаблоны URL архива (catchup) — порт tv_plugin/src/core/url.js с тем же поведением.
+ * Шаблоны URL архива (catchup) (§8; примеры — CatchupUrlTest).
  *
  * Подстановки:
  *   ${start} ${utc} ${end} ${utcend} ${offset} ${duration} ${now} ${lutc} ${timestamp}
@@ -117,7 +117,7 @@ object CatchupUrl {
         return url
     }
 
-    /** formatUrlTime из core/time.js: utc — «u» в (bu), tz — сдвиг часов из (b+3) */
+    /** Дата/время в шаблоне: utc — «u» в (bu), tz — сдвиг часов из (b+3) */
     private fun formatTime(minutes: Double, format: String, utc: String, tzShift: String, tz: TimeZone): String {
         var shift = (tzShift.toIntOrNull() ?: 0) * 60.0
         val ms = Math.round(minutes * 60000)

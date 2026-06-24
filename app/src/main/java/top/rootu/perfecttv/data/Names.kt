@@ -1,6 +1,6 @@
 package top.rootu.perfecttv.data
 
-/** Нормализация названий каналов (из tv_plugin: favId в core/utils.js, shortName/translit в playlist/epgmap.js) */
+/** Нормализация названий каналов: ключ канала для пользовательских данных, короткое имя и транслит для сопоставления с EPG (§6) */
 object Names {
 
     private val KEY_RE = Regex("[\\s!-/:-@\\[-`\\{-~]+")

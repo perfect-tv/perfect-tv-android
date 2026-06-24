@@ -4,7 +4,7 @@ import java.io.BufferedReader
 
 /**
  * Потоковый парсер M3U/M3U8: читает построчно и отдаёт каналы по одному в [onChannel],
- * весь файл в памяти не держит. Правила — как в tv_plugin/src/playlist/m3u.js и catalog.js.
+ * весь файл в памяти не держит. Правила — §4.
  */
 class M3uParser(private val defaultGroup: String = "") {
 
@@ -90,7 +90,7 @@ class M3uParser(private val defaultGroup: String = "") {
         )
     }
 
-    /** Архив канала (catalog.js → catchupOf). days = 0 — «по умолчанию из настроек» */
+    /** Архив канала. days = 0 — «по умолчанию из настроек» */
     private fun catchupOf(a: Map<String, String>): Catchup? {
         val h = header
         val days = (a["catchup-days"] ?: a["tvg-rec"] ?: a["timeshift"] ?: h["catchup-days"] ?: h["tvg-rec"] ?: h["timeshift"] ?: "0")

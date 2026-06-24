@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Логика поиска TMDB (порт тестов tv_plugin/test/tmdb.test.mjs) */
+/** Логика поиска TMDB */
 class TmdbTest {
     private fun hit(title: String, date: String = "", type: String = "movie", original: String = "", backdrop: String = "") =
         Tmdb.Hit(title, original, date, backdrop, "", "", 0.0, type)

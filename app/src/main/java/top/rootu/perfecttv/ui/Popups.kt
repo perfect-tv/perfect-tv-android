@@ -16,7 +16,7 @@ import android.widget.TextView
 import top.rootu.perfecttv.data.Channel
 
 /**
- * Окно поверх плеера: затемнение и коробка по центру (layer_popup.xml, PopupLayer плагина).
+ * Окно поверх плеера: затемнение и коробка по центру (layer_popup.xml).
  * Тап вне коробки — back(). Содержимое — разметки окна, вставленные в [box].
  */
 abstract class PopupLayer(context: Context, widthEm: Float, heightFraction: Float = 0f) : Layer {
@@ -170,7 +170,7 @@ class ProgressLine(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs)
 }
 
 /**
- * Карточка передачи (ui/details.js): канал, пометка, время, название, описание с прокруткой ↑/↓,
+ * Карточка передачи: канал, пометка, время, название, описание с прокруткой ↑/↓,
  * кнопки ←/→, OK — действие кнопки.
  */
 class DetailsLayer(

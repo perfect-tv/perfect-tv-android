@@ -4,7 +4,7 @@ import top.rootu.perfecttv.core.Prefs
 
 /**
  * Каталог каналов одного плейлиста в памяти: категории, избранное, история, скрытое,
- * очки адаптивной сортировки (порт tv_plugin/src/playlist/catalog.js).
+ * очки адаптивной сортировки.
  * Пользовательские данные хранятся в БД ([Repo]) по ключу канала.
  */
 class Catalog(val playlist: Playlist, val channels: List<Channel>, private val repo: Repo, favoritesTitle: String, private val allTitle: String) {

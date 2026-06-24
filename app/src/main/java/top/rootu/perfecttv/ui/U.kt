@@ -15,14 +15,14 @@ import top.rootu.perfecttv.core.Clock
 import java.util.Calendar
 
 /**
- * Палитра, размеры и общие приёмы рисования (аналог styles/_vars.scss и _mixins.scss плагина).
- * Размеры — в «em» плагина: 1 em = высота экрана / 54 (13,3 px на 720p, 20 px на 1080p).
+ * Палитра, размеры и общие приёмы рисования.
+ * Размеры — в em: 1 em = высота экрана / 54 (13,3 px на 720p, 20 px на 1080p).
  */
 object U {
     var em = 13.3f
         private set
 
-    /** Сенсорное устройство, но не ТВ: показываем кнопки в инфопанели и ✕ в гиде (как плагин) */
+    /** Сенсорное устройство, но не ТВ: показываем кнопки в инфопанели и ✕ в гиде */
     var touch = false
         private set
 
@@ -91,7 +91,7 @@ object U {
     }
 }
 
-/** Форматирование времени (порт core/time.js плагина) */
+/** Форматирование времени и размеров */
 object Fmt {
     // дни недели и месяцы — на текущем языке (после смены языка — новые)
     private val WEEK get() = top.rootu.perfecttv.core.Lang.res.getStringArray(R.array.week_short)
