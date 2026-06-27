@@ -58,7 +58,9 @@ object U {
     val OVERLAY = c(R.color.overlay)
     val GUIDE_TOP = c(R.color.guide_top)
     val GUIDE_BOTTOM = c(R.color.guide_bottom)
-    val LIVE = c(R.color.live)
+    val LIVE = c(R.color.live)                  // эфир, линия «сейчас»
+    val ARCHIVE = c(R.color.archive)            // архив и сдвиг
+    val ON_ARCHIVE = c(R.color.on_archive)
 
     const val RADIUS_S = 0.4f
     const val RADIUS = 0.6f

@@ -100,6 +100,7 @@ class InfoPanel(val view: View) {
         set(timeStart, Fmt.hhmm(from))
         set(timeEnd, Fmt.hhmm(to))
         val f = { x: Long -> Fmt.progress(from, to, x) }
+        bar.archive = m.archive
         bar.set(f(m.position), if (m.ahead > 0) maxOf(f(m.position + m.ahead), f(m.position) + 0.01f) else f(m.position), m.seek?.let { f(it) })
         val now = Clock.now()
         if (m.seek != null) {
@@ -124,7 +125,7 @@ class InfoPanel(val view: View) {
         }
         if (m.error) badge(str(R.string.error), U.LIVE)
         if (m.paused) badge("❚❚", U.FILL_ACTIVE)
-        if (m.archive) badge(str(R.string.archive_2), U.WHITE, U.BLACK) else badge(str(R.string.live), U.LIVE)
+        if (m.archive) badge(str(R.string.archive_2), U.ARCHIVE, U.ON_ARCHIVE) else badge(str(R.string.live), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
         if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
@@ -263,6 +264,12 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
     private var buffer = 0f
     private var seek: Float? = null
 
+    /** Архив или сдвиг: шкала янтарная (эфир — белая) */
+    var archive = false
+        set(v) {
+            if (field != v) { field = v; invalidate() }
+        }
+
     fun set(v: Float, b: Float, s: Float?) {
         if (v == value && b == buffer && s == seek) return
         value = v; buffer = b; seek = s
@@ -282,7 +289,8 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
         val r = t / 2
         U.roundRect(c, 0f, top, w, bottom, r, U.FILL_MARKED)
         U.roundRect(c, 0f, top, w * buffer, bottom, r, U.wa(0.35f))
-        U.roundRect(c, 0f, top, w * value, bottom, r, if (seek != null) U.wa(0.6f) else U.WHITE)
+        val on = if (archive) U.ARCHIVE else U.WHITE
+        U.roundRect(c, 0f, top, w * value, bottom, r, if (seek != null) (on and 0xFFFFFF) or (0x99 shl 24) else on)
         seek?.let {
             // маркер: белый с тёмной обводкой — виден и на белой части полосы
             val half = U.px(0.25f)

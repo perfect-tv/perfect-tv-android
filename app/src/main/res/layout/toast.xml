@@ -5,11 +5,11 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_gravity="top|center_horizontal"
-    android:layout_marginTop="20dp"
+    android:layout_marginTop="@dimen/screen_pad_v"
     android:background="@drawable/bg_toast"
     android:paddingStart="12dp"
     android:paddingTop="7dp"
     android:paddingEnd="12dp"
     android:paddingBottom="7dp"
-    android:textSize="11sp"
+    android:textSize="12.5sp"
     android:visibility="gone" />

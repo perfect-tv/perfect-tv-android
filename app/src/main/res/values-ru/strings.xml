@@ -110,7 +110,7 @@
     <string name="hidden">Не показывать</string>
     <string name="next_to_the_name">Рядом с названием</string>
     <string name="badge_on_the_logo">Бейдж на логотипе</string>
-    <string name="without_a_logo_the_number_is_always">без логотипа номер всегда на плашке вместо него</string>
+    <string name="without_a_logo_the_number_is_always">без логотипа — буквы названия на цветной плашке</string>
     <string name="hide_info_panel_after">Скрывать инфопанель через</string>
     <string name="x_s">%1$s с</string>
     <string name="smooth_animations">Плавные анимации</string>

@@ -246,38 +246,42 @@ class GuideLayer(private val tv: Tv) : Layer {
     @SuppressLint("ViewConstructor")
     private inner class GuideView(context: Context) : View(context) {
         private val em = U.em
-        private val pTitle = U.paint(1.7f, bold = true)
-        private val pChannel = U.paint(1.05f, U.wa(0.7f))
-        private val pTime = U.paint(1f, U.wa(0.8f))
-        private val pDesc = TextPaint(U.paint(1f, U.wa(0.6f)))
-        private val pClock = U.paint(1.6f, U.wa(0.9f))
-        private val pCat = U.paint(1.25f, bold = true)
-        private val pCatArrow = U.paint(1.3f, U.wa(0.5f))
-        private val pCount = U.paint(0.8f, U.wa(0.5f))
-        private val pTick = U.paint(0.95f, U.wa(0.7f))
-        private val pNum = U.paint(0.95f, U.wa(0.5f))
-        private val pName = U.paint(1.15f)
-        private val pNameBold = U.paint(1.15f, bold = true)
-        private val pCell = U.paint(1.05f)
-        private val pCellTime = U.paint(0.85f, U.wa(0.55f))
-        private val pEmpty = U.paint(1.2f, U.wa(0.6f))
+        // текст — не мельче 1,1 em (11 sp): «Масштаб»
+        private val pTitle = U.paint(1.8f, bold = true)
+        private val pChannel = U.paint(1.2f, U.wa(0.7f))
+        private val pTime = U.paint(1.2f, U.wa(0.8f))
+        private val pDesc = TextPaint(U.paint(1.15f, U.wa(0.65f)))
+        private val pClock = U.paint(2.2f, U.wa(0.9f))
+        private val pCat = U.paint(1.4f, bold = true)
+        private val pCatArrow = U.paint(1.4f, U.wa(0.5f))
+        private val pCount = U.paint(1.1f, U.wa(0.5f))
+        private val pTick = U.paint(1.1f, U.wa(0.7f))
+        private val pNowChip = U.paint(1.1f, bold = true)
+        private val pNum = U.paint(1.15f, U.wa(0.5f))
+        private val pName = U.paint(1.35f)
+        private val pNameBold = U.paint(1.35f, bold = true)
+        private val pCell = U.paint(1.25f)
+        private val pCellTime = U.paint(1.1f, U.wa(0.55f))
+        private val pEmpty = U.paint(1.35f, U.wa(0.6f))
         private val line = Paint().apply { color = U.wa(0.25f); strokeWidth = 0.1f * em }
-        private val nowLine = Paint().apply { color = U.wa(0.7f); strokeWidth = 0.12f * em }
+        private val nowLine = Paint().apply { color = U.LIVE; strokeWidth = 0.2f * em }
         private var gradient: LinearGradient? = null
         private val bgPaint = Paint()
         private var descLayout: StaticLayout? = null
         private var descKey = ""
 
-        private val padX get() = 2f * em
-        private val padTop get() = 1.5f * em
+        // безопасная зона: 4 em по бокам, 2,4 em сверху и снизу
+        private val padX get() = 4f * em
+        private val padTop get() = 2.4f * em
+        private val padBottom get() = 2.4f * em
         private val topH get() = 7.6f * em
         private val headH get() = 2.6f * em
-        private val rowH get() = 3.2f * em
+        private val rowH get() = 3.4f * em
         private val gap get() = 0.25f * em
         private val bodyTop get() = padTop + topH + em + headH
         private val chW get() = (width - 2 * padX) * (if (grid) 0.30f else 0.45f)
 
-        fun visibleRows() = maxOf(1, ((height - bodyTop - em) / (rowH + gap)).toInt())
+        fun visibleRows() = maxOf(1, ((height - bodyTop - padBottom + gap) / (rowH + gap)).toInt())
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
             gradient = LinearGradient(0f, 0f, 0f, h.toFloat(), intArrayOf(U.GUIDE_TOP, android.graphics.Color.argb(220, 12, 13, 14), U.GUIDE_BOTTOM),
@@ -289,6 +293,10 @@ class GuideLayer(private val tv: Tv) : Layer {
             c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
             val now = Clock.now()
             if (live) winStart = liveStart()
+            if (now / 60 != nowMinute) {
+                nowMinute = now / 60
+                nowText = Fmt.hhmm(now)
+            }
             drawTop(c, now)
             drawHead(c, now)
             val list = channels
@@ -310,9 +318,24 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             if (grid) {
                 val x = gridL + (now - winStart).toFloat() / SPAN * (gridR - gridL)
-                if (x in gridL..gridR) c.drawLine(x, bodyTop - 0.3f * em, x, bodyTop + rows * (rowH + gap), nowLine)
+                if (x in gridL..gridR) {
+                    // красная линия «сейчас» и время над ней (подпись деления под плашкой не рисуется)
+                    val shown = minOf(rows, list.size - first)
+                    c.drawLine(x, bodyTop - 0.5f * em, x, bodyTop + shown * (rowH + gap) - gap, nowLine)
+                    val hw = nowChipHalf()
+                    val cx = x.coerceIn(gridL + hw, gridR - hw)
+                    val cy = bodyTop - 1.35f * em
+                    U.roundRect(c, cx - hw, cy - 0.85f * em, cx + hw, cy + 0.85f * em, 0.35f * em, U.LIVE)
+                    c.drawText(nowText, cx - pNowChip.measureText(nowText) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
+                }
             } else drawSide(c, now)
         }
+
+        // подпись плашки «сейчас»: строка меняется раз в минуту, а не на каждом кадре
+        private var nowText = ""
+        private var nowMinute = -1L
+
+        private fun nowChipHalf() = pNowChip.measureText(nowText) / 2 + 0.45f * em
 
         private fun drawTop(c: Canvas, now: Long) {
             val ch = focused ?: return
@@ -325,9 +348,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             val ref = if (zone == Zone.GRID) focusTime else now
             val cell = Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
-            U.drawText(c, ch.title(), x, t + 0.7f * em, w, pChannel)
-            U.drawText(c, p?.title ?: str(R.string.no_programme), x, t + 2.3f * em, w, pTitle)
-            U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 3.9f * em, w, pTime)
+            U.drawText(c, ch.title(), x, t + 0.6f * em, w, pChannel)
+            U.drawText(c, p?.title ?: str(R.string.no_programme), x, t + 2.35f * em, w, pTitle)
+            U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 4.05f * em, w, pTime)
             val desc = p?.desc ?: ""
             if (desc.isNotEmpty()) {
                 val key = desc + w.toInt()
@@ -337,18 +360,18 @@ class GuideLayer(private val tv: Tv) : Layer {
                         .setMaxLines(2).setEllipsize(android.text.TextUtils.TruncateAt.END).setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                 }
                 c.save()
-                c.translate(x, t + 4.6f * em)
+                c.translate(x, t + 4.9f * em)
                 descLayout?.draw(c)
                 c.restore()
             }
             val clock = Fmt.hhmm(now)
             // на сенсорных (не ТВ) — ✕ закрыть, часы левее
             val closeW = if (U.touch) 2.6f * em else 0f
-            if (U.touch) c.drawText("✕", width - padX - pClock.measureText("✕"), t + 1.4f * em, pClock)
-            c.drawText(clock, width - padX - closeW - pClock.measureText(clock), t + 1.4f * em, pClock)
+            if (U.touch) c.drawText("✕", width - padX - pClock.measureText("✕"), t + 1.7f * em, pClock)
+            c.drawText(clock, width - padX - closeW - pClock.measureText(clock), t + 1.7f * em, pClock)
             if (tv.repo.epgLoading()) {
                 val s = str(R.string.programme_is_loading)
-                c.drawText(s, width - padX - pCount.measureText(s), t + 2.8f * em, pCount)
+                c.drawText(s, width - padX - pCount.measureText(s), t + 3.4f * em, pCount)
             }
         }
 
@@ -378,12 +401,30 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (t >= winStart) {
                     val x = gl + (t - winStart).toFloat() / SPAN * (gr - gl)
                     c.drawLine(x, y + 0.6f * em, x, y + headH, line)
-                    c.drawText(Fmt.hhmm(t), x + 0.4f * em, y + 1.6f * em, pTick)
+                    val lx = x + 0.4f * em
+                    val nx = gl + (now - winStart).toFloat() / SPAN * (gr - gl)
+                    val hw = nowChipHalf() + 0.3f * em
+                    if (nx < gl || nx > gr || lx > nx + hw || lx + tickW < nx - hw) c.drawText(tickLabel(t), lx, y + 1.6f * em, pTick)
                 }
                 t += Cells.SLOT
             }
             val day = Fmt.dayLabel(maxOf(winStart, if (zone == Zone.GRID) focusTime else now))
-            c.drawText(day, gr - pCount.measureText(day), y + 0.2f * em, pCount)
+            c.drawText(day, gr - pCount.measureText(day), y - 0.1f * em, pCount)
+        }
+
+        private val tickW get() = pTick.measureText("00:00")
+
+        // подписи делений: четыре строки на окно, без выделений на кадр
+        private val tickTimes = LongArray(8)
+        private val tickTexts = arrayOfNulls<String>(8)
+
+        private fun tickLabel(t: Long): String {
+            val i = (Math.floorMod(t / Cells.SLOT, 8L)).toInt()
+            if (tickTimes[i] != t || tickTexts[i] == null) {
+                tickTimes[i] = t
+                tickTexts[i] = Fmt.hhmm(t)
+            }
+            return tickTexts[i]!!
         }
 
         private fun drawRow(c: Canvas, ch: Channel, focus: Boolean, y: Float, gl: Float, gr: Float, now: Long) {
@@ -395,20 +436,20 @@ class GuideLayer(private val tv: Tv) : Layer {
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
             var x = l + 0.35f * em
-            Logos.draw(c, context, ch, x, y + 0.25f * em, x + 3.9f * em, y + rowH - 0.25f * em, plate = chFocus) { invalidate() }
-            x += 3.9f * em + 0.7f * em
+            Logos.draw(c, context, ch, x, y + 0.25f * em, x + 4.3f * em, y + rowH - 0.25f * em, plate = chFocus) { invalidate() }
+            x += 4.3f * em + 0.7f * em
             // колонка номеров — только в режиме «рядом с названием»
             if (Prefs.numberMode == Prefs.NUMBER_NEAR_NAME) {
                 pNum.color = if (chFocus) U.BLACK else U.wa(0.5f)
                 c.drawText(ch.num.toString(), x, cy - (pNum.descent() + pNum.ascent()) / 2, pNum)
-                x += 2.4f * em
+                x += 2.8f * em
             } else x += 0.5f * em
             val current = ch === tv.state.channel
             val pn = if (current) pNameBold else pName
             pn.color = fg
             val fav = tv.catalog?.isFavorite(ch) == true
             val locked = tv.catalog?.isLocked(ch) == true
-            val isz = 1f * em
+            val isz = 1.2f * em
             val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0) + (if (locked) 1 else 0)) * (isz + 0.35f * em)
             if (grid) {
                 U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
@@ -417,11 +458,11 @@ class GuideLayer(private val tv: Tv) : Layer {
                 U.drawText(c, ch.name, x, y + 1.05f * em, r - x - 0.8f * em - iw, pn)
                 val p = tv.repo.at(ch, now)
                 pCellTime.color = if (chFocus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, p?.title ?: str(R.string.no_programme), x, y + 2.05f * em, r - x - 0.8f * em, pCellTime)
+                U.drawText(c, p?.title ?: str(R.string.no_programme), x, y + 2.3f * em, r - x - 0.8f * em - iw, pCellTime)
                 if (p != null) {
                     val bw = r - x - 0.8f * em
-                    U.roundRect(c, x, y + 2.6f * em, x + bw, y + 2.8f * em, 0.1f * em, if (chFocus) 0x33000000 else U.FILL_MARKED)
-                    U.roundRect(c, x, y + 2.6f * em, x + bw * Fmt.progress(p.start, p.stop, now), y + 2.8f * em, 0.1f * em, if (chFocus) U.BLACK else U.WHITE)
+                    U.roundRect(c, x, y + 2.95f * em, x + bw, y + 3.15f * em, 0.1f * em, if (chFocus) 0x33000000 else U.FILL_MARKED)
+                    U.roundRect(c, x, y + 2.95f * em, x + bw * Fmt.progress(p.start, p.stop, now), y + 3.15f * em, 0.1f * em, if (chFocus) U.BLACK else U.WHITE)
                 }
             }
             val ic = if (chFocus) U.BLACK else U.wa(0.7f)
@@ -441,10 +482,13 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (cr - cl < 2) continue
                 val isFocus = fc != null && fc.start == cell.start
                 val isNow = cell.start <= now && now < cell.end
+                val isPast = cell.end <= now
+                // прошедшее приглушено, идущее сейчас — ярче будущего
                 val color = when {
                     isFocus -> U.WHITE
                     cell.program == null -> U.wa(0.04f)
                     isNow -> U.FILL_NOW
+                    isPast -> U.FILL
                     else -> U.FILL_CELL
                 }
                 U.roundRect(c, cl, y, cr, y + rowH, U.px(U.RADIUS_S), color)
@@ -452,12 +496,12 @@ class GuideLayer(private val tv: Tv) : Layer {
                 var tw = cr - tl - 0.5f * em
                 // запланированное напоминание — значок часов в ячейке
                 if (cell.program != null && cell.start > now && tv.reminders.has(ch, cell.start) && tw > 2 * em) {
-                    val isz = 0.9f * em
-                    Icons.draw(c, Icons.Kind.REMIND, cr - 0.5f * em - isz, cy - isz / 2, isz, if (isFocus) U.BLACK else U.wa(0.85f))
+                    val isz = 1.1f * em
+                    Icons.draw(c, Icons.Kind.REMIND, cr - 0.5f * em - isz, cy - isz / 2, isz, if (isFocus) U.BLACK else U.ARCHIVE)
                     tw -= isz + 0.4f * em
                 }
                 if (tw > em) {
-                    pCell.color = if (isFocus) U.BLACK else if (cell.end <= now) U.wa(0.6f) else U.WHITE
+                    pCell.color = if (isFocus) U.BLACK else if (isPast) U.wa(0.45f) else U.WHITE
                     U.drawText(c, cell.title.ifEmpty { if (isFocus) Fmt.timeRange(cell.start, cell.end) else "" }, tl, cy, tw, pCell)
                 }
             }
@@ -478,11 +522,11 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (y + 1.8f * em > height) break
                 val isNow = p.start <= now
                 pCellTime.color = U.wa(0.6f)
-                c.drawText(Fmt.hhmm(p.start), l, y + 1.2f * em, pCellTime)
+                c.drawText(Fmt.hhmm(p.start), l, y + 1.3f * em, pCellTime)
                 val pn = if (isNow) pNameBold else pName
                 pn.color = U.WHITE
-                U.drawText(c, p.title, l + 4f * em, y + 0.9f * em, r - l - 4f * em, pn)
-                y += 2.2f * em
+                U.drawText(c, p.title, l + 4.6f * em, y + 0.9f * em, r - l - 4.6f * em, pn)
+                y += 2.5f * em
             }
         }
 

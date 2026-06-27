@@ -24,6 +24,9 @@
     <color name="settings_bg">#FF121314</color>
     <color name="logo_plate">#FF2A2C2F</color>
     <color name="live">#FFE53935</color>
+    <!-- архив и сдвиг: бейдж и шкала инфопанели, значки архива и напоминаний -->
+    <color name="archive">#FFFFB84D</color>
+    <color name="on_archive">#FF201400</color>   <!-- текст на янтарном -->
     <!-- текст: белый с прозрачностью -->
     <color name="text_95">#F2FFFFFF</color>
     <color name="text_90">#E6FFFFFF</color>

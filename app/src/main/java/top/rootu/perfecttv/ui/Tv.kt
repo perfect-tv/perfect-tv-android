@@ -69,6 +69,17 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private val overlay: FrameLayout = root.findViewById(R.id.overlay)
     val info = InfoPanel(root.findViewById(R.id.info_panel))
     private val toast = Toast(root.findViewById(R.id.toast))
+    private val bufferingView: View = root.findViewById(R.id.buffering)
+    private val showBufferingLater = Runnable { bufferingView.visibility = View.VISIBLE }
+
+    /** Индикатор загрузки потока: с задержкой, чтобы не мигал при коротких подгрузках */
+    private fun showBuffering(on: Boolean) {
+        main.removeCallbacks(showBufferingLater)
+        if (on) {
+            if (bufferingView.visibility != View.VISIBLE) main.postDelayed(showBufferingLater, 600)
+        } else bufferingView.visibility = View.GONE
+    }
+
     private val osd = Osd(root.findViewById(R.id.osd))
     private val carousel = Carousel(root.findViewById(R.id.carousel))
     val guide = GuideLayer(this)
@@ -101,6 +112,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                     state.error = false
                     onReady()
                 }
+                showBuffering(buffering && !playing && !state.error)
                 updateInfo()
             }
 
@@ -665,6 +677,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             }
         }
         state.error = true
+        showBuffering(false)
         updateInfo(true)
         // эфир: повтор через 2, 5, 10 с
         val delay = RETRY.getOrNull(retry++) ?: return

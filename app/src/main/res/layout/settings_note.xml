@@ -8,4 +8,4 @@
     android:maxLines="3"
     android:singleLine="false"
     android:textColor="@color/text_70"
-    android:textSize="10.5sp" />
+    android:textSize="12sp" />

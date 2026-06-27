@@ -70,7 +70,7 @@
             style="@style/Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
+            android:textSize="14.5sp"
             android:textStyle="bold" />
 
         <TextView
@@ -79,6 +79,6 @@
             android:layout_height="wrap_content"
             android:text="@string/up_down_others"
             android:textColor="@color/text_55"
-            android:textSize="8.5sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 </LinearLayout>

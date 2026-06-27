@@ -15,8 +15,8 @@ import top.rootu.perfecttv.data.Channel
 
 /**
  * Логотипы каналов: загрузка через Coil (дисковый кэш), в памяти — LRU битмапов для рисования
- * на Canvas (гид, списки). Нет логотипа или не загрузился — цветная плашка с аббревиатурой
- * номер канала на плашке; при логотипе — бейдж с номером (настройка «Номер канала»).
+ * на Canvas (гид, списки). Нет логотипа или не загрузился — цветная плашка с монограммой
+ * названия (`Names.monogram`); бейдж с номером — по настройке «Номер канала».
  */
 object Logos {
     private lateinit var loader: ImageLoader
@@ -113,8 +113,9 @@ object Logos {
     /**
      * Логотип канала в прямоугольнике [l, t, r, b]: серая подложка (как под логотипами
      * в шапке гида и инфопанели), логотип внутри с отступом, по настройке «Номер канала» —
-     * бейдж с номером в левом верхнем углу. Логотипа нет (или ещё грузится) — на подложке
-     * крупный номер канала (вместо цветных плашек с буквами — у всех одинаково).
+     * бейдж с номером в левом верхнем углу. Логотипа нет или не загрузился — цветная плашка
+     * с монограммой (цвет — от ключа канала, у одного канала всегда один); пока логотип
+     * грузится — пустая подложка, чтобы монограмма не мелькала.
      * @param plate тёмная подложка (строка в фокусе с белым фоном: белые логотипы иначе не видно)
      * @param badge рисовать бейдж (если включён в настройках)
      */
@@ -123,26 +124,50 @@ object Logos {
         val h = b - t
         val radius = minOf(U.px(U.RADIUS_S), h * 0.2f)
         U.roundRect(c, l, t, r, b, radius, if (plate) PLATE else U.FILL_SOFT)
-        if (bm == null) return drawNumber(c, ch, l, t, r, b)
+        val showBadge = badge && Prefs.numberMode == Prefs.NUMBER_BADGE && ch.num > 0
+        if (bm == null) {
+            val url = ch.logoUrl()
+            if (url.isEmpty() || url in failed) {
+                drawMonogram(c, ch, l, t, r, b, radius)
+                if (showBadge) drawBadge(c, ch.num, l, t, h, radius)
+            }
+            return
+        }
         val pad = h * 0.14f
         val scale = minOf((r - l - 2 * pad) / bm.width, (h - 2 * pad) / bm.height)
         val w = bm.width * scale
         val bh = bm.height * scale
         dst.set((l + r - w) / 2, (t + b - bh) / 2, (l + r + w) / 2, (t + b + bh) / 2)
         c.drawBitmap(bm, null, dst, U.fill.apply { color = Color.WHITE; isFilterBitmap = true })
-        if (badge && Prefs.numberMode == Prefs.NUMBER_BADGE && ch.num > 0) drawBadge(c, ch.num, l, t, h, radius)
+        if (showBadge) drawBadge(c, ch.num, l, t, h, radius)
     }
 
     private val numPaint = U.paint(1f, bold = true)
 
-    /** Номер канала крупно по центру подложки */
-    private fun drawNumber(c: Canvas, ch: Channel, l: Float, t: Float, r: Float, b: Float) {
+    /** Монограмма и цвет плашки канала без логотипа (считаются один раз на название) */
+    private class Mono(val text: String, val color: Int)
+
+    private val monos = LruCache<String, Mono>(600)
+    private val hsv = FloatArray(3)
+
+    private fun mono(ch: Channel): Mono {
+        monos.get(ch.name)?.let { return it }
+        // приглушённый тон: плашка не спорит с настоящими логотипами и с белым фокусом
+        hsv[0] = Math.floorMod(top.rootu.perfecttv.data.Names.key(ch.name).hashCode() * 47, 360).toFloat()
+        hsv[1] = 0.42f
+        hsv[2] = 0.44f
+        return Mono(top.rootu.perfecttv.data.Names.monogram(ch.name), Color.HSVToColor(hsv)).also { monos.put(ch.name, it) }
+    }
+
+    /** Цветная плашка с монограммой названия по центру */
+    private fun drawMonogram(c: Canvas, ch: Channel, l: Float, t: Float, r: Float, b: Float, radius: Float) {
+        val m = mono(ch)
+        U.roundRect(c, l, t, r, b, radius, m.color)
         val h = b - t
-        val text = if (ch.num > 0) ch.num.toString() else ch.name.take(2).uppercase()
-        numPaint.color = U.wa(0.75f)
-        numPaint.textSize = minOf(h * (if (text.length > 3) 0.36f else 0.46f), (r - l) * 0.8f / maxOf(1, text.length) * 1.6f)
-        val tw = numPaint.measureText(text)
-        c.drawText(text, (l + r - tw) / 2, (t + b) / 2 - (numPaint.descent() + numPaint.ascent()) / 2, numPaint)
+        numPaint.color = U.wa(0.92f)
+        numPaint.textSize = minOf(h * 0.44f, (r - l) * 0.8f / maxOf(1, m.text.length) * 1.6f)
+        val tw = numPaint.measureText(m.text)
+        c.drawText(m.text, (l + r - tw) / 2, (t + b) / 2 - (numPaint.descent() + numPaint.ascent()) / 2, numPaint)
     }
 
     /** Бейдж номера в левом верхнем углу подложки высотой [h] (угол — как у подложки) */
@@ -152,7 +177,7 @@ object Logos {
 
     private fun drawBadge(c: Canvas, num: Int, l: Float, t: Float, h: Float, radius: Float) {
         val text = num.toString()
-        badgePaint.textSize = maxOf(U.px(0.65f), h * 0.26f)
+        badgePaint.textSize = maxOf(U.px(0.9f), h * 0.26f)
         val bh = badgePaint.textSize * 1.35f
         val bw = maxOf(bh * 1.15f, badgePaint.measureText(text) + badgePaint.textSize * 0.8f)
         U.roundRect(c, l, t, l + bw, t + bh, radius, badgeBg)

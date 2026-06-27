@@ -7,7 +7,7 @@
         <item name="android:gravity">center_vertical</item>
         <item name="android:singleLine">true</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:textSize">10sp</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <!-- многострочный (описания) -->
@@ -18,19 +18,19 @@
 
     <!-- заголовок окна -->
     <style name="Text.PopupTitle">
-        <item name="android:textSize">14sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <!-- подпись под заголовком -->
     <style name="Text.Sub">
-        <item name="android:textSize">9.5sp</item>
+        <item name="android:textSize">11.5sp</item>
         <item name="android:textColor">@color/text_60</item>
     </style>
 
     <!-- кнопка окна: белая в фокусе (selected — фокус ведёт код, а не Android) -->
     <style name="Text.Button">
-        <item name="android:textSize">10.5sp</item>
+        <item name="android:textSize">12sp</item>
         <item name="android:background">@drawable/bg_button</item>
         <item name="android:textColor">@color/text_sel</item>
         <item name="android:paddingStart">11dp</item>
@@ -69,7 +69,7 @@
         <item name="android:layout_height">30dp</item>
         <item name="android:layout_margin">2.5dp</item>
         <item name="android:gravity">center</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:background">@drawable/bg_button</item>
         <item name="android:textColor">@color/text_sel</item>
         <item name="android:clickable">true</item>

@@ -8,6 +8,8 @@
     <dimen name="radius">6dp</dimen>
     <dimen name="radius_l">10dp</dimen>
     <dimen name="popup_pad">15dp</dimen>
-    <dimen name="screen_pad">20dp</dimen>
+    <!-- безопасная зона экрана: по бокам и сверху/снизу -->
+    <dimen name="screen_pad">40dp</dimen>
+    <dimen name="screen_pad_v">24dp</dimen>
     <dimen name="button_gap">6dp</dimen>
 </resources>

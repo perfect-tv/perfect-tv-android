@@ -39,6 +39,33 @@ object Names {
         return sb.toString()
     }
 
+    /**
+     * Монограмма канала для плашки без логотипа: до трёх знаков. Одно слово — целиком, если оно
+     * не длиннее трёх знаков («НТВ»), иначе две первые буквы («КА»); несколько слов — первые буквы,
+     * число — целиком, пока есть место («Россия 24» → «Р24», «Матч! ТВ» → «МТ»).
+     */
+    fun monogram(name: String): String {
+        val sb = StringBuilder(3)
+        var words = 0
+        var first = ""
+        var i = 0
+        val n = name.length
+        while (i < n) {
+            while (i < n && !name[i].isLetterOrDigit()) i++
+            val s = i
+            while (i < n && name[i].isLetterOrDigit()) i++
+            if (i == s) break
+            if (words++ == 0) first = name.substring(s, i)
+            if (sb.length >= 3) continue
+            if (name[s].isDigit()) sb.append(name, s, minOf(i, s + 3 - sb.length)) else sb.append(name[s])
+        }
+        return when (words) {
+            0 -> "?"
+            1 -> (if (first.length <= 3) first else first.substring(0, 2)).uppercase()
+            else -> sb.toString().uppercase()
+        }
+    }
+
     /** Ключ сравнения: короткое имя с транслитом */
     fun matchKey(name: String): String = translit(short(name))
 }

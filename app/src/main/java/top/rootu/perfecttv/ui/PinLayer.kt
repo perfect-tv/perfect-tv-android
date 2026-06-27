@@ -236,8 +236,8 @@ class PinWheel(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
 
     private val pDigit = U.paint(1.8f, U.BLACK, bold = true)
     private val pCenter = U.paint(2.1f, U.WHITE, bold = true)
-    private val pSmall = U.paint(1.05f, U.wa(0.5f))
-    private val pSmallOn = U.paint(1.05f, U.WHITE, bold = true)
+    private val pSmall = U.paint(1.15f, U.wa(0.5f))
+    private val pSmallOn = U.paint(1.15f, U.WHITE, bold = true)
 
     init {
         // без привязки знаков к целым пикселям: иначе цифра уезжает до пикселя от центра колонки

@@ -231,21 +231,21 @@ class ScheduleLayer(
     @SuppressLint("ViewConstructor")
     private inner class ListView(context: Context) : View(context) {
         private val em = U.em
-        private val rowH = 2.9f * em
-        private val richH = 3.8f * em
-        private val sepH = 2.6f * em
+        private val rowH = 3.2f * em
+        private val richH = 4.3f * em
+        private val sepH = 2.9f * em
         private val viewsW get() = if (views.size > 1) 7.5f * em else 0f
         private val tabsW = 7.5f * em
-        private val pTime = U.paint(1.05f, U.wa(0.8f))
-        private val pTitle = U.paint(1.1f)
-        private val pTitleBold = U.paint(1.1f, bold = true)
-        private val pSub = U.paint(0.9f, U.wa(0.6f))
-        private val pSep = U.paint(1f, U.wa(0.55f), bold = true)
-        private val pTab = U.paint(0.95f, U.wa(0.7f))
-        private val pTabBold = U.paint(0.95f, bold = true)
-        private val pIcon = U.paint(0.95f, U.wa(0.8f))
-        private val pLive = U.paint(0.75f, bold = true)
-        private val pEmpty = U.paint(1.1f, U.wa(0.6f))
+        private val pTime = U.paint(1.2f, U.wa(0.8f))
+        private val pTitle = U.paint(1.3f)
+        private val pTitleBold = U.paint(1.3f, bold = true)
+        private val pSub = U.paint(1.1f, U.wa(0.6f))
+        private val pSep = U.paint(1.15f, U.wa(0.55f), bold = true)
+        private val pTab = U.paint(1.1f, U.wa(0.7f))
+        private val pTabBold = U.paint(1.1f, bold = true)
+        private val pIcon = U.paint(1.1f, U.wa(0.8f))
+        private val pLive = U.paint(1.1f, bold = true)
+        private val pEmpty = U.paint(1.3f, U.wa(0.6f))
         var scrollY0 = 0f
         private var target = 0f
 
@@ -331,7 +331,7 @@ class ScheduleLayer(
             }
             pTime.color = if (focus) U.BLACK else U.wa(0.8f)
             c.drawText(r.time, x, cy - (pTime.descent() + pTime.ascent()) / 2, pTime)
-            x += 3.6f * em
+            x += 4.1f * em
             if (r.channel == null) {
                 pSub.color = if (focus) U.BLACK else U.wa(0.5f)
                 c.drawText("›", x, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
@@ -339,14 +339,14 @@ class ScheduleLayer(
             }
             val isz = 1.1f * em
             val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
-            val liveW = if (r.live) pLive.measureText("LIVE") + 1.2f * em else 0f
+            val liveW = if (r.live) pLive.measureText("LIVE") + 1.4f * em else 0f
             val iw = nIcons * (isz + 0.4f * em) + liveW
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = if (focus) U.BLACK else if (r.past) U.wa(0.75f) else if (r.future) U.wa(0.85f) else U.WHITE
             if (r.sub.isNotEmpty()) {
-                U.drawText(c, r.title, x, cy - 0.6f * em, rr - x - iw - 0.8f * em, p)
+                U.drawText(c, r.title, x, cy - 0.75f * em, rr - x - iw - 0.8f * em, p)
                 pSub.color = if (focus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, r.sub, x, cy + 0.75f * em, rr - x - iw - 0.8f * em, pSub)
+                U.drawText(c, r.sub, x, cy + 0.9f * em, rr - x - iw - 0.8f * em, pSub)
             } else U.drawText(c, r.title, x, cy, rr - x - iw - 0.8f * em, p)
             var ix = rr - 0.8f * em
             if (r.live) {
@@ -356,14 +356,16 @@ class ScheduleLayer(
                 U.fill.style = android.graphics.Paint.Style.STROKE
                 U.fill.strokeWidth = 0.12f * em
                 U.fill.color = fg
-                c.drawRoundRect(ix - 0.1f * em, cy - 0.65f * em, ix + lw + 0.4f * em, cy + 0.65f * em, 0.25f * em, 0.25f * em, U.fill)
+                c.drawRoundRect(ix - 0.15f * em, cy - 0.85f * em, ix + lw + 0.45f * em, cy + 0.85f * em, 0.25f * em, 0.25f * em, U.fill)
                 U.fill.style = android.graphics.Paint.Style.FILL
                 c.drawText("LIVE", ix + 0.15f * em, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= 0.6f * em
             }
             val ic = if (focus) U.BLACK else U.wa(0.8f)
-            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.4f * em }
-            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ic); ix -= 0.4f * em }
+            // архив и напоминание — янтарные (цвет «не эфир»), в белой строке фокуса — чёрные
+            val ia = if (focus) U.BLACK else U.ARCHIVE
+            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.4f * em }
+            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.4f * em }
             if (r.playing) {
                 pIcon.color = ic
                 c.drawText("▶", ix - pIcon.measureText("▶"), cy - (pIcon.descent() + pIcon.ascent()) / 2, pIcon)
@@ -399,7 +401,7 @@ class ScheduleLayer(
                 val lines = t.label.split('\n')
                 lines.forEachIndexed { n, s ->
                     val tw = p.measureText(s)
-                    val ly = y + th / 2 + (n - (lines.size - 1) / 2f) * 1.25f * em
+                    val ly = y + th / 2 + (n - (lines.size - 1) / 2f) * 1.4f * em
                     c.drawText(s, l + (tabsW - tw) / 2, ly - (p.descent() + p.ascent()) / 2, p)
                 }
             }
