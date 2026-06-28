@@ -965,10 +965,12 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         // при перемотке — передача в точке назначения
         val ref = sk ?: pos
         val p = repo.at(ch, ref)
+        val next = repo.after(ch, p?.stop ?: ref)
         info.update(InfoPanel.Model(
             channel = ch,
             program = p,
-            next = repo.after(ch, p?.stop ?: ref),
+            next = next,
+            next2 = next?.let { repo.after(ch, it.stop) },
             archive = same && state.archive != null,
             position = pos,
             ahead = if (same) bufferAhead() else 0,
@@ -994,12 +996,15 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val p = repo.at(ch, position())
         val key = ch.key + ":" + (p?.start ?: 0)
         moreKey = key
+        // «Далее на канале»: блок не пустой и без описания
+        val upcoming = repo.programmes(ch).asSequence().filter { it.start >= (p?.stop ?: position()) }.take(4).toList()
         if (p == null) {
-            info.setMore(str(R.string.no_programme), ch.name, "", ch = ch)
+            info.setMore(str(R.string.no_programme), "", ch = ch, upcoming = upcoming)
             return
         }
         val tags = arrayListOf(Fmt.dayTimeRange(p.start, p.stop), p.category, p.subTitle).filter { it.isNotEmpty() }.toMutableList()
-        info.setMore(p.title, tags.joinToString(" · "), p.desc, ch = ch)
+        // картинка: из EPG, затем TMDB; нет или не загрузилась — логотип канала
+        info.setMore(tags.joinToString(" · "), p.desc, p.icon, ch, upcoming)
         Tmdb.find(p.title, p.desc) { r ->
             if (r == null || !info.more || moreKey != key) return@find
             if (r.year.isNotEmpty()) tags.add(r.year)
@@ -1007,7 +1012,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             if (r.original.isNotEmpty() && r.original != r.title) tags.add(r.original)
             // описание TMDB — если в программе его нет или совпадение однозначно
             val text = if (r.overview.isNotEmpty() && (p.desc.isEmpty() || r.unique)) r.overview else p.desc
-            info.setMore(p.title, tags.joinToString(" · "), text, r.backdrop.ifEmpty { r.poster }, ch)
+            info.setMore(tags.joinToString(" · "), text, r.backdrop.ifEmpty { r.poster }.ifEmpty { p.icon }, ch, upcoming)
         }
     }
 

@@ -11,5 +11,7 @@
     <!-- безопасная зона экрана: по бокам и сверху/снизу -->
     <dimen name="screen_pad">40dp</dimen>
     <dimen name="screen_pad_v">24dp</dimen>
+    <!-- высота плавной части затемнения над содержимым инфопанели -->
+    <dimen name="info_fade">56dp</dimen>
     <dimen name="button_gap">6dp</dimen>
 </resources>

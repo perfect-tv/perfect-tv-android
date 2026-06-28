@@ -34,6 +34,11 @@ object Prefs {
         get() = int("info_hide", 5)
         set(v) = sp.edit().putInt("info_hide", v).apply()
 
+    /** Строка подсказок клавиш у закреплённой инфопанели */
+    var keyHints: Boolean
+        get() = bool("key_hints", true)
+        set(v) = sp.edit().putBoolean("key_hints", v).apply()
+
     var animations: Boolean
         get() = bool("animations", true)
         set(v) = sp.edit().putBoolean("animations", v).apply()

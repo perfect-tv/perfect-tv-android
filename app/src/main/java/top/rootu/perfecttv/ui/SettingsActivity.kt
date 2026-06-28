@@ -156,6 +156,9 @@ class SettingsActivity : Activity() {
         item(col, str(R.string.hide_info_panel_after), str(R.string.x_s, Prefs.infoHide)) {
             Prefs.infoHide = cycle(listOf(3, 5, 7, 10), Prefs.infoHide); showMain()
         }
+        item(col, str(R.string.key_hints), if (Prefs.keyHints) str(R.string.on) else str(R.string.off), str(R.string.a_row_at_the_bottom_of_the_pinned)) {
+            Prefs.keyHints = !Prefs.keyHints; showMain()
+        }
         item(col, str(R.string.smooth_animations), if (Prefs.animations) str(R.string.on) else str(R.string.off), str(R.string.turn_off_on_weak_boxes)) {
             Prefs.animations = !Prefs.animations; Anim.on = Prefs.animations; showMain()
         }

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Инфопанель внизу экрана: логотип, канал, бейджи, часы, передача,
-  шкала, «Далее»; на сенсорных — кнопки; раскрытое описание с баннером TMDB.
+  Инфопанель внизу экрана, во всю ширину: фон — затемнение снизу (InfoPanel.Scrim), содержимое —
+  в безопасной зоне. Логотип, канал и бейджи, передача, шкала и «ещё N мин», «Далее» (при
+  перемотке на её месте — пузырь с целевым временем), часы; на сенсорных — кнопки; раскрытое
+  описание с картинкой и «Далее на канале»; у закреплённой панели — строка подсказок клавиш.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -10,31 +12,27 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="bottom"
-    android:layout_marginStart="@dimen/screen_pad"
-    android:layout_marginEnd="@dimen/screen_pad"
-    android:layout_marginBottom="@dimen/screen_pad_v"
-    android:background="@drawable/bg_panel"
     android:clickable="true"
     android:focusable="false"
     android:orientation="vertical"
-    android:paddingStart="12dp"
-    android:paddingTop="10dp"
-    android:paddingEnd="15dp"
-    android:paddingBottom="10dp"
+    android:paddingStart="@dimen/screen_pad"
+    android:paddingTop="@dimen/info_fade"
+    android:paddingEnd="@dimen/screen_pad"
+    android:paddingBottom="@dimen/screen_pad_v"
     android:visibility="gone">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <!-- подложку, отступ и бейдж номера рисует сам логотип (Logos) -->
         <ImageView
             android:id="@+id/info_logo"
-            android:layout_width="80dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="12dp"
+            android:layout_width="96dp"
+            android:layout_height="66dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="14dp"
             android:importantForAccessibility="no" />
 
         <LinearLayout
@@ -52,28 +50,20 @@
                 <TextView
                     android:id="@+id/info_channel"
                     style="@style/Text"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColor="@color/text_75"
-                    android:textSize="12.5sp" />
+                    android:maxWidth="340dp"
+                    android:textColor="@color/text_80"
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/info_badges"
                     style="@style/Text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/info_clock"
-                    style="@style/Text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:textColor="@color/text_90"
-                    android:textSize="14sp" />
+                    android:layout_marginStart="10dp"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
@@ -81,8 +71,8 @@
                 style="@style/Text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2.5dp"
-                android:textSize="18sp"
+                android:layout_marginTop="2dp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
             <LinearLayout
@@ -97,15 +87,15 @@
                     style="@style/Text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_70"
-                    android:textSize="11.5sp" />
+                    android:textColor="@color/text_75"
+                    android:textSize="12.5sp" />
 
                 <top.rootu.perfecttv.ui.InfoBar
                     android:id="@+id/info_bar"
                     android:layout_width="0dp"
-                    android:layout_height="14dp"
-                    android:layout_marginStart="7dp"
-                    android:layout_marginEnd="7dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="9dp"
+                    android:layout_marginEnd="9dp"
                     android:layout_weight="1" />
 
                 <TextView
@@ -113,17 +103,50 @@
                     style="@style/Text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_70"
-                    android:textSize="11.5sp" />
+                    android:textColor="@color/text_75"
+                    android:textSize="12.5sp" />
+
+                <!-- эфир: «ещё 22 мин»; архив: время кадра -->
+                <TextView
+                    android:id="@+id/info_remain"
+                    style="@style/Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/info_next"
-                style="@style/Text"
+            <!-- «Далее»; при перемотке вместо неё — пузырь под маркером шкалы (сдвигает код) -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4.5dp"
-                android:textColor="@color/text_65" />
+                android:layout_marginTop="5dp">
+
+                <TextView
+                    android:id="@+id/info_next"
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:textColor="@color/text_85"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/info_seek"
+                    style="@style/Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_seek"
+                    android:paddingStart="8dp"
+                    android:paddingTop="1.5dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="1.5dp"
+                    android:textColor="@color/on_archive"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="invisible" />
+            </FrameLayout>
 
             <!-- кнопки на сенсорных (не ТВ); tag — действие -->
             <LinearLayout
@@ -143,9 +166,18 @@
                 <TextView style="@style/Text.InfoButton" android:tag="history" android:text="@string/recent" />
             </LinearLayout>
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/info_clock"
+            style="@style/Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:textColor="@color/text_95"
+            android:textSize="24sp" />
     </LinearLayout>
 
-    <!-- раскрытое описание: баннер TMDB (или логотип канала), название, теги, текст -->
+    <!-- раскрытое описание: картинка (EPG, TMDB или логотип канала), теги, текст, «Далее на канале» -->
     <!-- выдвигается по высоте (InfoPanel.setMore), сверху — разделительная полоса -->
     <LinearLayout
         android:id="@+id/info_more"
@@ -170,7 +202,7 @@
                 android:id="@+id/info_banner"
                 android:layout_width="220dp"
                 android:layout_height="124dp"
-                android:layout_marginEnd="15dp"
+                android:layout_marginEnd="16dp"
                 android:background="@drawable/bg_soft"
                 android:importantForAccessibility="no"
                 android:scaleType="centerCrop" />
@@ -182,31 +214,53 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/info_more_title"
-                    style="@style/Text"
+                    android:id="@+id/info_more_tags"
+                    style="@style/Text.Multi"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:maxLines="2"
-                    android:singleLine="false"
-                    android:textSize="13.5sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/info_more_tags"
-                    style="@style/Text.Sub"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp" />
+                    android:textColor="@color/text_65"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/info_more_text"
                     style="@style/Text.Multi"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:maxLines="7"
-                    android:textColor="@color/text_80" />
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingMultiplier="1.12"
+                    android:maxLines="6"
+                    android:textColor="@color/text_85"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- «Далее на канале»: строки upnext_row добавляет код -->
+            <LinearLayout
+                android:id="@+id/info_upnext"
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="20dp"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/next_on_the_channel"
+                    android:textColor="@color/text_50"
+                    android:textSize="11.5sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
+    <!-- подсказки клавиш (hint_item добавляет код): только у закреплённой панели -->
+    <LinearLayout
+        android:id="@+id/info_hints"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone" />
 </LinearLayout>

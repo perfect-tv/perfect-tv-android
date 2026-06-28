@@ -19,6 +19,7 @@
     <color name="panel_card_on">#F21A1B1C</color>
     <color name="popup">#F01E1F20</color>
     <color name="overlay">#73000000</color>
+    <color name="scrim">#F708090B</color>         <!-- затемнение под инфопанелью (низ) -->
     <color name="guide_top">#F70C0D0E</color>
     <color name="guide_bottom">#CC0C0D0E</color>
     <color name="settings_bg">#FF121314</color>

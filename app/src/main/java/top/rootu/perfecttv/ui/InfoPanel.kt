@@ -16,13 +16,16 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import top.rootu.perfecttv.core.Clock
+import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Programme
 
 /**
- * Инфопанель внизу экрана: логотип, канал, бейджи, часы, передача,
- * шкала с буфером и маркером перемотки, «Далее». show(сек) — с автоскрытием,
- * show(0) — закреплена (↓). setMore() — раскрытое описание под основной строкой.
+ * Инфопанель внизу экрана (info_panel.xml): затемнение во всю ширину, логотип, канал, бейджи,
+ * часы, передача, шкала с буфером и маркером перемотки, «ещё N мин» (в архиве — время кадра),
+ * «Далее» (при перемотке на её месте — пузырь с целевым временем под маркером).
+ * show(сек) — с автоскрытием, show(0) — закреплена (↓): внизу — подсказки клавиш.
+ * setMore() — раскрытое описание под основной строкой.
  */
 class InfoPanel(val view: View) {
 
@@ -30,6 +33,7 @@ class InfoPanel(val view: View) {
         val channel: Channel,
         val program: Programme?,
         val next: Programme?,
+        val next2: Programme?,
         val archive: Boolean,
         val position: Long,
         val ahead: Long,
@@ -61,14 +65,18 @@ class InfoPanel(val view: View) {
     private val timeStart: TextView = view.findViewById(R.id.info_start)
     private val timeEnd: TextView = view.findViewById(R.id.info_end)
     private val bar: InfoBar = view.findViewById(R.id.info_bar)
+    private val remain: TextView = view.findViewById(R.id.info_remain)
     private val next: TextView = view.findViewById(R.id.info_next)
+    private val seekBubble: TextView = view.findViewById(R.id.info_seek)
     private val moreBox: View = view.findViewById(R.id.info_more)
     private val banner: ImageView = view.findViewById(R.id.info_banner)
-    private val moreTitle: TextView = view.findViewById(R.id.info_more_title)
+    private val upnext: LinearLayout = view.findViewById(R.id.info_upnext)
+    private val hints: LinearLayout = view.findViewById(R.id.info_hints)
     private val moreTags: TextView = view.findViewById(R.id.info_more_tags)
     private val moreText: TextView = view.findViewById(R.id.info_more_text)
 
     init {
+        view.background = Scrim(view.resources.getDimension(R.dimen.info_fade), view.resources.getColor(R.color.scrim, null))
         banner.clipToOutline = true
         if (U.touch) {
             // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
@@ -102,16 +110,90 @@ class InfoPanel(val view: View) {
         val f = { x: Long -> Fmt.progress(from, to, x) }
         bar.archive = m.archive
         bar.set(f(m.position), if (m.ahead > 0) maxOf(f(m.position + m.ahead), f(m.position) + 0.01f) else f(m.position), m.seek?.let { f(it) })
-        val now = Clock.now()
+        // справа от шкалы: эфир — сколько осталось, архив — время кадра (при перемотке оно в пузыре)
+        set(remain, when {
+            m.seek != null -> ""
+            m.archive -> hhmmss(m.position)
+            p != null -> remainText(p.stop - m.position)
+            else -> ""
+        })
         if (m.seek != null) {
-            val diff = m.seek - now
-            set(next, hhmmss(m.seek) + " (" + (if (diff < 0) "−" else "+") + Fmt.duration(Math.abs(diff)) + ")")
+            val diff = m.seek - Clock.now()
+            set(seekBubble, hhmmss(m.seek) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(Math.abs(diff)))
+            seekAt = f(m.seek)
+            placeSeek()
+            next.visibility = View.INVISIBLE
+            seekBubble.visibility = View.VISIBLE
         } else {
-            var s = ""
-            if (m.archive) s = hhmmss(m.position) + " (−" + Fmt.duration(now - m.position) + ") · "
-            s += str(R.string.next) + (m.next?.let { Fmt.hhmm(it.start) + " " + it.title } ?: str(R.string.no_programme_2))
-            set(next, s)
+            seekBubble.visibility = View.INVISIBLE
+            next.visibility = View.VISIBLE
+            set(next, nextText(m))
         }
+        hintArchive = m.archive
+        hintPaused = m.paused
+        updateHints()
+    }
+
+    /** «ещё 22 мин» / «ещё 1 ч 05 мин»; передача кончилась — пусто */
+    private fun remainText(sec: Long): String {
+        if (sec <= 0) return ""
+        val min = (sec + 59) / 60
+        return if (min < 60) str(R.string.x_min_left, min) else str(R.string.x_h_x_min_left, min / 60, (min % 60).let { if (it < 10) "0$it" else it.toString() })
+    }
+
+    /** «Далее: 00:55 Новости · 01:10 Все на Матч!» — подпись приглушена */
+    private fun nextText(m: Model): CharSequence {
+        val sb = SpannableStringBuilder(str(R.string.next))
+        sb.setSpan(ForegroundColorSpan(U.wa(0.5f)), 0, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val n = m.next ?: return sb.append(str(R.string.no_programme_2))
+        sb.append(Fmt.hhmm(n.start)).append(' ').append(n.title)
+        m.next2?.let { sb.append("   ·   ").append(Fmt.hhmm(it.start)).append(' ').append(it.title) }
+        return sb
+    }
+
+    private var seekAt = 0f
+
+    /** Пузырь перемотки — под маркером шкалы (шкала и строка пузыря начинаются с одного края) */
+    private fun placeSeek() {
+        if (bar.width == 0) {
+            seekBubble.post { if (bar.width != 0) placeSeek() }
+            return
+        }
+        seekBubble.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val w = seekBubble.measuredWidth
+        val max = ((seekBubble.parent as View).width - w).toFloat()
+        seekBubble.translationX = (bar.left + bar.width * seekAt.coerceIn(0f, 1f) - w / 2f).coerceIn(0f, maxOf(0f, max))
+    }
+
+    // ---------------------------------------------------------- подсказки клавиш
+
+    private var hintArchive = false
+    private var hintPaused = false
+    private var hintsKey = ""
+
+    /** Строка подсказок у закреплённой панели (настройка «Подсказки клавиш»; на сенсорных — кнопки) */
+    private fun updateHints() {
+        val show = visible && sticky && Prefs.keyHints && !U.touch
+        U.show(hints, show)
+        if (!show) return
+        val key = "$hintArchive$hintPaused$more"
+        if (key == hintsKey && hints.childCount > 0) return
+        hintsKey = key
+        hints.removeAllViews()
+        val inflater = android.view.LayoutInflater.from(view.context)
+        fun hint(k: String, action: String) {
+            val v = inflater.inflate(R.layout.hint_item, hints, false)
+            v.findViewById<TextView>(R.id.hint_key).text = k
+            v.findViewById<TextView>(R.id.hint_action).text = action
+            hints.addView(v)
+        }
+        hint("OK", str(if (hintPaused) R.string.hint_resume else R.string.hint_pause))
+        if (more) hint("↑", str(R.string.hint_collapse)) else {
+            hint("↓", str(R.string.about))
+            hint("↑", str(R.string.close))
+        }
+        hint("←  →", str(if (hintArchive) R.string.hint_seek else R.string.hint_channel))
+        hint(str(R.string.key_hold_ok), str(R.string.menu))
     }
 
     private fun badgesOf(m: Model): CharSequence {
@@ -125,7 +207,11 @@ class InfoPanel(val view: View) {
         }
         if (m.error) badge(str(R.string.error), U.LIVE)
         if (m.paused) badge("❚❚", U.FILL_ACTIVE)
-        if (m.archive) badge(str(R.string.archive_2), U.ARCHIVE, U.ON_ARCHIVE) else badge(str(R.string.live), U.LIVE)
+        if (m.archive) {
+            // отставание от эфира — в бейдже: «Архив · −21:40»
+            val lag = Clock.now() - m.position
+            badge(str(R.string.archive_2) + (if (lag > 0) " · −" + Fmt.duration(lag) else ""), U.ARCHIVE, U.ON_ARCHIVE)
+        } else badge(str(R.string.live), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
         if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
@@ -139,38 +225,48 @@ class InfoPanel(val view: View) {
     private var bannerUrl: String? = null
 
     /**
-     * Раскрытое описание: null — свернуть. [image] — баннер TMDB; пусто — логотип канала [ch]
-     * в области баннера.
+     * Раскрытое описание (название — в самой панели): [tags] — время, жанр, год…; [image] —
+     * картинка передачи (EPG или TMDB); пусто или не загрузилась — логотип канала [ch]
+     * в её области; [upcoming] — «Далее на канале» (блок не пустой и без описания).
      */
-    fun setMore(t: String?, tags: String, text: String, image: String = "", ch: Channel? = null) {
-        more = t != null
-        if (t != null) {
-            moreTitle.text = t
-            moreTags.text = tags
-            moreText.text = text
-            U.show(moreText, text.isNotEmpty())
-            if (image.isNotEmpty()) {
-                if (bannerUrl != image) {
-                    bannerUrl = image
-                    banner.scaleType = ImageView.ScaleType.CENTER_CROP
-                    banner.setPadding(0, 0, 0, 0)
-                    banner.setBackgroundResource(R.drawable.bg_soft)
-                    Logos.banner(banner, image)
-                }
-            } else if (ch != null) {
-                bannerUrl = null
-                banner.scaleType = ImageView.ScaleType.FIT_CENTER
-                // логотип со своей подложкой на всю область баннера
-                banner.setPadding(0, 0, 0, 0)
-                banner.background = null
-                Logos.into(banner, ch, badge = false)   // в области баннера номер-бейдж не нужен
+    fun setMore(tags: String, text: String, image: String = "", ch: Channel? = null, upcoming: List<Programme> = emptyList()) {
+        more = true
+        moreTags.text = tags
+        moreText.text = text
+        U.show(moreText, text.isNotEmpty())
+        if (image.isNotEmpty()) {
+            if (bannerUrl != image) {
+                bannerUrl = image
+                banner.scaleType = ImageView.ScaleType.CENTER_CROP
+                banner.setBackgroundResource(R.drawable.bg_soft)
+                Logos.banner(banner, image) { if (bannerUrl == image && ch != null) logoBanner(ch) }
             }
+        } else if (ch != null) logoBanner(ch)
+        // «Далее на канале»: первая строка блока — заголовок из разметки
+        while (upnext.childCount > 1) upnext.removeViewAt(upnext.childCount - 1)
+        val inflater = android.view.LayoutInflater.from(view.context)
+        for (p in upcoming) {
+            val row = inflater.inflate(R.layout.upnext_row, upnext, false)
+            row.findViewById<TextView>(R.id.upnext_time).text = Fmt.hhmm(p.start)
+            row.findViewById<TextView>(R.id.upnext_title).text = p.title
+            upnext.addView(row)
         }
-        animateMore(more)
+        U.show(upnext, upcoming.isNotEmpty())
+        updateHints()
+        animateMore(true)
+    }
+
+    /** Логотип канала со своей подложкой на всю область картинки (без бейджа номера) */
+    private fun logoBanner(ch: Channel) {
+        bannerUrl = null
+        banner.scaleType = ImageView.ScaleType.FIT_CENTER
+        banner.background = null
+        Logos.into(banner, ch, badge = false)
     }
 
     fun collapse() {
         more = false
+        updateHints()
         animateMore(false)
     }
 
@@ -241,6 +337,7 @@ class InfoPanel(val view: View) {
         }
         main.removeCallbacks(hideRun)
         if (timeout != 0) main.postDelayed(hideRun, timeout * 1000L)
+        updateHints()
     }
 
     fun hide() {
@@ -256,6 +353,31 @@ class InfoPanel(val view: View) {
     companion object {
         const val SLOT = 1800L
     }
+}
+
+/**
+ * Затемнение под инфопанелью: сверху плавно проявляется на длине [fade] (она задана в px,
+ * поэтому не растягивается, когда панель становится выше — раскрыто описание), ниже — плотное.
+ */
+private class Scrim(private val fade: Float, private val color: Int) : android.graphics.drawable.Drawable() {
+    private val paint = android.graphics.Paint()
+
+    private fun c(k: Float) = (color and 0xFFFFFF) or (Math.round(android.graphics.Color.alpha(color) * k) shl 24)
+
+    override fun onBoundsChange(b: android.graphics.Rect) {
+        val h = b.height().toFloat()
+        if (h <= 0f) return
+        // к началу содержимого (конец плавной части) — уже 94% плотности: текст читается на светлом кадре
+        val f = (fade / h).coerceAtMost(0.95f)
+        paint.shader = android.graphics.LinearGradient(0f, b.top.toFloat(), 0f, b.bottom.toFloat(),
+            intArrayOf(c(0f), c(0.55f), c(0.94f), color), floatArrayOf(0f, f * 0.5f, f, 1f), android.graphics.Shader.TileMode.CLAMP)
+    }
+
+    override fun draw(canvas: Canvas) = canvas.drawRect(bounds, paint)
+    override fun setAlpha(alpha: Int) {}
+    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {}
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
 }
 
 /** Шкала прогресса: подложка, буфер, значение, маркер перемотки */

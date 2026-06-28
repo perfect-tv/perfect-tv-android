@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Строка «Далее на канале» в раскрытом описании инфопанели: время и название -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="5dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/upnext_time"
+        style="@style/Text"
+        android:layout_width="44dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_55"
+        android:textSize="12.5sp" />
+
+    <TextView
+        android:id="@+id/upnext_title"
+        style="@style/Text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@color/text_90"
+        android:textSize="13sp" />
+</LinearLayout>

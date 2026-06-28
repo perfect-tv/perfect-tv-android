@@ -44,7 +44,7 @@ class Carousel(private val row: LinearLayout) {
             card.findViewById<TextView>(R.id.name).text = ch.name
             card.isSelected = k == mid
         }
-        (row.layoutParams as FrameLayout.LayoutParams).bottomMargin = above.height + U.pxi(3.2f)   // 2,4 em — отступ инфопанели от края, 0,8 em — зазор
+        (row.layoutParams as FrameLayout.LayoutParams).bottomMargin = above.height - above.paddingTop + U.pxi(0.8f)   // над содержимым панели (её верх — затемнение)
         row.requestLayout()
         row.visibility = View.VISIBLE
         row.bringToFront()

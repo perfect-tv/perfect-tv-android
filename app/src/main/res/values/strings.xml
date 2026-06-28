@@ -277,4 +277,18 @@
         <item quantity="one">%1$d programme · %2$s ago</item>
         <item quantity="other">%1$d programmes · %2$s ago</item>
     </plurals>
+    <string name="next_on_the_channel">Up next on this channel</string>
+    <string name="x_min_left">%1$s min left</string>
+    <string name="x_h_x_min_left">%1$s h %2$s min left</string>
+    <string name="key_hints">Key hints</string>
+    <string name="a_row_at_the_bottom_of_the_pinned">a row at the bottom of the pinned info panel</string>
+    <string name="key_hold_ok">hold OK</string>
+    <string name="key_back">Back</string>
+    <string name="hint_pause">Pause</string>
+    <string name="hint_resume">Resume</string>
+    <string name="hint_collapse">Collapse</string>
+    <string name="hint_channel">Channel</string>
+    <string name="hint_seek">Seek</string>
+    <string name="hint_programme">Schedule</string>
+    <string name="hint_recent">Recent</string>
 </resources>

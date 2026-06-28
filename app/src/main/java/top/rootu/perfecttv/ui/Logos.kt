@@ -99,10 +99,13 @@ object Logos {
         view.setImageDrawable(LogoDrawable(view, ch, badge))
     }
 
-    /** Баннер передачи (TMDB) в ImageView: без кэша битмапов для Canvas, только дисковый кэш Coil */
-    fun banner(view: ImageView, url: String) {
+    /**
+     * Картинка передачи (EPG, TMDB) в ImageView: без кэша битмапов для Canvas, только дисковый
+     * кэш Coil. Не загрузилась — [onError] (картинки в EPG часто битые).
+     */
+    fun banner(view: ImageView, url: String, onError: () -> Unit = {}) {
         view.setImageDrawable(null)
-        loader.enqueue(ImageRequest.Builder(view.context).data(url).target(view).build())
+        loader.enqueue(ImageRequest.Builder(view.context).data(url).target(view).listener(onError = { _, _ -> onError() }).build())
     }
 
     private val dst = RectF()
