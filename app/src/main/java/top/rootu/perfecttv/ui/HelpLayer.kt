@@ -58,6 +58,7 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
                 "↑" to str(R.string.channel_programme_and_archive_in),
                 str(R.string.hold_up) to str(R.string.reminders),
                 "⏯ ⏪ ⏩" to str(R.string.pause_seek_from_live_into_the),
+                "⏹" to str(R.string.stop_in_the_archive_back_to_live),
                 str(R.string.guide_info) to str(R.string.tv_guide_info_panel),
                 str(R.string.back_twice) to str(R.string.exit_the_app)
             ),

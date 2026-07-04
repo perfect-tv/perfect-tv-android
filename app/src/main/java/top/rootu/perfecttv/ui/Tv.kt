@@ -769,7 +769,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "pause" -> if (!playback.paused) togglePause()
             "forward" -> seekStep(1)
             "rewind" -> seekStep(-1)
-            "stop" -> return exitRequest()
+            // ⏹: в архиве — вернуться в эфир, в эфире — как «Назад»
+            "stop" -> return if (state.archive != null) state.channel?.let { playChannel(it, state.groupKey) } ?: Unit else exitRequest()
             "guide" -> return openGuide()
             "info" -> return if (info.visible) info.hide() else showInfo(true)
             "menu" -> return state.channel?.let { openMenu(it) } ?: Unit
@@ -1302,46 +1303,165 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     /** Меню канала (удерж. OK) */
+    private var menu: MenuLayer? = null
+
+    private fun closeMenu() {
+        menu?.let { remove(it) }
+        menu = null
+    }
+
+    /**
+     * Меню канала — шторка справа (MenuLayer): до четырёх плиток частых действий, ниже — группы
+     * «Просмотр», «Канал», «Приложение»; редкое — на втором уровне. Что не поместилось
+     * в плитки, идёт первыми пунктами «Просмотра».
+     */
     fun openMenu(ch: Channel, guide: Boolean = false) {
-        val cat = catalog ?: return
-        val now = Clock.now()
-        val p = repo.at(ch, now)
-        val items = ArrayList<ListLayer.Item>()
-        if (guide) items.add(ListLayer.Item(str(R.string.watch), action = "play"))
-        if (p != null) items.add(ListLayer.Item(str(R.string.about), p.title, action = "about"))
-        if (ch.hasArchive) {
-            if (p != null) items.add(ListLayer.Item(str(R.string.watch_from_start), action = "restart"))
-            items.add(ListLayer.Item(str(R.string.archive_2), str(R.string.x_d, ch.archiveDays), action = "archive"))
-        }
-        if (state.channel === ch && state.archive != null) items.add(ListLayer.Item(str(R.string.watch_live), action = "live"))
-        if (!guide) items.add(ListLayer.Item(str(R.string.tv_guide), action = "guide"))
-        items.add(ListLayer.Item(str(R.string.recent_channels), action = "history"))
-        items.add(ListLayer.Item(str(R.string.reminders), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", action = "reminders"))
-        items.add(ListLayer.Item(if (cat.isFavorite(ch)) str(R.string.remove_from_favourites) else str(R.string.add_to_favourites), action = "fav"))
-        if (cat.isFavorite(ch) && this.guide.groupKey() == Catalog.FAV_KEY && layers.contains(this.guide)) {
-            items.add(ListLayer.Item(str(R.string.move_up), action = "fav_up"))
-            items.add(ListLayer.Item(str(R.string.move_down), action = "fav_down"))
-        }
-        items.add(ListLayer.Item(str(R.string.hide_channel), action = "hide"))
-        if (ch.group.isNotEmpty()) items.add(ListLayer.Item(str(R.string.hide_category), ch.group, action = "hide_group"))
-        val pinOn = Prefs.pin.isNotEmpty()
-        items.add(ListLayer.Item(if (pinOn && cat.isChannelLocked(ch)) str(R.string.unlock_channel) else str(R.string.lock_channel), str(R.string.by_pin), action = if (pinOn && cat.isChannelLocked(ch)) "unlock" else "lock"))
-        items.add(ListLayer.Item(if (pinOn && cat.isGroupLocked(ch.groupKey)) str(R.string.unlock_category) else str(R.string.lock_category), ch.groupKey,
-            action = if (pinOn && cat.isGroupLocked(ch.groupKey)) "unlock_group" else "lock_group"))
-        if (cat.hiddenCount() > 0) items.add(ListLayer.Item(str(R.string.hidden_2), cat.hiddenCount().toString(), action = "hidden"))
-        items.add(ListLayer.Item(str(R.string.adaptive_sorting), if (Prefs.adaptiveSort) str(R.string.on) else str(R.string.off), action = "adaptive"))
-        items.add(ListLayer.Item(str(R.string.view), if (Prefs.guideGrid) str(R.string.tv_guide) else str(R.string.list), action = "view"))
-        if (repo.playlists().size > 1) items.add(ListLayer.Item(str(R.string.playlist), playlist?.name ?: "", action = "playlist"))
-        items.add(ListLayer.Item(str(R.string.reload_playlist), action = "reload"))
-        items.add(ListLayer.Item(str(R.string.reload_programme), action = "reload_epg"))
-        items.add(ListLayer.Item(str(R.string.controls), action = "help"))
-        items.add(ListLayer.Item(str(R.string.settings), action = "settings"))
-        var layer: ListLayer? = null
-        layer = ListLayer(activity, ch.title(), items, onSelect = { it ->
-            remove(layer!!)
-            menuAction(ch, it.action)
-        }, onBack = { remove(layer!!) })
+        closeMenu()
+        val layer = MenuLayer(activity, { menuPage(ch, guide) }, ::closeMenu)
+        menu = layer
         push(layer)
+    }
+
+    private fun onOff(v: Boolean) = str(if (v) R.string.on else R.string.off)
+
+    private fun menuPage(ch: Channel, guide: Boolean): MenuLayer.Page {
+        val cat = catalog ?: return MenuLayer.Page(ch.title(), sections = emptyList())
+        val p = repo.at(ch, Clock.now())
+        val current = state.channel === ch
+        val fav = cat.isFavorite(ch)
+        fun act(a: String): () -> Unit = { menuAction(ch, a) }
+
+        // частые действия по убыванию важности: первые четыре — плитки, остальные — пункты
+        val quick = ArrayList<MenuLayer.Tile>()
+        if (guide) quick.add(MenuLayer.Tile(R.drawable.ic_play, str(R.string.watch), act("play")))
+        if (current && state.archive != null) quick.add(MenuLayer.Tile(R.drawable.ic_live, str(R.string.tile_live), act("live")))
+        if (ch.hasArchive && p != null) quick.add(MenuLayer.Tile(R.drawable.ic_restart, str(R.string.tile_restart), act("restart")))
+        quick.add(MenuLayer.Tile(R.drawable.ic_list, str(R.string.hint_programme), act("archive")))
+        quick.add(MenuLayer.Tile(R.drawable.ic_fav, str(if (fav) R.string.tile_fav_remove else R.string.tile_fav_add), act("fav")))
+        quick.add(MenuLayer.Tile(R.drawable.ic_recent, str(R.string.hint_recent), act("history")))
+
+        val viewing = ArrayList<MenuLayer.Item>()
+        quick.drop(4).forEach { t -> viewing.add(MenuLayer.Item(t.title, run = t.run)) }
+        if (p != null) viewing.add(MenuLayer.Item(str(R.string.about), run = act("about")))
+        if (current) {
+            val audio = playback.tracks(C.TRACK_TYPE_AUDIO)
+            val text = playback.tracks(C.TRACK_TYPE_TEXT)
+            if (audio.size > 1 || text.isNotEmpty()) {
+                val now = audio.firstOrNull { it.selected }?.label ?: ""
+                viewing.add(MenuLayer.Item(str(R.string.audio_and_subtitles), now, sub = { tracksPage(ch) }))
+            }
+            viewing.add(MenuLayer.Item(str(R.string.picture_format), aspectName(), keep = true) { Prefs.aspect = (Prefs.aspect + 1) % 3; applyAspect() })
+        }
+        viewing.add(MenuLayer.Item(str(R.string.sleep_timer), sleepValue(), keep = true) { cycleSleep() })
+
+        val channel = ArrayList<MenuLayer.Item>()
+        if (fav && this.guide.groupKey() == Catalog.FAV_KEY && layers.contains(this.guide)) {
+            channel.add(MenuLayer.Item(str(R.string.move_up), keep = true, run = act("fav_up")))
+            channel.add(MenuLayer.Item(str(R.string.move_down), keep = true, run = act("fav_down")))
+        }
+        channel.add(MenuLayer.Item(str(R.string.hide_channel), run = act("hide")))
+        val pinOn = Prefs.pin.isNotEmpty()
+        val chLocked = pinOn && cat.isChannelLocked(ch)
+        channel.add(MenuLayer.Item(str(if (chLocked) R.string.unlock_channel else R.string.lock_channel), str(R.string.by_pin), run = act(if (chLocked) "unlock" else "lock")))
+        if (ch.group.isNotEmpty()) channel.add(MenuLayer.Item(str(R.string.category_x, ch.group), sub = {
+            val gLocked = pinOn && cat.isGroupLocked(ch.groupKey)
+            MenuLayer.Page(ch.group, str(R.string.category), sections = listOf(MenuLayer.Section("", listOf(
+                MenuLayer.Item(str(R.string.hide_category), run = act("hide_group")),
+                MenuLayer.Item(str(if (gLocked) R.string.unlock_category else R.string.lock_category), str(R.string.by_pin), run = act(if (gLocked) "unlock_group" else "lock_group"))
+            ))))
+        }))
+
+        val app = ArrayList<MenuLayer.Item>()
+        if (!guide) app.add(MenuLayer.Item(str(R.string.tv_guide), run = act("guide")))
+        app.add(MenuLayer.Item(str(R.string.reminders), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", run = act("reminders")))
+        app.add(MenuLayer.Item(str(R.string.channel_list), sub = {
+            val l = arrayListOf(
+                MenuLayer.Item(str(R.string.view), if (Prefs.guideGrid) str(R.string.tv_guide) else str(R.string.list), keep = true, run = act("view")),
+                MenuLayer.Item(str(R.string.adaptive_sorting), onOff(Prefs.adaptiveSort), keep = true, run = act("adaptive"))
+            )
+            if (cat.hiddenCount() > 0) l.add(MenuLayer.Item(str(R.string.hidden_2), cat.hiddenCount().toString(), run = act("hidden")))
+            MenuLayer.Page(str(R.string.channel_list), sections = listOf(MenuLayer.Section("", l)))
+        }))
+        app.add(MenuLayer.Item(str(R.string.playlist_and_programme), playlist?.name ?: "", sub = {
+            val l = ArrayList<MenuLayer.Item>()
+            if (repo.playlists().size > 1) l.add(MenuLayer.Item(str(R.string.playlist), playlist?.name ?: "", run = act("playlist")))
+            l.add(MenuLayer.Item(str(R.string.reload_playlist), run = act("reload")))
+            l.add(MenuLayer.Item(str(R.string.reload_programme), run = act("reload_epg")))
+            MenuLayer.Page(str(R.string.playlist_and_programme), playlist?.name ?: "", sections = listOf(MenuLayer.Section("", l)))
+        }))
+        app.add(MenuLayer.Item(str(R.string.controls), run = act("help")))
+        app.add(MenuLayer.Item(str(R.string.settings), run = act("settings")))
+
+        return MenuLayer.Page(ch.title(), p?.let { it.title + " · " + Fmt.timeRange(it.start, it.stop) } ?: "", ch, quick.take(4), listOf(
+            MenuLayer.Section(str(R.string.viewing), viewing),
+            MenuLayer.Section(str(R.string.channel), channel),
+            MenuLayer.Section(str(R.string.app), app)
+        ))
+    }
+
+    /** «Звук и субтитры»: дорожки потока; выбор запоминается как предпочитаемый язык */
+    private fun tracksPage(ch: Channel): MenuLayer.Page {
+        fun label(t: Playback.Track, i: Int) = t.label.ifEmpty { str(R.string.track_x, i + 1) }
+        fun mark(on: Boolean) = if (on) str(R.string.selected_mark) else ""
+        val audio = playback.tracks(C.TRACK_TYPE_AUDIO)
+        val text = playback.tracks(C.TRACK_TYPE_TEXT)
+        // выбор применяется не мгновенно — страницу перестроить, когда плеер переключит дорожку
+        fun pick(type: Int, t: Playback.Track?) {
+            playback.selectTrack(type, t)
+            if (type == C.TRACK_TYPE_AUDIO) Prefs.audioLang = t?.language ?: "" else Prefs.subtitleLang = t?.language ?: ""
+            main.postDelayed({ menu?.refresh() }, 400)
+        }
+        val a = audio.mapIndexed { i, t -> MenuLayer.Item(label(t, i), mark(t.selected), keep = true) { pick(C.TRACK_TYPE_AUDIO, t) } }
+        val off = text.none { it.selected }
+        val s = arrayListOf(MenuLayer.Item(str(R.string.off), mark(off), keep = true) { pick(C.TRACK_TYPE_TEXT, null) })
+        text.forEachIndexed { i, t -> s.add(MenuLayer.Item(label(t, i), mark(t.selected), keep = true) { pick(C.TRACK_TYPE_TEXT, t) }) }
+        return MenuLayer.Page(str(R.string.audio_and_subtitles), ch.title(), sections = listOf(
+            MenuLayer.Section(str(R.string.audio), a.ifEmpty { listOf(MenuLayer.Item(str(R.string.no_tracks), enabled = false)) }),
+            MenuLayer.Section(str(R.string.subtitles), if (text.isEmpty()) listOf(MenuLayer.Item(str(R.string.no_tracks), enabled = false)) else s)
+        ))
+    }
+
+    // ---------------------------------------------------------- формат кадра, таймер сна
+
+    private val playerView: androidx.media3.ui.PlayerView = root.findViewById(R.id.player)
+
+    private fun aspectName() = str(when (Prefs.aspect) { 1 -> R.string.format_stretch; 2 -> R.string.format_zoom; else -> R.string.auto })
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun applyAspect() {
+        playerView.resizeMode = when (Prefs.aspect) {
+            1 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+            2 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
+    }
+
+    // таймер сна — таймер интерфейса (uptime), а не время передач
+    private var sleepAt = 0L
+    private val sleepWarn = Runnable { toast.show(str(R.string.sleep_timer_in_a_minute)) }
+    private val sleepRun = Runnable { sleepAt = 0; activity.finish() }
+
+    private fun sleepValue(): String {
+        if (sleepAt == 0L) return str(R.string.off)
+        return str(R.string.x_min, (sleepAt - android.os.SystemClock.uptimeMillis() + 59_999) / 60_000)
+    }
+
+    /** Следующее значение: выкл. → 15 → 30 → 45 → 60 → 90 → 120 мин → выкл. */
+    private fun cycleSleep() {
+        val left = if (sleepAt == 0L) 0 else ((sleepAt - android.os.SystemClock.uptimeMillis() + 59_999) / 60_000).toInt()
+        val next = SLEEP_STEPS.firstOrNull { it > left } ?: 0
+        main.removeCallbacks(sleepWarn)
+        main.removeCallbacks(sleepRun)
+        sleepAt = 0
+        if (next == 0) return
+        sleepAt = android.os.SystemClock.uptimeMillis() + next * 60_000L
+        main.postDelayed(sleepWarn, (next - 1) * 60_000L)
+        main.postDelayed(sleepRun, next * 60_000L)
+    }
+
+    init {
+        applyAspect()
+        playback.preferLanguages(Prefs.audioLang, Prefs.subtitleLang)
     }
 
     private fun menuAction(ch: Channel, a: String) {
@@ -1475,6 +1595,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         /** Проверка устаревания плейлиста и программы, тиков (с) */
         const val AUTO_REFRESH = 15 * 60
         const val SWITCH_DELAY = 700L
+        /** Шаги таймера сна, мин */
+        val SLEEP_STEPS = intArrayOf(15, 30, 45, 60, 90, 120)
         const val OSD_NUMBER = 2000L
         const val SEEK_DELAY = 900L
         const val ADAPTIVE_AFTER = 5 * 60 * 1000L

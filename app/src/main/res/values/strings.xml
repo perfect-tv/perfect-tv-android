@@ -291,4 +291,26 @@
     <string name="hint_seek">Seek</string>
     <string name="hint_programme">Schedule</string>
     <string name="hint_recent">Recent</string>
+    <string name="tile_restart">From start</string>
+    <string name="tile_live">Go live</string>
+    <string name="tile_fav_add">Favourite</string>
+    <string name="tile_fav_remove">Unfavourite</string>
+    <string name="app">App</string>
+    <string name="audio_and_subtitles">Audio and subtitles</string>
+    <string name="audio">Audio</string>
+    <string name="subtitles">Subtitles</string>
+    <string name="track_x">Track %1$s</string>
+    <string name="auto">Auto</string>
+    <string name="no_tracks">no tracks</string>
+    <string name="selected_mark">●</string>
+    <string name="picture_format">Picture format</string>
+    <string name="format_stretch">Stretch</string>
+    <string name="format_zoom">Zoom</string>
+    <string name="sleep_timer">Sleep timer</string>
+    <string name="x_min">%1$s min</string>
+    <string name="sleep_timer_in_a_minute">Sleep timer: turning off in a minute</string>
+    <string name="category_x">Category “%1$s”</string>
+    <string name="channel_list">Channel list</string>
+    <string name="playlist_and_programme">Playlist and guide data</string>
+    <string name="stop_in_the_archive_back_to_live">in the archive — go live; live — same as Back</string>
 </resources>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Меню канала: шторка справа на всю высоту (MenuLayer). Шапка, ряд плиток частых действий,
+  ниже — группы пунктов; содержимое — в безопасной зоне. Тап вне шторки — «Назад».
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_menu_scrim"
+    android:clickable="true">
+
+    <LinearLayout
+        android:id="@+id/box"
+        android:layout_width="356dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="@color/popup"
+        android:clickable="true"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="26dp"
+        android:paddingBottom="12dp">
+
+        <include layout="@layout/popup_head" />
+
+        <LinearLayout
+            android:id="@+id/menu_tiles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="7dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="4dp"
+            android:orientation="horizontal" />
+
+        <ScrollView
+            android:id="@+id/menu_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadingEdgeLength="30dp"
+            android:requiresFadingEdge="vertical"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/menu_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="7dp"
+                android:paddingEnd="7dp" />
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

@@ -112,6 +112,52 @@ class Playback(context: Context) {
         player.stop()
     }
 
+    // ---------------------------------------------------------- звук и субтитры
+
+    /** Дорожка потока: [label] — название или язык, [selected] — играет сейчас */
+    class Track(val group: androidx.media3.common.TrackGroup, val index: Int, val label: String, val language: String, val selected: Boolean)
+
+    /** Дорожки типа [type] (C.TRACK_TYPE_AUDIO / C.TRACK_TYPE_TEXT), которые плеер умеет играть */
+    fun tracks(type: Int): List<Track> {
+        val out = ArrayList<Track>()
+        for (g in player.currentTracks.groups) {
+            if (g.type != type) continue
+            for (i in 0 until g.length) {
+                if (!g.isTrackSupported(i)) continue
+                val f = g.getTrackFormat(i)
+                val lang = f.language?.takeIf { it != C.LANGUAGE_UNDETERMINED } ?: ""
+                val name = lang.takeIf { it.isNotEmpty() }?.let { java.util.Locale.forLanguageTag(it).getDisplayLanguage(top.rootu.perfecttv.core.Lang.locale).replaceFirstChar { c -> c.uppercase() } } ?: ""
+                var label = listOf(name, f.label ?: "").filter { it.isNotEmpty() }.distinct().joinToString(" · ")
+                if (type == C.TRACK_TYPE_AUDIO && f.channelCount > 0) {
+                    val ch = when (f.channelCount) { 1 -> "1.0"; 2 -> "2.0"; 6 -> "5.1"; 8 -> "7.1"; else -> f.channelCount.toString() }
+                    label = if (label.isEmpty()) ch else "$label · $ch"
+                }
+                out.add(Track(g.mediaTrackGroup, i, label, lang, g.isTrackSelected(i)))
+            }
+        }
+        return out
+    }
+
+    /** Выбрать дорожку; null — звук: как в потоке, субтитры: выключить */
+    fun selectTrack(type: Int, t: Track?) {
+        val b = player.trackSelectionParameters.buildUpon().clearOverridesOfType(type)
+        if (t != null) {
+            b.setTrackTypeDisabled(type, false).setOverrideForType(androidx.media3.common.TrackSelectionOverride(t.group, t.index))
+            if (t.language.isNotEmpty()) { if (type == C.TRACK_TYPE_AUDIO) b.setPreferredAudioLanguage(t.language) else b.setPreferredTextLanguage(t.language) }
+        } else if (type == C.TRACK_TYPE_TEXT) b.setTrackTypeDisabled(type, true)
+        player.trackSelectionParameters = b.build()
+    }
+
+    /** Языки по умолчанию для следующих каналов (последний выбор пользователя); пусто — не задан */
+    fun preferLanguages(audio: String, text: String) {
+        val b = player.trackSelectionParameters.buildUpon()
+        if (audio.isNotEmpty()) b.setPreferredAudioLanguage(audio)
+        if (text.isNotEmpty()) b.setPreferredTextLanguage(text)
+        player.trackSelectionParameters = b.build()
+    }
+
+    val textDisabled get() = player.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+
     fun pause() {
         player.playWhenReady = false
     }

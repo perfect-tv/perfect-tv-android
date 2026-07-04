@@ -39,6 +39,19 @@ object Prefs {
         get() = bool("key_hints", true)
         set(v) = sp.edit().putBoolean("key_hints", v).apply()
 
+    /** Формат кадра: 0 — авто (вписать), 1 — растянуть, 2 — увеличить (обрезать края) */
+    var aspect: Int
+        get() = int("aspect", 0)
+        set(v) = sp.edit().putInt("aspect", v).apply()
+
+    /** Предпочитаемые языки звука и субтитров (последний выбор в меню); пусто — как в потоке */
+    var audioLang: String
+        get() = sp.getString("audio_lang", "") ?: ""
+        set(v) = sp.edit().putString("audio_lang", v).apply()
+    var subtitleLang: String
+        get() = sp.getString("subtitle_lang", "") ?: ""
+        set(v) = sp.edit().putString("subtitle_lang", v).apply()
+
     var animations: Boolean
         get() = bool("animations", true)
         set(v) = sp.edit().putBoolean("animations", v).apply()

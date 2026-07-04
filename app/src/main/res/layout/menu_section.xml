@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Название группы пунктов в меню канала -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="3dp"
+    android:textAllCaps="true"
+    android:letterSpacing="0.06"
+    android:textColor="@color/text_50"
+    android:textSize="11sp" />

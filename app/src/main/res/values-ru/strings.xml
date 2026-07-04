@@ -291,4 +291,26 @@
     <string name="hint_seek">Перемотка</string>
     <string name="hint_programme">Программа</string>
     <string name="hint_recent">Недавние</string>
+    <string name="tile_restart">Сначала</string>
+    <string name="tile_live">В эфир</string>
+    <string name="tile_fav_add">В избранное</string>
+    <string name="tile_fav_remove">Из избранного</string>
+    <string name="app">Приложение</string>
+    <string name="audio_and_subtitles">Звук и субтитры</string>
+    <string name="audio">Звук</string>
+    <string name="subtitles">Субтитры</string>
+    <string name="track_x">Дорожка %1$s</string>
+    <string name="auto">Авто</string>
+    <string name="no_tracks">нет дорожек</string>
+    <string name="selected_mark">●</string>
+    <string name="picture_format">Формат кадра</string>
+    <string name="format_stretch">Растянуть</string>
+    <string name="format_zoom">Увеличить</string>
+    <string name="sleep_timer">Таймер сна</string>
+    <string name="x_min">%1$s мин</string>
+    <string name="sleep_timer_in_a_minute">Таймер сна: выключение через минуту</string>
+    <string name="category_x">Категория «%1$s»</string>
+    <string name="channel_list">Список каналов</string>
+    <string name="playlist_and_programme">Плейлист и программа</string>
+    <string name="stop_in_the_archive_back_to_live">в архиве — в эфир, в эфире — как «Назад»</string>
 </resources>
