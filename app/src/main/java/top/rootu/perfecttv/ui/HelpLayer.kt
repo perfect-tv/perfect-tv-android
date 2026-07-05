@@ -64,9 +64,9 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
             ),
             str(R.string.tv_guide) to listOf(
                 "↑ / ↓" to str(R.string.channel),
-                "← / →" to str(R.string.category),
+                "←" to str(R.string.categories_up_down_right_to_channels),
+                "→" to str(R.string.into_the_grid_in_list_view_programme),
                 str(R.string.hold_left) to str(R.string.channel_programme_and_archive),
-                str(R.string.hold_right) to str(R.string.go_to_the_programme_grid),
                 str(R.string.ok_hold_ok) to str(R.string.watch_channel_menu),
                 str(R.string.in_the_grid) to str(R.string.arrows_programmes_ok_programme_card),
                 str(R.string.back) to str(R.string.close_the_guide)

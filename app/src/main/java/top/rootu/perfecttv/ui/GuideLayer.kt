@@ -21,8 +21,9 @@ import top.rootu.perfecttv.data.Catalog
 import top.rootu.perfecttv.data.Channel
 
 /**
- * ТВ-гид: категории ‹ ›, список каналов и сетка программы
- * (вид «ТВ-гид») или текущая передача и «далее» (вид «Список»).
+ * ТВ-гид: список каналов и сетка программы (вид «ТВ-гид») или текущая передача и «далее»
+ * (вид «Список»). ← из списка каналов — колонка категорий: выезжает слева и сдвигает список
+ * и сетку вправо, за край экрана (шапка с передачей и часами стоит); → — фокус в сетку.
  *
  * Всё рисуется одним View без выделения памяти на кадр. Окно сетки — [winStart] и 2 часа,
  * шаг 30 минут. Пока фокус на списке каналов, окно «живое»: winStart = сейчас − 30 мин
@@ -44,7 +45,11 @@ class GuideLayer(private val tv: Tv) : Layer {
     private var focusTime = 0L
     private var live = true
 
-    private enum class Zone { CHANNELS, GRID }
+    private enum class Zone { CATS, CHANNELS, GRID }
+
+    // колонка категорий: куда вернуться по «Назад» (отмена выбора)
+    private var catsFromGroup = 0
+    private var catsFromChannel: Channel? = null
 
     private val group get() = groups.getOrNull(groupIndex)
     private val channels get() = group?.channels ?: emptyList()
@@ -71,6 +76,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         live = true
         winStart = liveStart()
         grid = Prefs.guideGrid
+        gv.resetShift()
         if (toGrid && grid) toGrid()
         main.removeCallbacks(tick)
         main.postDelayed(tick, 10_000)
@@ -107,7 +113,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     fun setView(gridView: Boolean) {
         grid = gridView
-        zone = Zone.CHANNELS
+        if (zone == Zone.GRID) zone = Zone.CHANNELS
         live = true
         winStart = liveStart()
         gv.invalidate()
@@ -136,19 +142,56 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     // ------------------------------------------------------------------ клавиши
 
-    override fun hasLong(name: String) = zone == Zone.CHANNELS && (name == "left" || name == "right")
+    override fun hasLong(name: String) = zone == Zone.CHANNELS && name == "left"
 
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") return tv.digit(digit)
         if (zone == Zone.GRID) return gridKey(name)
+        if (zone == Zone.CATS) return catsKey(name)
         when (name) {
             "up" -> move(-1)
             "down" -> move(1)
             "pgup" -> move(-pageSize())
             "pgdown" -> move(pageSize())
-            "left" -> if (long) focused?.let { tv.openSchedule(it, 0) } else changeGroup(-1)
-            "right" -> if (long) { if (grid) toGrid() } else changeGroup(1)
+            "left" -> if (long) focused?.let { tv.openSchedule(it, 0) } else openCats()
+            // → в сетку программы; в виде «Список» сетки нет — программа канала
+            "right" -> if (grid) toGrid() else focused?.let { tv.openSchedule(it, 0) }
         }
+    }
+
+    // ---------------------------------------------------------- колонка категорий
+
+    private fun openCats() {
+        if (groups.size < 2) return
+        catsFromGroup = groupIndex
+        catsFromChannel = focused
+        zone = Zone.CATS
+        gv.invalidate()
+    }
+
+    /** ↑/↓ — категория (список каналов справа меняется сразу), → — к её каналам */
+    private fun catsKey(name: String) {
+        val n = groups.size
+        when (name) {
+            "up" -> setGroup((groupIndex - 1 + n) % n)
+            "down" -> setGroup((groupIndex + 1) % n)
+            "pgup" -> setGroup(maxOf(0, groupIndex - gv.catRows() + 1))
+            "pgdown" -> setGroup(minOf(n - 1, groupIndex + gv.catRows() - 1))
+            "right" -> closeCats()
+        }
+    }
+
+    private fun setGroup(i: Int) {
+        if (i == groupIndex || i !in groups.indices) return
+        groupIndex = i
+        // канал, с которого открыли колонку, — если он есть в категории; иначе начало
+        index = catsFromChannel?.let { channels.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+        gv.invalidate()
+    }
+
+    private fun closeCats() {
+        zone = Zone.CHANNELS
+        gv.invalidate()
     }
 
     private fun move(d: Int) {
@@ -156,15 +199,6 @@ class GuideLayer(private val tv: Tv) : Layer {
         if (n == 0) return
         // по одному — по кругу, страницами — до края
         index = if (Math.abs(d) == 1) (index + d + n) % n else (index + d).coerceIn(0, n - 1)
-        gv.invalidate()
-    }
-
-    private fun changeGroup(d: Int) {
-        if (groups.size < 2) return
-        val ch = focused
-        groupIndex = (groupIndex + d + groups.size) % groups.size
-        // тот же канал в новой категории, иначе — начало
-        index = ch?.let { channels.indexOf(it) }?.takeIf { it >= 0 } ?: 0
         gv.invalidate()
     }
 
@@ -205,6 +239,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     override fun enter() {
         if (tv.numberPending()) return tv.applyNumber()
+        if (zone == Zone.CATS) return closeCats()
         val ch = focused ?: return
         if (zone == Zone.GRID) {
             focusCell()?.let { tv.openDetails(ch, it) }
@@ -219,6 +254,12 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     override fun back() {
         if (tv.numberPending()) return tv.cancelNumber()
+        if (zone == Zone.CATS) {
+            // отмена: категория и канал — как до открытия колонки
+            groupIndex = catsFromGroup.coerceIn(0, maxOf(0, groups.size - 1))
+            index = catsFromChannel?.let { channels.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+            return closeCats()
+        }
         if (zone == Zone.GRID) {
             zone = Zone.CHANNELS
             live = true
@@ -271,6 +312,23 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var descKey = ""
 
         // безопасная зона: 4 em по бокам, 2,4 em сверху и снизу
+        private val pHint = U.paint(1.15f, U.wa(0.6f))
+        private val pHintKey = U.paint(1.1f, U.wa(0.8f))
+        private val pCatItem = U.paint(1.3f)
+        private val pCatItemBold = U.paint(1.3f, bold = true)
+
+        // колонка категорий: 0 — убрана, 1 — выехала; список и сетка сдвинуты на shift * (catW + зазор)
+        private var shift = 0f
+        private val catW get() = 19f * em
+        private val catRowH get() = 3.2f * em
+
+        fun resetShift() { shift = 0f }
+
+        fun catRows() = maxOf(1, ((height - bodyTop - padBottom - hintsH + gap) / (catRowH + gap)).toInt())
+
+        // строка подсказок под списком (настройка «Подсказки клавиш»)
+        private val hintsH get() = if (Prefs.keyHints && !U.touch) 1.9f * em else 0f
+
         private val padX get() = 4f * em
         private val padTop get() = 2.4f * em
         private val padBottom get() = 2.4f * em
@@ -281,7 +339,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val bodyTop get() = padTop + topH + em + headH
         private val chW get() = (width - 2 * padX) * (if (grid) 0.30f else 0.45f)
 
-        fun visibleRows() = maxOf(1, ((height - bodyTop - padBottom + gap) / (rowH + gap)).toInt())
+        fun visibleRows() = maxOf(1, ((height - bodyTop - padBottom - hintsH + gap) / (rowH + gap)).toInt())
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
             gradient = LinearGradient(0f, 0f, 0f, h.toFloat(), intArrayOf(U.GUIDE_TOP, android.graphics.Color.argb(220, 12, 13, 14), U.GUIDE_BOTTOM),
@@ -298,6 +356,27 @@ class GuideLayer(private val tv: Tv) : Layer {
                 nowText = Fmt.hhmm(now)
             }
             drawTop(c, now)
+            // колонка категорий выезжает слева, список и сетка уезжают вправо за край экрана
+            val target = if (zone == Zone.CATS) 1f else 0f
+            if (!Anim.on || Math.abs(target - shift) < 0.01f) shift = target
+            else {
+                shift += (target - shift) * 0.3f
+                postInvalidateOnAnimation()
+            }
+            drawHints(c)
+            if (shift > 0f) drawCats(c)
+            val moved = shift > 0f
+            if (moved) {
+                c.save()
+                val dx = shift * (catW + em)
+                c.clipRect(padX + dx - gap, 0f, width.toFloat(), height.toFloat())
+                c.translate(dx, 0f)
+            }
+            drawBody(c, now)
+            if (moved) c.restore()
+        }
+
+        private fun drawBody(c: Canvas, now: Long) {
             drawHead(c, now)
             val list = channels
             if (list.isEmpty()) {
@@ -329,6 +408,79 @@ class GuideLayer(private val tv: Tv) : Layer {
                     c.drawText(nowText, cx - pNowChip.measureText(nowText) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
                 }
             } else drawSide(c, now)
+        }
+
+        /** Колонка категорий: название, число каналов, замок; в фокусе — белая */
+        private fun drawCats(c: Canvas) {
+            val l = padX - (1f - shift) * (padX + catW)
+            val r = l + catW
+            val headY = padTop + topH + em
+            U.drawText(c, catsTitle, l + em, headY + headH / 2, catW - 2 * em, pCat)
+            val rows = catRows()
+            val n = groups.size
+            val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
+            val cat = tv.catalog
+            val pin = Prefs.pin.isNotEmpty()
+            for (k in 0 until rows) {
+                val i = first + k
+                if (i >= n) break
+                val g = groups[i]
+                val y = bodyTop + k * (catRowH + gap)
+                val focus = i == groupIndex
+                val white = focus && zone == Zone.CATS
+                if (focus) U.roundRect(c, l, y, r, y + catRowH, U.px(U.RADIUS_S), if (white) U.WHITE else U.FILL_ACTIVE)
+                val cy = y + catRowH / 2
+                val count = counts.getOrPut(g.key + g.channels.size) { g.channels.size.toString() }
+                pCount.color = if (white) U.BLACK else U.wa(0.5f)
+                val cw = pCount.measureText(count)
+                c.drawText(count, r - em - cw, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
+                var tx = l + em
+                val isz = 1.2f * em
+                val ic = if (white) U.BLACK else U.wa(0.7f)
+                if (g.favorites) { Icons.draw(c, Icons.Kind.FAV, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
+                else if (pin && cat?.isGroupLocked(g.key) == true) { Icons.draw(c, Icons.Kind.LOCK, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
+                val p = if (focus) pCatItemBold else pCatItem
+                p.color = if (white) U.BLACK else if (focus) U.WHITE else U.wa(0.85f)
+                U.drawText(c, g.title.ifEmpty { "—" }, tx, cy, r - em - cw - em - tx, p)
+            }
+            pCount.color = U.wa(0.5f)
+        }
+
+        // строки, которые не меняются от кадра к кадру: собираются при открытии и смене зоны
+        private val counts = HashMap<String, String>()
+        private var catsTitle = ""
+        private var hintZone: Zone? = null
+        private var hintList: List<Pair<String, String>> = emptyList()
+
+        private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
+            Zone.CATS -> listOf("↑ ↓" to str(R.string.category), "→" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
+            Zone.GRID -> listOf("OK" to str(R.string.about), "← →" to str(R.string.hint_programmes), str(R.string.key_back) to str(R.string.hint_to_channels))
+            Zone.CHANNELS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_categories),
+                "→" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
+        }
+
+        /** Подсказки клавиш под списком: клавиша в рамке и действие */
+        private fun drawHints(c: Canvas) {
+            if (hintsH == 0f) return
+            if (hintZone != zone || catsTitle.isEmpty()) {
+                hintZone = zone
+                hintList = hintsFor(zone)
+                catsTitle = str(R.string.hint_categories)
+            }
+            val cy = height - padBottom - 0.8f * em
+            var x = padX
+            for ((key, action) in hintList) {
+                val kw = maxOf(2f * em, pHintKey.measureText(key) + em)
+                U.fill.style = Paint.Style.STROKE
+                U.fill.strokeWidth = 0.1f * em
+                U.fill.color = U.wa(0.4f)
+                c.drawRoundRect(x, cy - 0.85f * em, x + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
+                U.fill.style = Paint.Style.FILL
+                c.drawText(key, x + (kw - pHintKey.measureText(key)) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
+                x += kw + 0.6f * em
+                c.drawText(action, x, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
+                x += pHint.measureText(action) + 1.8f * em
+            }
         }
 
         // подпись плашки «сейчас»: строка меняется раз в минуту, а не на каждом кадре
@@ -382,17 +534,15 @@ class GuideLayer(private val tv: Tv) : Layer {
             val arrowW = 1.6f * em
             val l = padX
             val r = padX + chW - em
-            if (groups.size > 1) {
-                c.drawText("‹", l, cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
-                c.drawText("›", r - pCatArrow.measureText("›"), cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
-            }
+            // «‹ Эфирные 20»: стрелка напоминает, что категории — слева (←)
+            if (groups.size > 1) c.drawText("‹", l, cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
             val title = g?.title?.ifEmpty { "—" } ?: "—"
-            val count = " " + (g?.channels?.size ?: 0)
+            val count = g?.let { counts.getOrPut(it.key + it.channels.size) { it.channels.size.toString() } } ?: ""
             val cw = pCount.measureText(count)
-            val tw = minOf(pCat.measureText(title), r - l - 2 * arrowW - cw)
-            val tx = (l + r - tw - cw) / 2
-            U.drawText(c, if (g?.favorites == true) "♥ $title" else title, tx, cy, tw, pCat)
-            c.drawText(count, tx + tw, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
+            val tw = minOf(pCat.measureText(title), r - l - arrowW - cw - em)
+            val tx = l + arrowW
+            U.drawText(c, title, tx, cy, tw, pCat)
+            c.drawText(count, tx + tw + 0.6f * em, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
             if (!grid) return
             val gl = padX + chW + gap
             val gr = width - padX
@@ -544,10 +694,16 @@ class GuideLayer(private val tv: Tv) : Layer {
         private fun tap(x: Float, y: Float) {
             val headY = padTop + topH + em
             if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
-            if (y in headY..headY + headH && x < padX + chW) {
-                if (x < padX + 3 * em) changeGroup(-1) else if (x > padX + chW - 3 * em) changeGroup(1)
-                return
+            if (zone == Zone.CATS) {
+                // тап по категории — открыть её каналы; мимо колонки — закрыть колонку
+                if (x < padX + catW && y >= bodyTop) {
+                    val rows = catRows()
+                    val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                    setGroup(first + ((y - bodyTop) / (catRowH + gap)).toInt())
+                }
+                return closeCats()
             }
+            if (y in headY..headY + headH && x < padX + chW) return openCats()
             if (y < bodyTop) return
             val i = rowAt(y)
             if (i !in channels.indices) return

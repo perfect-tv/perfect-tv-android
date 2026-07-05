@@ -313,4 +313,11 @@
     <string name="channel_list">Список каналов</string>
     <string name="playlist_and_programme">Плейлист и программа</string>
     <string name="stop_in_the_archive_back_to_live">в архиве — в эфир, в эфире — как «Назад»</string>
+    <string name="hint_categories">Категории</string>
+    <string name="hint_to_channels">К каналам</string>
+    <string name="hint_programmes">Передачи</string>
+    <string name="hint_into_grid">В программу</string>
+    <string name="categories_up_down_right_to_channels">колонка категорий: ↑/↓ — категория, → — к её каналам, «Назад» — отмена</string>
+    <string name="into_the_grid_in_list_view_programme">в сетку программы (в виде «Список» — программа канала)</string>
+    <string name="hint_cancel">Отмена</string>
 </resources>

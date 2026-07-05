@@ -313,4 +313,11 @@
     <string name="channel_list">Channel list</string>
     <string name="playlist_and_programme">Playlist and guide data</string>
     <string name="stop_in_the_archive_back_to_live">in the archive — go live; live — same as Back</string>
+    <string name="hint_categories">Categories</string>
+    <string name="hint_to_channels">To channels</string>
+    <string name="hint_programmes">Programmes</string>
+    <string name="hint_into_grid">Into the grid</string>
+    <string name="categories_up_down_right_to_channels">category column: ↑/↓ — category, → — to its channels, Back — cancel</string>
+    <string name="into_the_grid_in_list_view_programme">into the programme grid (in List view — the channel schedule)</string>
+    <string name="hint_cancel">Cancel</string>
 </resources>
