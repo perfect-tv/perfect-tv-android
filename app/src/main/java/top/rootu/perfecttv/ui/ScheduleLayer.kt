@@ -1,6 +1,7 @@
 package top.rootu.perfecttv.ui
 
 import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.str
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -11,9 +12,10 @@ import android.view.View
 import top.rootu.perfecttv.data.Channel
 
 /**
- * Окно «Программа и архив» / «Напоминания»: слева вкладки видов
- * (если их больше одного), в центре передачи по дням (виртуальный список на Canvas),
- * справа вкладки дат.
+ * Окно «Программа и архив» / «Напоминания» (виртуальный список на Canvas). Слева — вкладки дат
+ * (←), в центре передачи по дням, правее — панель передачи в фокусе (время, название, описание,
+ * что сделает OK), у правого края — вкладки видов «Программа» / «Напоминания» с подписями (→),
+ * если видов больше одного.
  *
  * Подсветка: серым — играющая передача и её дата, открытый вид; белым — фокус (строка и
  * её дата; вкладка даты и заголовок этого дня; вкладка вида).
@@ -24,7 +26,7 @@ class ScheduleLayer(
     private var viewIndex: Int,
     private val makeContent: (Int) -> Content,
     private val onBack: () -> Unit
-) : PopupLayer(context, 64f, 0.86f) {
+) : PopupLayer(context, 88f, 0.86f) {
 
     class Row(
         val separator: Boolean,
@@ -40,7 +42,11 @@ class ScheduleLayer(
         val playing: Boolean = false,
         val remind: Boolean = false,
         val channel: Channel? = null,     // логотип в строке (список напоминаний)
-        val payload: Any? = null
+        val payload: Any? = null,
+        val desc: String = "",            // панель справа: описание,
+        val range: String = "",           // «Сегодня, 00:05 – 00:30»
+        val action: String = "",          // и что сделает OK
+        val progress: Float = -1f         // идущая передача: доля 0..1
     )
 
     class Tab(val day: Long, val label: String)
@@ -180,23 +186,25 @@ class ScheduleLayer(
 
     override fun key(name: String, long: Boolean, digit: Int) {
         when (zone) {
+            // вкладки видов — справа: ← обратно в список
             Zone.VIEWS -> when (name) {
                 "up" -> switchView(viewIndex - 1)
                 "down" -> switchView(viewIndex + 1)
-                "right" -> { zone = Zone.LIST; list.invalidate() }
+                "left" -> { zone = Zone.LIST; list.invalidate() }
             }
+            // даты — слева: → обратно в список
             Zone.TABS -> when (name) {
                 "up" -> moveTab(-1)
                 "down" -> moveTab(1)
-                "left" -> toList()
+                "right" -> toList()
             }
             Zone.LIST -> when (name) {
                 "up" -> move(-1)
                 "down" -> move(1)
                 "pgup" -> repeat(8) { move(-1) }
                 "pgdown" -> repeat(8) { move(1) }
-                "right" -> toTabs()
-                "left" -> if (views.size > 1) { zone = Zone.VIEWS; list.invalidate() }
+                "left" -> toTabs()
+                "right" -> if (views.size > 1) { zone = Zone.VIEWS; list.invalidate() }
             }
         }
     }
@@ -234,8 +242,14 @@ class ScheduleLayer(
         private val rowH = 3.2f * em
         private val richH = 4.3f * em
         private val sepH = 2.9f * em
-        private val viewsW get() = if (views.size > 1) 7.5f * em else 0f
+        private val viewsW get() = if (views.size > 1) 10f * em else 0f
         private val tabsW = 7.5f * em
+        private val detailW = 30f * em
+        private val pDetailTitle = android.text.TextPaint(U.paint(1.6f, bold = true))
+        private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
+        private val pViewLabel = U.paint(1.1f)
+        // подписи вкладок видов: окно живёт недолго, язык за это время не меняется
+        private val viewLabels = views.map { str(if (it == Icons.Kind.REMIND) R.string.reminders else R.string.hint_programme) }
         private val pTime = U.paint(1.2f, U.wa(0.8f))
         private val pTitle = U.paint(1.3f)
         private val pTitleBold = U.paint(1.3f, bold = true)
@@ -283,11 +297,12 @@ class ScheduleLayer(
                 postInvalidateOnAnimation()
             } else scrollY0 = target
             val w = width.toFloat()
-            val listL = viewsW
-            val listR = w - tabsW
-            drawViews(c)
+            val listL = tabsW
+            val listR = w - viewsW - detailW
+            drawViews(c, w)
             if (rows.isEmpty()) {
-                U.drawText(c, content.empty, listL + 2 * em, 2.5f * em, listR - listL - 4 * em, pEmpty)
+                // пусто — сообщение на всю ширину, без панели передачи
+                U.drawText(c, content.empty, listL + 2 * em, 2.5f * em, w - viewsW - listL - 4 * em, pEmpty)
             } else {
                 val save = Fade.begin(c, listL, 0f, listR, height.toFloat())
                 var y = -scrollY0
@@ -304,7 +319,57 @@ class ScheduleLayer(
                 Fade.end(c, save, listL, 0f, listR, height.toFloat(),
                     scrollY0 / fl, (total() - height - scrollY0) / fl)
             }
-            drawTabs(c, w)
+            if (rows.isNotEmpty()) drawDetail(c, listR, w - viewsW)
+            drawTabs(c)
+        }
+
+        // панель передачи в фокусе: раскладка текста пересобирается только при смене строки
+        private var detailRow: Row? = null
+        private var detailTitle: android.text.StaticLayout? = null
+        private var detailText: android.text.StaticLayout? = null
+
+        private fun layout(s: String, p: android.text.TextPaint, w: Int, lines: Int) =
+            android.text.StaticLayout.Builder.obtain(s, 0, s.length, p, w).setMaxLines(lines)
+                .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(0f, 1.15f).build()
+
+        /** Справа от списка: время, название, описание и подсказка «OK — …» для строки в фокусе */
+        private fun drawDetail(c: Canvas, l: Float, r: Float) {
+            U.fill.color = U.LINE
+            c.drawRect(l, 0f, l + 0.1f * em, height.toFloat(), U.fill)
+            // фокус на датах — в списке подсвечен заголовок дня, а не передача: панель пустая
+            if (zone == Zone.TABS) return
+            val row = rows.getOrNull(index)?.takeIf { !it.separator } ?: return
+            val x = l + 1.6f * em
+            val w = (r - x - 1.4f * em).toInt()
+            if (w <= 0) return
+            if (row !== detailRow) {
+                detailRow = row
+                detailTitle = layout(row.title, pDetailTitle, w, 3)
+                val maxLines = maxOf(2, ((height - 12f * em) / (pDetailText.textSize * 1.3f)).toInt())
+                detailText = if (row.desc.isEmpty()) null else layout(row.desc, pDetailText, w, maxLines)
+            }
+            var y = 1.4f * em
+            if (row.range.isNotEmpty()) {
+                pSub.color = if (row.archive && !row.live) U.ARCHIVE else if (row.live) U.LIVE else U.wa(0.6f)
+                U.drawText(c, row.range, x, y + 0.6f * em, w.toFloat(), pSub)
+                y += 1.9f * em
+            }
+            detailTitle?.let { c.save(); c.translate(x, y); it.draw(c); c.restore(); y += it.height + 0.9f * em }
+            detailText?.let { c.save(); c.translate(x, y); it.draw(c); c.restore() }
+            if (row.action.isNotEmpty()) {
+                // клавиша в рамке и действие — как в строке подсказок
+                val cy = height - 1.7f * em
+                val kw = pTab.measureText("OK") + em
+                U.fill.style = android.graphics.Paint.Style.STROKE
+                U.fill.strokeWidth = 0.1f * em
+                U.fill.color = U.wa(0.4f)
+                c.drawRoundRect(x, cy - 0.85f * em, x + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
+                U.fill.style = android.graphics.Paint.Style.FILL
+                pTab.color = U.wa(0.8f)
+                c.drawText("OK", x + 0.5f * em, cy - (pTab.descent() + pTab.ascent()) / 2, pTab)
+                pSub.color = U.wa(0.6f)
+                c.drawText(row.action, x + kw + 0.6f * em, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
+            }
         }
 
         private fun drawRow(c: Canvas, r: Row, i: Int, l: Float, rr: Float, y: Float, rh: Float, focusDay: Long?) {
@@ -348,6 +413,13 @@ class ScheduleLayer(
                 pSub.color = if (focus) U.BLACK else U.wa(0.6f)
                 U.drawText(c, r.sub, x, cy + 0.9f * em, rr - x - iw - 0.8f * em, pSub)
             } else U.drawText(c, r.title, x, cy, rr - x - iw - 0.8f * em, p)
+            // идущая передача: тонкая шкала под названием (в эфире — красная)
+            if (r.progress >= 0f) {
+                val bw = rr - x - iw - 0.8f * em
+                val by = y + rh - 0.45f * em
+                U.roundRect(c, x, by, x + bw, by + 0.2f * em, 0.1f * em, if (focus) 0x33000000 else U.FILL_MARKED)
+                U.roundRect(c, x, by, x + bw * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.LIVE)
+            }
             var ix = rr - 0.8f * em
             if (r.live) {
                 pLive.color = fg
@@ -372,10 +444,12 @@ class ScheduleLayer(
             }
         }
 
-        private fun drawTabs(c: Canvas, w: Float) {
-            val l = w - tabsW
+        /** Вкладки дат — колонка слева */
+        private fun drawTabs(c: Canvas) {
+            val l = 0f
+            val w = tabsW
             U.fill.color = U.LINE
-            c.drawRect(l, 0f, l + 0.1f * em, height.toFloat(), U.fill)
+            c.drawRect(w - 0.1f * em, 0f, w, height.toFloat(), U.fill)
             if (tabs.isEmpty()) return
             val th = 3.6f * em
             val playing = playingDay()
@@ -395,7 +469,7 @@ class ScheduleLayer(
                     t.day == playing -> U.FILL_MARKED
                     else -> 0
                 }
-                if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.5f * em, y + th, U.px(U.RADIUS_S), bg)
+                if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S), bg)
                 val p = if (focus || active) pTabBold else pTab
                 p.color = if (focus || active) U.BLACK else if (t.day == playing) U.WHITE else U.wa(0.7f)
                 val lines = t.label.split('\n')
@@ -408,28 +482,37 @@ class ScheduleLayer(
             Fade.end(c, save, l, 0f, w, height.toFloat(), off / Fade.length, (totalH - height - off) / Fade.length)
         }
 
-        private fun drawViews(c: Canvas) {
+        private val viewH get() = 5.2f * em
+
+        /** Вкладки видов — колонка справа: значок и подпись */
+        private fun drawViews(c: Canvas, w: Float) {
             if (views.size < 2) return
+            val l = w - viewsW
             U.fill.color = U.LINE
-            c.drawRect(viewsW - 0.1f * em, 0f, viewsW, height.toFloat(), U.fill)
-            val th = 3.6f * em
+            c.drawRect(l, 0f, l + 0.1f * em, height.toFloat(), U.fill)
+            val th = viewH
             for ((k, icon) in views.withIndex()) {
                 val y = 0.4f * em + k * (th + 0.3f * em)
                 val open = k == viewIndex
                 val focus = open && zone == Zone.VIEWS
-                if (open) U.roundRect(c, 0.5f * em, y, viewsW - 0.6f * em, y + th, U.px(U.RADIUS_S), if (focus) U.WHITE else U.FILL_MARKED)
-                val sz = 2.8f * em
-                Icons.draw(c, icon, (viewsW - 0.1f * em - sz) / 2, y + (th - sz) / 2, sz, if (focus) U.BLACK else if (open) U.WHITE else U.wa(0.7f))
+                if (open) U.roundRect(c, l + 0.6f * em, y, w - 0.5f * em, y + th, U.px(U.RADIUS_S), if (focus) U.WHITE else U.FILL_MARKED)
+                val color = if (focus) U.BLACK else if (open) U.WHITE else U.wa(0.7f)
+                val sz = 2.2f * em
+                Icons.draw(c, icon, l + (viewsW - sz) / 2, y + 0.6f * em, sz, color)
+                val label = viewLabels[k]
+                pViewLabel.color = color
+                pViewLabel.isFakeBoldText = open
+                c.drawText(label, l + (viewsW - pViewLabel.measureText(label)) / 2, y + th - 0.9f * em, pViewLabel)
             }
         }
 
         private fun tap(ex: Float, ey: Float) {
-            if (ex < viewsW) {
-                val k = ((ey - 0.4f * em) / (3.9f * em)).toInt()
+            if (views.size > 1 && ex > width - viewsW) {
+                val k = ((ey - 0.4f * em) / (viewH + 0.3f * em)).toInt()
                 switchView(k)
                 return
             }
-            if (ex > width - tabsW) return
+            if (ex < tabsW || ex > width - viewsW - detailW) return
             var y = -scrollY0
             for (i in rows.indices) {
                 val rh = h(rows[i])

@@ -73,8 +73,8 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
             ),
             str(R.string.programme_and_archive) to listOf(
                 "↑ / ↓" to str(R.string.programme),
-                "→" to str(R.string.to_dates_up_down_day_left_back_to),
-                "←" to str(R.string.to_archive_reminders_tabs_up_down),
+                "←" to str(R.string.to_dates_up_down_day_left_back_to),
+                "→" to str(R.string.to_archive_reminders_tabs_up_down),
                 "OK" to str(R.string.past_from_archive_current_live),
                 str(R.string.hold_ok) to str(R.string.programme_card_watch_from_start)
             ),

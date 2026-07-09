@@ -42,8 +42,8 @@
     <string name="close_the_guide">Close the guide</string>
     <string name="programme_and_archive">Programme &amp; archive</string>
     <string name="programme">Programme</string>
-    <string name="to_dates_up_down_day_left_back_to">To dates: ↑/↓ — day, ← — back to the list</string>
-    <string name="to_archive_reminders_tabs_up_down">To Archive / Reminders tabs: ↑/↓ — switch, → — back to the list</string>
+    <string name="to_dates_up_down_day_left_back_to">To dates (left): ↑/↓ — day, → — back to the list</string>
+    <string name="to_archive_reminders_tabs_up_down">To Schedule / Reminders tabs (right): ↑/↓ — switch, ← — back to the list</string>
     <string name="past_from_archive_current_live">Past — from archive, current — live, upcoming — card</string>
     <string name="hold_ok">hold OK</string>
     <string name="programme_card_watch_from_start">Programme card (“Watch from start”, “Remind”)</string>

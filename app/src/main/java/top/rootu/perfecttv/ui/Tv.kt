@@ -1087,7 +1087,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                     separator = false, day = d, title = r.title, id = r.start, time = Fmt.hhmm(r.start),
                     sub = r.chName + (if (multi && r.playlistName.isNotEmpty()) " · " + r.playlistName else "") + " · " + whenText(r),
                     channel = Channel.stub(r.chName, r.chNum, r.logo), payload = r,
-                    past = r.missed(Clock.now()), archive = r.missed(Clock.now())
+                    past = r.missed(Clock.now()), archive = r.missed(Clock.now()),
+                    desc = r.desc, range = Fmt.dayTimeRange(r.start, r.stop)
                 ))
             }
             ScheduleLayer.Built(rows, tabs)
@@ -1232,7 +1233,15 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                     separator = false, day = d, title = c.label(), id = c.start, time = Fmt.hhmm(c.start),
                     past = c.end <= tm, live = live, future = c.start > tm,
                     archive = ch.hasArchive && c.start >= archFrom - Cells.SLOT && c.start < tm,
-                    playing = playing, remind = c.start > tm && reminders.has(ch, c.start), payload = c
+                    playing = playing, remind = c.start > tm && reminders.has(ch, c.start), payload = c,
+                    desc = c.program?.desc ?: "", range = Fmt.dayTimeRange(c.start, c.end),
+                    // что сделает OK — как в onSelect ниже
+                    action = str(when {
+                        live -> R.string.watch_live
+                        c.end <= tm && ch.hasArchive && c.start >= archFrom - Cells.SLOT -> R.string.watch_from_archive
+                        else -> R.string.about
+                    }),
+                    progress = if (live) Fmt.progress(c.start, c.end, tm) else -1f
                 ))
             }
             ScheduleLayer.Built(rows, tabs, focusId)
