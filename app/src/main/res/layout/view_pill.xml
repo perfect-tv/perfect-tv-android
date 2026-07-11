@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Вкладка вида в шапке окна «Программа и архив»: «Программа», «Напоминания · 2» -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Text"
+    android:layout_width="wrap_content"
+    android:layout_height="26dp"
+    android:layout_marginStart="5dp"
+    android:background="@drawable/bg_pill"
+    android:clickable="true"
+    android:gravity="center"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:textColor="@color/text_sel"
+    android:textSize="12.5sp" />

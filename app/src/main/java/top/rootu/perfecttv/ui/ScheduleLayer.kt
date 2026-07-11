@@ -1,7 +1,6 @@
 package top.rootu.perfecttv.ui
 
 import top.rootu.perfecttv.R
-import top.rootu.perfecttv.core.str
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -13,17 +12,18 @@ import top.rootu.perfecttv.data.Channel
 
 /**
  * Окно «Программа и архив» / «Напоминания» (виртуальный список на Canvas). Слева — вкладки дат
- * (←), в центре передачи по дням, правее — панель передачи в фокусе (время, название, описание,
- * что сделает OK), у правого края — вкладки видов «Программа» / «Напоминания» с подписями (→),
- * если видов больше одного.
+ * (←), в центре передачи по дням, справа — панель передачи в фокусе (время, название, описание,
+ * что сделает OK). Вкладки видов «Программа» / «Напоминания · N» — кнопками в шапке окна справа
+ * (view_pill.xml), фокус на них — → из списка; если вид один — без кнопок.
  *
  * Подсветка: серым — играющая передача и её дата, открытый вид; белым — фокус (строка и
  * её дата; вкладка даты и заголовок этого дня; вкладка вида).
  */
 class ScheduleLayer(
     context: Context,
-    private val views: List<Icons.Kind>,      // значки видов (пусто или один — без колонки)
+    private val views: List<String>,          // подписи вкладок видов (пусто или одна — без кнопок)
     private var viewIndex: Int,
+    private val viewLabel: (Int) -> String,   // подпись со счётчиком («Напоминания · 2»), обновляется с содержимым
     private val makeContent: (Int) -> Content,
     private val onBack: () -> Unit
 ) : PopupLayer(context, 88f, 0.86f) {
@@ -78,6 +78,7 @@ class ScheduleLayer(
     private var unwatch: (() -> Unit)? = null
     private val headBox: LinearLayout = add<View>(R.layout.schedule_head).findViewById(R.id.schedule_head)
     private var subView: android.widget.TextView? = null
+    private val pills = ArrayList<android.widget.TextView>()
     private val list = ListView(context)
 
     init {
@@ -95,6 +96,15 @@ class ScheduleLayer(
         box.removeView(headRow)
         headBox.addView(headRow)
         subView = sub
+        // вкладки видов — кнопками в шапке справа
+        pills.clear()
+        if (views.size > 1) for (k in views.indices) {
+            val pill = inflater.inflate(R.layout.view_pill, headRow as LinearLayout, false) as android.widget.TextView
+            pill.setOnClickListener { zone = Zone.LIST; switchView(k); applyPills() }
+            headRow.addView(pill)
+            pills.add(pill)
+        }
+        applyPills()
         val b = c.build()
         rows = emptyList()
         index = -1
@@ -105,6 +115,16 @@ class ScheduleLayer(
 
     fun refresh() {
         setRows(content.build(), null)
+        applyPills()
+    }
+
+    /** Кнопки видов: открытая — серая, в фокусе (зона VIEWS) — белая; подписи со счётчиками */
+    private fun applyPills() {
+        pills.forEachIndexed { k, p ->
+            p.text = viewLabel(k)
+            p.isActivated = k == viewIndex
+            p.isSelected = k == viewIndex && zone == Zone.VIEWS
+        }
     }
 
     /** Обновить список, сохранив фокус на той же передаче (id = начало) */
@@ -116,7 +136,8 @@ class ScheduleLayer(
         if (keep != null) for (k in rows.indices) if (!rows[k].separator && rows[k].id <= keep) i = k
         if (i < 0) i = next(-1, 1)
         index = i
-        subView?.text = content.sub()
+        // у напоминаний счётчик уже стоит на кнопке вида — справа в шапке его не повторять
+        subView?.text = if (pills.isNotEmpty() && content.channel == null) "" else content.sub()
         list.scrollToFocus(true)
         list.invalidate()
     }
@@ -186,11 +207,11 @@ class ScheduleLayer(
 
     override fun key(name: String, long: Boolean, digit: Int) {
         when (zone) {
-            // вкладки видов — справа: ← обратно в список
+            // кнопки видов в шапке: ←/→ — соседняя (вид меняется сразу), с первой ← и ↓ — в список
             Zone.VIEWS -> when (name) {
-                "up" -> switchView(viewIndex - 1)
-                "down" -> switchView(viewIndex + 1)
-                "left" -> { zone = Zone.LIST; list.invalidate() }
+                "right" -> switchView(viewIndex + 1)
+                "left" -> if (viewIndex > 0) switchView(viewIndex - 1) else { zone = Zone.LIST; list.invalidate() }
+                "down" -> { zone = Zone.LIST; list.invalidate() }
             }
             // даты — слева: → обратно в список
             Zone.TABS -> when (name) {
@@ -207,11 +228,12 @@ class ScheduleLayer(
                 "right" -> if (views.size > 1) { zone = Zone.VIEWS; list.invalidate() }
             }
         }
+        applyPills()
     }
 
     override fun enter() {
         when (zone) {
-            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate() }
+            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate(); applyPills() }
             Zone.TABS -> toList()
             Zone.LIST -> rows.getOrNull(index)?.let { if (!it.separator) content.onSelect(it) }
         }
@@ -223,7 +245,7 @@ class ScheduleLayer(
 
     override fun back() {
         when (zone) {
-            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate() }
+            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate(); applyPills() }
             Zone.TABS -> toList()
             Zone.LIST -> onBack()
         }
@@ -242,14 +264,12 @@ class ScheduleLayer(
         private val rowH = 3.2f * em
         private val richH = 4.3f * em
         private val sepH = 2.9f * em
-        private val viewsW get() = if (views.size > 1) 10f * em else 0f
+        private val viewsW get() = 0f   // вкладки видов — в шапке окна, колонки справа нет
         private val tabsW = 7.5f * em
         private val detailW = 30f * em
         private val pDetailTitle = android.text.TextPaint(U.paint(1.6f, bold = true))
         private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
-        private val pViewLabel = U.paint(1.1f)
-        // подписи вкладок видов: окно живёт недолго, язык за это время не меняется
-        private val viewLabels = views.map { str(if (it == Icons.Kind.REMIND) R.string.reminders else R.string.hint_programme) }
+
         private val pTime = U.paint(1.2f, U.wa(0.8f))
         private val pTitle = U.paint(1.3f)
         private val pTitleBold = U.paint(1.3f, bold = true)
@@ -299,7 +319,6 @@ class ScheduleLayer(
             val w = width.toFloat()
             val listL = tabsW
             val listR = w - viewsW - detailW
-            drawViews(c, w)
             if (rows.isEmpty()) {
                 // пусто — сообщение на всю ширину, без панели передачи
                 U.drawText(c, content.empty, listL + 2 * em, 2.5f * em, w - viewsW - listL - 4 * em, pEmpty)
@@ -482,36 +501,7 @@ class ScheduleLayer(
             Fade.end(c, save, l, 0f, w, height.toFloat(), off / Fade.length, (totalH - height - off) / Fade.length)
         }
 
-        private val viewH get() = 5.2f * em
-
-        /** Вкладки видов — колонка справа: значок и подпись */
-        private fun drawViews(c: Canvas, w: Float) {
-            if (views.size < 2) return
-            val l = w - viewsW
-            U.fill.color = U.LINE
-            c.drawRect(l, 0f, l + 0.1f * em, height.toFloat(), U.fill)
-            val th = viewH
-            for ((k, icon) in views.withIndex()) {
-                val y = 0.4f * em + k * (th + 0.3f * em)
-                val open = k == viewIndex
-                val focus = open && zone == Zone.VIEWS
-                if (open) U.roundRect(c, l + 0.6f * em, y, w - 0.5f * em, y + th, U.px(U.RADIUS_S), if (focus) U.WHITE else U.FILL_MARKED)
-                val color = if (focus) U.BLACK else if (open) U.WHITE else U.wa(0.7f)
-                val sz = 2.2f * em
-                Icons.draw(c, icon, l + (viewsW - sz) / 2, y + 0.6f * em, sz, color)
-                val label = viewLabels[k]
-                pViewLabel.color = color
-                pViewLabel.isFakeBoldText = open
-                c.drawText(label, l + (viewsW - pViewLabel.measureText(label)) / 2, y + th - 0.9f * em, pViewLabel)
-            }
-        }
-
         private fun tap(ex: Float, ey: Float) {
-            if (views.size > 1 && ex > width - viewsW) {
-                val k = ((ey - 0.4f * em) / (viewH + 0.3f * em)).toInt()
-                switchView(k)
-                return
-            }
             if (ex < tabsW || ex > width - viewsW - detailW) return
             var y = -scrollY0
             for (i in rows.indices) {

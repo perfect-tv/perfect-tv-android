@@ -1061,9 +1061,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         info.hide()
         var layer: ScheduleLayer? = null
         val close = { remove(layer!!) }
-        val views = if (ch != null) listOf(Icons.Kind.ARCHIVE, Icons.Kind.REMIND) else emptyList()
+        val views = if (ch != null) listOf(str(R.string.hint_programme), str(R.string.reminders)) else emptyList()
         val make = { k: Int -> if (k == 0 && ch != null) archiveContent(ch, close) else remindersContent() }
-        layer = ScheduleLayer(activity, views, if (ch != null) view else 1, make) { close() }
+        // «Напоминания · 2»: счётчик обновляется вместе со списком
+        val label = { k: Int -> if (k == 1) reminders.all().size.let { n -> if (n > 0) views[1] + " · " + n else views[1] } else views[k] }
+        layer = ScheduleLayer(activity, views, if (ch != null) view else 1, label, make) { close() }
         push(layer)
     }
 

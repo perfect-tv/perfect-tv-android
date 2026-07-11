@@ -39,7 +39,7 @@
     <string name="programme_and_archive">Программа и архив</string>
     <string name="programme">Передача</string>
     <string name="to_dates_up_down_day_left_back_to">К датам (слева): ↑/↓ — день, → — обратно в список</string>
-    <string name="to_archive_reminders_tabs_up_down">К вкладкам «Программа» / «Напоминания» (справа): ↑/↓ — переключить, ← — обратно в список</string>
+    <string name="to_archive_reminders_tabs_up_down">К кнопкам «Программа» / «Напоминания» вверху: ←/→ — переключить, ↓ — обратно в список</string>
     <string name="past_from_archive_current_live">Прошедшая — из архива, текущая — эфир, будущая — карточка</string>
     <string name="hold_ok">удерж. OK</string>
     <string name="programme_card_watch_from_start">Карточка передачи («Смотреть сначала», «Напомнить»)</string>

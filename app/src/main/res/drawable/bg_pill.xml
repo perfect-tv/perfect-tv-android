@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кнопка-вкладка в шапке окна: в фокусе — белая, открытая — серая -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="rectangle"><solid android:color="@color/white" /><corners android:radius="13dp" /></shape>
+    </item>
+    <item android:state_activated="true">
+        <shape android:shape="rectangle"><solid android:color="@color/fill_active" /><corners android:radius="13dp" /></shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle"><solid android:color="@color/fill_soft" /><corners android:radius="13dp" /></shape>
+    </item>
+</selector>
