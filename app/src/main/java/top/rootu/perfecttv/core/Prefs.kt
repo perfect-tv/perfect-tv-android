@@ -11,6 +11,22 @@ object Prefs {
         sp = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
     }
 
+    /** Все настройки как есть — для резервной копии (Backup) */
+    fun all(): Map<String, *> = sp.all
+
+    /** Заменить настройки значениями из резервной копии; commit — дальше приложение перезапускается */
+    fun replace(values: Map<String, Any>) {
+        val e = sp.edit().clear()
+        for ((k, v) in values) when (v) {
+            is Boolean -> e.putBoolean(k, v)
+            is Int -> e.putInt(k, v)
+            is Long -> e.putLong(k, v)
+            is Float -> e.putFloat(k, v)
+            is String -> e.putString(k, v)
+        }
+        e.commit()
+    }
+
     private fun int(key: String, def: Int) = sp.getInt(key, def)
     private fun bool(key: String, def: Boolean) = sp.getBoolean(key, def)
 
@@ -51,6 +67,14 @@ object Prefs {
     var subtitleLang: String
         get() = sp.getString("subtitle_lang", "") ?: ""
         set(v) = sp.edit().putString("subtitle_lang", v).apply()
+
+    /** Размер интерфейса: крупный — экран считается высотой 480 dp вместо 540 (всё на 12,5% больше) */
+    var uiLarge: Boolean
+        get() = bool("ui_large", false)
+        set(v) = sp.edit().putBoolean("ui_large", v).apply()
+
+    /** Высота экрана в dp, под которую подбирается плотность (1 em = 10 dp) */
+    val screenDp: Int get() = if (uiLarge) 480 else 540
 
     var animations: Boolean
         get() = bool("animations", true)

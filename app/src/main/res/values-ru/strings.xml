@@ -320,4 +320,22 @@
     <string name="categories_up_down_right_to_channels">колонка категорий: ↑/↓ — категория, → — к её каналам, «Назад» — отмена</string>
     <string name="into_the_grid_in_list_view_programme">в сетку программы (в виде «Список» — программа канала)</string>
     <string name="hint_cancel">Отмена</string>
+    <string name="appearance">Внешний вид</string>
+    <string name="data_and_backup">Данные и резервная копия</string>
+    <string name="interface_size">Размер интерфейса</string>
+    <string name="size_normal">Обычный</string>
+    <string name="size_large">Крупный</string>
+    <string name="larger_for_a_big_room">крупнее — для большой комнаты и слабого зрения</string>
+    <string name="guide_view">Вид гида</string>
+    <string name="backup_save">Сохранить резервную копию</string>
+    <string name="backup_save_sub">настройки, плейлисты, избранное, скрытое, блокировки, напоминания</string>
+    <string name="backup_restore">Восстановить из копии</string>
+    <string name="backup_restore_sub">заменит плейлисты и ваши данные; приложение перезапустится</string>
+    <string name="backup_saved_x">Копия сохранена: %1$s</string>
+    <string name="backup_not_found_x">Файл копии не найден: %1$s</string>
+    <string name="backup_failed_x">Не удалось: %1$s</string>
+    <string name="backup_restored">Восстановлено, перезапуск…</string>
+    <string name="hint_change">Изменить</string>
+    <string name="hint_select">Выбрать</string>
+    <string name="hint_sections">К разделам</string>
 </resources>

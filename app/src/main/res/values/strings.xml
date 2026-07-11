@@ -320,4 +320,22 @@
     <string name="categories_up_down_right_to_channels">category column: ↑/↓ — category, → — to its channels, Back — cancel</string>
     <string name="into_the_grid_in_list_view_programme">into the programme grid (in List view — the channel schedule)</string>
     <string name="hint_cancel">Cancel</string>
+    <string name="appearance">Appearance</string>
+    <string name="data_and_backup">Data and backup</string>
+    <string name="interface_size">Interface size</string>
+    <string name="size_normal">Normal</string>
+    <string name="size_large">Large</string>
+    <string name="larger_for_a_big_room">larger — for a big room or weaker eyesight</string>
+    <string name="guide_view">Guide view</string>
+    <string name="backup_save">Save a backup</string>
+    <string name="backup_save_sub">settings, playlists, favourites, hidden, locks, reminders</string>
+    <string name="backup_restore">Restore from a backup</string>
+    <string name="backup_restore_sub">replaces playlists and your data; the app will restart</string>
+    <string name="backup_saved_x">Backup saved: %1$s</string>
+    <string name="backup_not_found_x">Backup file not found: %1$s</string>
+    <string name="backup_failed_x">Failed: %1$s</string>
+    <string name="backup_restored">Restored, restarting…</string>
+    <string name="hint_change">Change</string>
+    <string name="hint_select">Select</string>
+    <string name="hint_sections">To sections</string>
 </resources>

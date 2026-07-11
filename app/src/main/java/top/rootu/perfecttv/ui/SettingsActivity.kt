@@ -22,8 +22,12 @@ import top.rootu.perfecttv.data.Loaders
 import top.rootu.perfecttv.data.Playlist
 
 /**
- * Настройки (минимум из ТЗ §11): плейлисты с источниками программы и параметры.
- * Обычные View с фокусом Android: ↑/↓ — пункты, OK — изменить, «Назад» — выйти.
+ * Настройки в два столбца: слева — разделы, справа — пункты раздела (ТЗ §11).
+ * Обычные View с фокусом Android. В разделах: ↑/↓ — раздел (страница справа меняется сразу),
+ * → / OK — к пунктам. В пунктах: ↑/↓ — пункт, ← / → — предыдущее / следующее значение
+ * (у пункта без значений ← — к разделам), OK — следующее значение или действие,
+ * «Назад» — к разделам, из разделов — выйти. Формы (плейлист, PIN, TMDB) открываются справа,
+ * разделы на это время недоступны.
  * С EXTRA_FIRST — мастер первого плейлиста: сразу форма добавления.
  */
 class SettingsActivity : Activity() {
@@ -31,7 +35,9 @@ class SettingsActivity : Activity() {
     private val repo get() = App.repo
     private lateinit var frame: FrameLayout
     private var editing: Long? = null
-    private val onData: (DataEvent) -> Unit = { if (editing == null) showMain() }
+    private val onData: (DataEvent) -> Unit = { if (editing == null) showSection(false) }
+    private lateinit var nav: LinearLayout
+    private var section = 0
 
     override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Lang.wrap(base))
 
@@ -40,6 +46,10 @@ class SettingsActivity : Activity() {
         U.init(this)
         setContentView(R.layout.activity_settings)
         frame = findViewById(R.id.frame)
+        nav = findViewById(R.id.settings_nav)
+        section = intent.getIntExtra(EXTRA_SECTION, 0)
+        buildNav()
+        buildHints()
         if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null) else showMain()
         Bus.on(onData)
     }
@@ -54,8 +64,55 @@ class SettingsActivity : Activity() {
     private var keepIndex = -1
     private var keepScroll = 0
 
+    // ------------------------------------------------------------------ разделы
+
+    private fun sectionTitles() = listOf(str(R.string.playlists), str(R.string.viewing), str(R.string.appearance), str(R.string.channel_list),
+        str(R.string.parental_lock), "TMDB", str(R.string.data_and_backup))
+
+    private fun buildNav() {
+        nav.removeAllViews()
+        sectionTitles().forEachIndexed { i, title ->
+            val v = layoutInflater.inflate(R.layout.settings_nav_item, nav, false) as TextView
+            v.text = title
+            // фокус на разделе — его страница справа сразу
+            v.setOnFocusChangeListener { _, has -> if (has && !building && (section != i || editing != null)) { section = i; showSection(false) } }
+            v.setOnClickListener { section = i; showSection(true) }
+            v.setOnKeyListener { _, code, e ->
+                if (e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_RIGHT) { showSection(true); true } else false
+            }
+            nav.addView(v)
+        }
+    }
+
+    /** Разделы доступны только на страницах разделов; в форме — приглушены и без фокуса */
+    private fun setNav(on: Boolean) {
+        for (i in 0 until nav.childCount) nav.getChildAt(i).apply {
+            isFocusable = on
+            isActivated = on && i == section
+            alpha = if (on || i == section) 1f else 0.4f
+        }
+    }
+
+    private fun focusNav() {
+        nav.getChildAt(section)?.takeIf { it.isFocusable }?.requestFocus()
+    }
+
+    private fun buildHints() {
+        val box = findViewById<LinearLayout>(R.id.settings_hints)
+        if (!Prefs.keyHints || U.touch) return
+        box.visibility = View.VISIBLE
+        for ((k, action) in listOf("←  →" to str(R.string.hint_change), "OK" to str(R.string.hint_select), str(R.string.key_back) to str(R.string.hint_sections))) {
+            val v = layoutInflater.inflate(R.layout.hint_item, box, false)
+            v.findViewById<TextView>(R.id.hint_key).text = k
+            v.findViewById<TextView>(R.id.hint_action).text = action
+            box.addView(v)
+        }
+    }
+
     /** Новая страница (settings_page.xml) с заголовком; вернёт список для пунктов */
-    private fun page(title: String): LinearLayout {
+    private fun page(title: String, form: Boolean = true): LinearLayout {
+        // форма: разделы недоступны (снимать фокусируемость с раздела в фокусе нельзя — фокус уйдёт)
+        if (form) setNav(false)
         keepIndex = -1
         keepScroll = 0
         (frame.getChildAt(0) as? ScrollView)?.let { old ->
@@ -97,26 +154,97 @@ class SettingsActivity : Activity() {
         col.addView((layoutInflater.inflate(R.layout.settings_note, col, false) as TextView).apply { this.text = text })
     }
 
-    /** Пункт (settings_item.xml): название, значение справа, подпись снизу; OK — [onClick] */
-    private fun item(col: LinearLayout, title: String, value: String, sub: String = "", onClick: () -> Unit): View {
+    /**
+     * Пункт (settings_item.xml): название, значение справа, подпись снизу; OK — [onClick].
+     * ← / → — [onSide] (−1 / +1): смена значения на месте; без него ← уводит к разделам.
+     */
+    private fun item(col: LinearLayout, title: String, value: String, sub: String = "", onSide: ((Int) -> Unit)? = null, onClick: () -> Unit): View {
         val row = layoutInflater.inflate(R.layout.settings_item, col, false)
         row.findViewById<TextView>(R.id.item_title).text = title
         row.findViewById<TextView>(R.id.item_value).text = value
         row.findViewById<TextView>(R.id.item_sub).apply { text = sub; U.show(this, sub.isNotEmpty()) }
         row.setOnClickListener { onClick() }
-        row.setOnKeyListener { _, code, e -> if (e.action == KeyEvent.ACTION_UP && Keys.isOk(code)) { onClick(); true } else false }
+        row.setOnKeyListener { _, code, e ->
+            when {
+                e.action == KeyEvent.ACTION_UP && Keys.isOk(code) -> { onClick(); true }
+                e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT -> { if (onSide != null) onSide(-1) else focusNav(); true }
+                e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_RIGHT -> { onSide?.invoke(1); true }
+                else -> false
+            }
+        }
         col.addView(row)
         return row
     }
 
-    private fun <T> cycle(list: List<T>, cur: T): T = list[(list.indexOf(cur) + 1) % list.size]
+    /** Пункт с выбором из [labels]: «‹ значение ›», ← / → и OK меняют на месте (по кругу) */
+    private fun choice(col: LinearLayout, title: String, labels: List<String>, index: Int, sub: String = "", onPick: (Int) -> Unit): View {
+        val n = labels.size
+        val i = index.coerceIn(0, n - 1)
+        return item(col, title, "‹  " + labels[i] + "  ›", sub, onSide = { d -> onPick((i + d + n) % n) }) { onPick((i + 1) % n) }
+    }
+
+    private fun toggle(col: LinearLayout, title: String, value: Boolean, sub: String = "", onPick: (Boolean) -> Unit) =
+        choice(col, title, listOf(str(R.string.off), str(R.string.on)), if (value) 1 else 0, sub) { onPick(it == 1) }
+
+    /** Выбор из чисел: [label] — подпись значения */
+    private fun number(col: LinearLayout, title: String, values: List<Int>, cur: Int, sub: String = "", label: (Int) -> String, onPick: (Int) -> Unit) =
+        choice(col, title, values.map(label), values.indexOf(cur).coerceAtLeast(0), sub) { onPick(values[it]) }
+
+    /** Экран пересоздаётся (язык, размер интерфейса) — вернуться в тот же раздел на тот же пункт */
+    private fun recreateHere() {
+        val list = frame.findViewById<LinearLayout>(R.id.settings_list)
+        var v: View? = list?.findFocus()
+        while (v != null && v.parent !== list) v = v.parent as? View
+        intent.putExtra(EXTRA_SECTION, section)
+        intent.putExtra(EXTRA_FOCUS_INDEX, if (v != null) list.indexOfChild(v) else -1)
+        Lang.init(applicationContext)
+        recreate()
+    }
 
     // ------------------------------------------------------------------ главная
 
-    private fun showMain() {
+    /** Вернуться к странице раздела с фокусом в пунктах (из формы, после действия) */
+    private fun showMain() = showSection(true)
+
+    /**
+     * Страница текущего раздела. [takeFocus] — поставить фокус в пункты; иначе он остаётся
+     * в разделах (листаем разделы, пришло обновление данных), а если был в пунктах — на том же.
+     */
+    private fun showSection(takeFocus: Boolean) {
+        // старая страница убирается — фокус на миг перескакивает на раздел: это не выбор раздела
+        building = true
+        try {
+            buildSection(takeFocus)
+        } finally {
+            building = false
+        }
+    }
+
+    private var building = false
+
+    private fun buildSection(takeFocus: Boolean) {
         editing = null
-        val col = page(str(R.string.settings))
-        section(col, str(R.string.playlists))
+        val col = page(sectionTitles()[section], form = false)
+        setNav(true)
+        val first = when (section) {
+            0 -> sectionPlaylists(col)
+            1 -> sectionViewing(col)
+            2 -> sectionAppearance(col)
+            3 -> sectionChannels(col)
+            4 -> sectionLock(col)
+            5 -> sectionTmdb(col)
+            else -> sectionData(col)
+        }
+        // после пересоздания экрана (язык, размер) — на тот же пункт
+        val back = intent.getIntExtra(EXTRA_FOCUS_INDEX, -1)
+        if (back >= 0) {
+            intent.removeExtra(EXTRA_FOCUS_INDEX)
+            keepIndex = back
+        }
+        if (takeFocus || keepIndex >= 0) focus(col, first) else focusNav()
+    }
+
+    private fun sectionPlaylists(col: LinearLayout): View? {
         var first: View? = null
         for (p in repo.playlists()) {
             val status = when {
@@ -128,77 +256,136 @@ class SettingsActivity : Activity() {
             if (first == null) first = v
         }
         val add = item(col, str(R.string.plus_add_playlist), "") { showEdit(null) }
-        if (first == null) first = add
-        section(col, str(R.string.viewing))
-        val lang = item(col, "Язык / Language", when (Prefs.language) { "ru" -> "Русский"; "en" -> "English"; else -> getString(R.string.system) }) {
-            Prefs.language = cycle(listOf("", "ru", "en"), Prefs.language)
-            Lang.init(applicationContext)
-            // экран пересоздаётся на новом языке — фокус вернуть на «Язык»
-            intent.putExtra(EXTRA_FOCUS_LANG, true)
-            recreate()
+        return first ?: add
+    }
+
+    private fun sectionViewing(col: LinearLayout): View? {
+        val first = number(col, str(R.string.default_archive_depth), listOf(1, 2, 3, 4, 5, 7, 10, 14), Prefs.archiveDays,
+            str(R.string.if_the_playlist_does_not_set_it), { str(R.string.x_d, it) }) { Prefs.archiveDays = it; showMain() }
+        choice(col, str(R.string.up_key_in_the_player), listOf(str(R.string.recent_channels), str(R.string.programme_and_archive)), if (Prefs.upArchive) 1 else 0) {
+            Prefs.upArchive = it == 1; showMain()
         }
-        if (intent.getBooleanExtra(EXTRA_FOCUS_LANG, false)) {
-            intent.removeExtra(EXTRA_FOCUS_LANG)
-            first = lang
+        number(col, str(R.string.remind_about_a_programme), listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore,
+            label = { if (it == 0) str(R.string.when_it_starts) else str(R.string.x_min_before, it) }) { Prefs.remindBefore = it; showMain() }
+        toggle(col, str(R.string.start_with_the_last_channel), Prefs.autoplayLast, str(R.string.off_the_guide_opens_on_start)) { Prefs.autoplayLast = it; showMain() }
+        number(col, str(R.string.reload_programme_every), listOf(6, 12, 24), Prefs.epgRefreshHours, label = { str(R.string.x_h, it) }) { Prefs.epgRefreshHours = it; showMain() }
+        return first
+    }
+
+    private fun sectionAppearance(col: LinearLayout): View? {
+        val langs = listOf("", "ru", "en")
+        val first = choice(col, "Язык / Language", listOf(getString(R.string.system), "Русский", "English"), langs.indexOf(Prefs.language)) {
+            Prefs.language = langs[it]
+            recreateHere()
         }
-        item(col, str(R.string.default_archive_depth), str(R.string.x_d, Prefs.archiveDays), str(R.string.if_the_playlist_does_not_set_it)) {
-            Prefs.archiveDays = cycle(listOf(1, 2, 3, 4, 5, 7, 10, 14), Prefs.archiveDays); showMain()
+        choice(col, str(R.string.interface_size), listOf(str(R.string.size_normal), str(R.string.size_large)), if (Prefs.uiLarge) 1 else 0, str(R.string.larger_for_a_big_room)) {
+            Prefs.uiLarge = it == 1
+            recreateHere()
         }
-        item(col, str(R.string.up_key_in_the_player), if (Prefs.upArchive) str(R.string.programme_and_archive) else str(R.string.recent_channels)) {
-            Prefs.upArchive = !Prefs.upArchive; showMain()
-        }
-        item(col, str(R.string.remind_about_a_programme), if (Prefs.remindBefore == 0) str(R.string.when_it_starts) else str(R.string.x_min_before, Prefs.remindBefore)) {
-            Prefs.remindBefore = cycle(listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore); showMain()
-        }
-        item(col, str(R.string.channel_number), listOf(str(R.string.hidden), str(R.string.next_to_the_name), str(R.string.badge_on_the_logo))[Prefs.numberMode.coerceIn(0, 2)], str(R.string.without_a_logo_the_number_is_always)) {
-            Prefs.numberMode = (Prefs.numberMode + 1) % 3; showMain()
-        }
-        item(col, str(R.string.hide_info_panel_after), str(R.string.x_s, Prefs.infoHide)) {
-            Prefs.infoHide = cycle(listOf(3, 5, 7, 10), Prefs.infoHide); showMain()
-        }
-        item(col, str(R.string.key_hints), if (Prefs.keyHints) str(R.string.on) else str(R.string.off), str(R.string.a_row_at_the_bottom_of_the_pinned)) {
-            Prefs.keyHints = !Prefs.keyHints; showMain()
-        }
-        item(col, str(R.string.smooth_animations), if (Prefs.animations) str(R.string.on) else str(R.string.off), str(R.string.turn_off_on_weak_boxes)) {
-            Prefs.animations = !Prefs.animations; Anim.on = Prefs.animations; showMain()
-        }
-        item(col, str(R.string.start_with_the_last_channel), if (Prefs.autoplayLast) str(R.string.on) else str(R.string.off), str(R.string.off_the_guide_opens_on_start)) {
-            Prefs.autoplayLast = !Prefs.autoplayLast; showMain()
-        }
-        item(col, str(R.string.adaptive_sorting), if (Prefs.adaptiveSort) str(R.string.on) else str(R.string.off), str(R.string.frequently_watched_channels_go_up)) {
-            Prefs.adaptiveSort = !Prefs.adaptiveSort; showMain()
-        }
+        choice(col, str(R.string.channel_number), listOf(str(R.string.hidden), str(R.string.next_to_the_name), str(R.string.badge_on_the_logo)), Prefs.numberMode,
+            str(R.string.without_a_logo_the_number_is_always)) { Prefs.numberMode = it; showMain() }
+        choice(col, str(R.string.guide_view), listOf(str(R.string.list), str(R.string.tv_guide)), if (Prefs.guideGrid) 1 else 0) { Prefs.guideGrid = it == 1; showMain() }
+        number(col, str(R.string.hide_info_panel_after), listOf(3, 5, 7, 10), Prefs.infoHide, label = { str(R.string.x_s, it) }) { Prefs.infoHide = it; showMain() }
+        toggle(col, str(R.string.key_hints), Prefs.keyHints, str(R.string.a_row_at_the_bottom_of_the_pinned)) { Prefs.keyHints = it; showMain() }
+        toggle(col, str(R.string.smooth_animations), Prefs.animations, str(R.string.turn_off_on_weak_boxes)) { Prefs.animations = it; Anim.on = it; showMain() }
+        return first
+    }
+
+    private fun sectionChannels(col: LinearLayout): View? {
+        val first = toggle(col, str(R.string.adaptive_sorting), Prefs.adaptiveSort, str(R.string.frequently_watched_channels_go_up)) { Prefs.adaptiveSort = it; showMain() }
         item(col, str(R.string.reset_sorting_scores), "", str(R.string.all_playlists_order_by_numbers_again)) {
             repo.resetAllScores()
             android.widget.Toast.makeText(this, str(R.string.scores_reset), android.widget.Toast.LENGTH_SHORT).show()
         }
+        val hiddenCount = repo.allHidden().size
+        item(col, str(R.string.hidden_categories_and_channels), if (hiddenCount > 0) hiddenCount.toString() else str(R.string.none), str(R.string.all_playlists_ok_restore)) { showHidden() }
+        return first
+    }
+
+    private fun sectionLock(col: LinearLayout): View? {
+        if (Prefs.pin.isEmpty()) return item(col, str(R.string.pin_code), str(R.string.not_set), str(R.string.channels_and_categories_are_locked)) { showPin(null) }
+        val first = item(col, str(R.string.change_pin), "") { showPin(Prefs.pin) }
+        choice(col, str(R.string.ask_for_pin), listOf(str(R.string.once_until_exit), str(R.string.every_time)), if (Prefs.pinEveryTime) 1 else 0) { Prefs.pinEveryTime = it == 1; showMain() }
+        choice(col, str(R.string.pin_input), PIN_INPUTS, Prefs.pinInput, str(R.string.ring_and_rows_do_not_show_which)) { Prefs.pinInput = it; showMain() }
+        item(col, str(R.string.remove_pin), "", str(R.string.locks_stop_working_marks_are_kept)) { showPin(Prefs.pin, remove = true) }
+        return first
+    }
+
+    private fun sectionTmdb(col: LinearLayout): View? =
+        item(col, str(R.string.tmdb_key), if (Prefs.tmdbKey.isEmpty()) str(R.string.not_set) else str(R.string.set),
+            str(R.string.programme_banner_and_description_on)) { showTmdb() }
+
+    private fun sectionData(col: LinearLayout): View? {
+        val first = item(col, str(R.string.backup_save), "", str(R.string.backup_save_sub)) { backupSave() }
+        item(col, str(R.string.backup_restore), "", str(R.string.backup_restore_sub)) { backupOpen() }
         item(col, str(R.string.logo_cache), Fmt.size(Logos.cacheSize()), str(R.string.logo_cache_sub)) {
             Logos.clearCache()
             android.widget.Toast.makeText(this, str(R.string.logo_cache_cleared), android.widget.Toast.LENGTH_SHORT).show()
             showMain()
         }
-        val hiddenCount = repo.allHidden().size
-        item(col, str(R.string.hidden_categories_and_channels), if (hiddenCount > 0) hiddenCount.toString() else str(R.string.none), str(R.string.all_playlists_ok_restore)) { showHidden() }
-        item(col, str(R.string.reload_programme_every), str(R.string.x_h, Prefs.epgRefreshHours)) {
-            Prefs.epgRefreshHours = cycle(listOf(6, 12, 24), Prefs.epgRefreshHours); showMain()
+        return first
+    }
+
+    // ------------------------------------------------------------------ резервная копия
+
+    private fun toast(text: String) = android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_LONG).show()
+
+    /** Есть ли на устройстве настоящий системный выбор файла (на Android TV часто заглушка) */
+    private fun hasPicker(i: android.content.Intent): Boolean {
+        @Suppress("DEPRECATION")
+        val handlers = packageManager.queryIntentActivities(i, 0).map { it.activityInfo.packageName }
+        return handlers.isNotEmpty() && !handlers.all { it.contains("stub", ignoreCase = true) }
+    }
+
+    private val backupFile get() = java.io.File(getExternalFilesDir(null) ?: filesDir, top.rootu.perfecttv.data.Backup.FILE)
+
+    /** Сохранить копию: системным выбором места, а без него — в папку приложения */
+    private fun backupSave() {
+        val i = android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(android.content.Intent.EXTRA_TITLE, top.rootu.perfecttv.data.Backup.FILE)
         }
-        section(col, str(R.string.programme_descriptions_tmdb))
-        item(col, str(R.string.tmdb_key), if (Prefs.tmdbKey.isEmpty()) str(R.string.not_set) else str(R.string.set),
-            str(R.string.programme_banner_and_description_on)) { showTmdb() }
-        section(col, str(R.string.parental_lock))
-        if (Prefs.pin.isEmpty()) {
-            item(col, str(R.string.pin_code), str(R.string.not_set), str(R.string.channels_and_categories_are_locked)) { showPin(null) }
-        } else {
-            item(col, str(R.string.change_pin), "") { showPin(Prefs.pin) }
-            item(col, str(R.string.ask_for_pin), if (Prefs.pinEveryTime) str(R.string.every_time) else str(R.string.once_until_exit)) {
-                Prefs.pinEveryTime = !Prefs.pinEveryTime; showMain()
-            }
-            item(col, str(R.string.pin_input), PIN_INPUTS[Prefs.pinInput.coerceIn(0, 2)], str(R.string.ring_and_rows_do_not_show_which)) {
-                Prefs.pinInput = (Prefs.pinInput + 1) % 3; showMain()
-            }
-            item(col, str(R.string.remove_pin), "", str(R.string.locks_stop_working_marks_are_kept)) { showPin(Prefs.pin, remove = true) }
+        if (hasPicker(i)) try {
+            @Suppress("DEPRECATION")
+            return startActivityForResult(i, BACKUP_SAVE)
+        } catch (_: android.content.ActivityNotFoundException) {
         }
-        focus(col, first)
+        try {
+            backupFile.writeText(top.rootu.perfecttv.data.Backup.export(repo.db.readableDatabase))
+            toast(str(R.string.backup_saved_x, backupFile.absolutePath))
+        } catch (e: Exception) {
+            toast(str(R.string.backup_failed_x, e.message ?: e.toString()))
+        }
+    }
+
+    private fun backupOpen() {
+        val i = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        if (hasPicker(i)) try {
+            @Suppress("DEPRECATION")
+            return startActivityForResult(i, BACKUP_OPEN)
+        } catch (_: android.content.ActivityNotFoundException) {
+        }
+        if (!backupFile.exists()) return toast(str(R.string.backup_not_found_x, backupFile.absolutePath))
+        backupRestore(backupFile.readText())
+    }
+
+    /** Заменить данные копией и перезапустить приложение: экран ТВ и каталог строятся заново */
+    private fun backupRestore(json: String) {
+        try {
+            top.rootu.perfecttv.data.Backup.restore(repo.db.writableDatabase, json)
+        } catch (e: Exception) {
+            return toast(str(R.string.backup_failed_x, e.message ?: e.toString()))
+        }
+        toast(str(R.string.backup_restored))
+        val launch = packageManager.getLeanbackLaunchIntentForPackage(packageName) ?: packageManager.getLaunchIntentForPackage(packageName)
+        launch?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        if (launch != null) startActivity(launch)
+        finishAffinity()
+        Runtime.getRuntime().exit(0)
     }
 
     // ------------------------------------------------------------------ скрытое
@@ -233,9 +420,7 @@ class SettingsActivity : Activity() {
             addCategory(android.content.Intent.CATEGORY_OPENABLE)
             type = "*/*"
         }
-        @Suppress("DEPRECATION")
-        val handlers = packageManager.queryIntentActivities(i, 0).map { it.activityInfo.packageName }
-        if (handlers.isEmpty() || handlers.all { it.contains("stub", ignoreCase = true) }) return pickBuiltIn()
+        if (!hasPicker(i)) return pickBuiltIn()
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(i, PICK_FILE)
@@ -290,7 +475,21 @@ class SettingsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
-        if (requestCode != PICK_FILE || resultCode != RESULT_OK || uri == null) return
+        if (resultCode != RESULT_OK || uri == null) return
+        if (requestCode == BACKUP_SAVE) {
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(top.rootu.perfecttv.data.Backup.export(repo.db.readableDatabase).toByteArray()) }
+                toast(str(R.string.backup_saved_x, uri.lastPathSegment ?: ""))
+            } catch (e: Exception) {
+                toast(str(R.string.backup_failed_x, e.message ?: e.toString()))
+            }
+            return
+        }
+        if (requestCode == BACKUP_OPEN) {
+            val json = try { contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } } catch (_: Exception) { null }
+            return if (json != null) backupRestore(json) else toast(str(R.string.backup_failed_x, uri.toString()))
+        }
+        if (requestCode != PICK_FILE) return
         // доступ к файлу и после перезапуска (плейлист перечитывается при обновлении)
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
         pickTarget?.setText(uri.toString())
@@ -444,12 +643,17 @@ class SettingsActivity : Activity() {
         if (editing == -5L) return returnToEdit()
         if (editing != null && repo.playlists().isNotEmpty()) showMain()
         else if (repo.playlists().isEmpty()) finishAffinity()
+        // из пунктов — к разделам, из разделов — выйти
+        else if (currentFocus != null && currentFocus?.parent !== nav && nav.getChildAt(section)?.isFocusable == true) focusNav()
         else @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     companion object {
         const val EXTRA_FIRST = "first"
-        private const val EXTRA_FOCUS_LANG = "focus_lang"
+        private const val EXTRA_SECTION = "section"
+        private const val EXTRA_FOCUS_INDEX = "focus_index"
+        const val BACKUP_SAVE = 12
+        const val BACKUP_OPEN = 13
         const val PICK_FILE = 10
         const val PICK_PERMISSION = 11
         val PIN_INPUTS get() = listOf(str(R.string.ring_like_fire_tv), str(R.string.rows_like_google), str(R.string.keypad))

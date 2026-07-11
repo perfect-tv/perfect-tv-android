@@ -28,7 +28,8 @@ object U {
 
     fun init(context: Context) {
         val dm = context.resources.displayMetrics
-        em = minOf(dm.heightPixels, dm.widthPixels * 9 / 16) / 54f
+        // 1 em = 10 dp: та же высота экрана в dp, что и в Lang.wrap
+        em = minOf(dm.heightPixels, dm.widthPixels * 9 / 16) / (top.rootu.perfecttv.core.Prefs.screenDp / 10f)
         val tvMode = (context.getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
         touch = !tvMode && context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
     }

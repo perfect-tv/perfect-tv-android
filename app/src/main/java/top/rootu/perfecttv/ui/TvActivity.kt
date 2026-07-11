@@ -84,10 +84,12 @@ class TvActivity : Activity() {
     override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(Lang.wrap(base))
 
     private val builtLocale by lazy { Lang.localeOf(resources) }
+    // размер интерфейса, с которым построен экран (настройка могла смениться)
+    private val builtScreenDp = top.rootu.perfecttv.core.Prefs.screenDp
 
     override fun onStart() {
         super.onStart()
-        if (builtLocale != Lang.locale) {
+        if (builtLocale != Lang.locale || builtScreenDp != top.rootu.perfecttv.core.Prefs.screenDp) {
             recreate()
             return
         }

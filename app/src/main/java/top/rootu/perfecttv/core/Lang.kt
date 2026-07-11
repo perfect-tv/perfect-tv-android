@@ -14,7 +14,8 @@ import java.util.Locale
  * по умолчанию) и `res/values-ru`. Язык — настройка «Язык» или системный (ru/uk/be/kk —
  * русский, иначе английский); на Android 13+ выбор передаётся и в системный язык приложения.
  *
- * Плотность подбирается так, чтобы высота экрана была 540 dp (1 em = 10 dp):
+ * Плотность подбирается так, чтобы высота экрана была 540 dp (1 em = 10 dp; настройка
+ * «Размер интерфейса: крупный» — 480 dp, [Prefs.screenDp]):
  * разметка в XML и рисование на Canvas ([top.rootu.perfecttv.ui.U.em]) совпадают
  * на любом экране — ТВ 720p/1080p/4K, приставке с нестандартной плотностью, телефоне.
  */
@@ -45,7 +46,7 @@ object Lang {
         val dm = base.resources.displayMetrics
         val h = minOf(dm.heightPixels, dm.widthPixels * 9 / 16)
         if (h > 0) {
-            cfg.densityDpi = maxOf(80, h * 160 / 540)
+            cfg.densityDpi = maxOf(80, h * 160 / Prefs.screenDp)
             // размеры текста — от той же плотности (системный масштаб шрифта сохраняется)
         }
         return base.createConfigurationContext(cfg)
