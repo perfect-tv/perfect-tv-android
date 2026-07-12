@@ -265,23 +265,28 @@ class ScheduleLayer(
         private val richH = 4.3f * em
         private val sepH = 2.9f * em
         private val viewsW get() = 0f   // вкладки видов — в шапке окна, колонки справа нет
-        private val tabsW = 7.5f * em
-        private val detailW = 30f * em
+        private val tabsW = 8.5f * em
+        private val detailW get() = minOf(30f * em, width * 0.36f)
         private val pDetailTitle = android.text.TextPaint(U.paint(1.6f, bold = true))
         private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
 
-        private val pTime = U.paint(1.2f, U.wa(0.8f))
+        private val pTime = U.paint(1.3f, U.wa(0.8f))
         private val pTitle = U.paint(1.3f)
         private val pTitleBold = U.paint(1.3f, bold = true)
-        private val pSub = U.paint(1.1f, U.wa(0.6f))
+        private val pSub = U.paint(1.2f, U.wa(0.6f))
         private val pSep = U.paint(1.15f, U.wa(0.55f), bold = true)
-        private val pTab = U.paint(1.1f, U.wa(0.7f))
-        private val pTabBold = U.paint(1.1f, bold = true)
-        private val pIcon = U.paint(1.1f, U.wa(0.8f))
-        private val pLive = U.paint(1.1f, bold = true)
+        private val pTab = U.paint(1.25f, U.wa(0.7f))
+        private val pTabBold = U.paint(1.25f, bold = true)
+        private val pRange = U.paint(1.4f, bold = true)
+        private val pLive = U.paint(1.2f, bold = true)
         private val pEmpty = U.paint(1.3f, U.wa(0.6f))
         var scrollY0 = 0f
         private var target = 0f
+        // рамка фокуса едет вместе с прокруткой (тем же шагом), а не прыгает на строку вперёд:
+        // верх и высота в координатах списка
+        private var focusY = 0f
+        private var focusH = 0f
+        private var focusSet = false
 
         private fun h(r: Row) = if (r.separator) sepH else if (r.channel != null || r.sub.isNotEmpty()) richH else rowH
 
@@ -303,6 +308,7 @@ class ScheduleLayer(
             val t = (top(i) - height / 2f + h(rows[i]) / 2).coerceIn(0f, maxOf(0f, total() - height))
             target = t
             if (jump || !Anim.on) scrollY0 = t
+            if (jump || !Anim.on) focusSet = false
             invalidate()
         }
 
@@ -316,6 +322,19 @@ class ScheduleLayer(
                 scrollY0 += (target - scrollY0) * 0.35f
                 postInvalidateOnAnimation()
             } else scrollY0 = target
+            // рамка фокуса — к своей строке тем же шагом, что и прокрутка
+            val fi = if (zone == Zone.LIST && index in rows.indices && !rows[index].separator) index else -1
+            if (fi >= 0) {
+                val ty = top(fi)
+                val th = h(rows[fi])
+                if (!focusSet || !Anim.on || (Math.abs(ty - focusY) < 0.5f && Math.abs(th - focusH) < 0.5f)) {
+                    focusY = ty; focusH = th; focusSet = true
+                } else {
+                    focusY += (ty - focusY) * 0.35f
+                    focusH += (th - focusH) * 0.35f
+                    postInvalidateOnAnimation()
+                }
+            } else focusSet = false
             val w = width.toFloat()
             val listL = tabsW
             val listR = w - viewsW - detailW
@@ -326,12 +345,30 @@ class ScheduleLayer(
                 val save = Fade.begin(c, listL, 0f, listR, height.toFloat())
                 var y = -scrollY0
                 val focusDay = if (zone == Zone.TABS) tabs.getOrNull(tabIndex)?.day else null
+                val rl = listL + 0.7f * em
+                val rr = listR - 0.7f * em
                 for (i in rows.indices) {
                     val r = rows[i]
                     val rh = h(r)
-                    if (y + rh >= 0 && y <= height) drawRow(c, r, i, listL + 0.7f * em, listR - 0.7f * em, y, rh, focusDay)
+                    if (y + rh >= 0 && y <= height) drawRow(c, r, rl, rr, y, rh, focusDay, false)
                     y += rh
                     if (y > height) break
+                }
+                // рамка фокуса и поверх неё — те же строки чёрным, обрезанные по рамке
+                if (fi >= 0) {
+                    val ft = focusY - scrollY0
+                    U.roundRect(c, rl, ft, rr, ft + focusH, 0.5f * em, U.WHITE)
+                    val clip = c.save()
+                    c.clipRect(rl, ft, rr, ft + focusH)
+                    y = -scrollY0
+                    for (i in rows.indices) {
+                        val r = rows[i]
+                        val rh = h(r)
+                        if (!r.separator && y + rh > ft && y < ft + focusH) drawRow(c, r, rl, rr, y, rh, focusDay, true)
+                        y += rh
+                        if (y > ft + focusH) break
+                    }
+                    c.restoreToCount(clip)
                 }
                 // затемнение: сверху — если прокручено, снизу — если ниже ещё есть строки
                 val fl = Fade.length
@@ -363,15 +400,16 @@ class ScheduleLayer(
             if (w <= 0) return
             if (row !== detailRow) {
                 detailRow = row
-                detailTitle = layout(row.title, pDetailTitle, w, 3)
+                // без программы название строки — само время: в панели его не повторять
+                detailTitle = if (row.range.endsWith(row.title)) null else layout(row.title, pDetailTitle, w, 3)
                 val maxLines = maxOf(2, ((height - 12f * em) / (pDetailText.textSize * 1.3f)).toInt())
                 detailText = if (row.desc.isEmpty()) null else layout(row.desc, pDetailText, w, maxLines)
             }
             var y = 1.4f * em
             if (row.range.isNotEmpty()) {
-                pSub.color = if (row.archive && !row.live) U.ARCHIVE else if (row.live) U.LIVE else U.wa(0.6f)
-                U.drawText(c, row.range, x, y + 0.6f * em, w.toFloat(), pSub)
-                y += 1.9f * em
+                pRange.color = if (row.archive && !row.live) U.ARCHIVE else if (row.live) U.LIVE else U.wa(0.75f)
+                U.drawText(c, row.range, x, y + 0.7f * em, w.toFloat(), pRange)
+                y += 2.3f * em
             }
             detailTitle?.let { c.save(); c.translate(x, y); it.draw(c); c.restore(); y += it.height + 0.9f * em }
             detailText?.let { c.save(); c.translate(x, y); it.draw(c); c.restore() }
@@ -391,7 +429,8 @@ class ScheduleLayer(
             }
         }
 
-        private fun drawRow(c: Canvas, r: Row, i: Int, l: Float, rr: Float, y: Float, rh: Float, focusDay: Long?) {
+        /** [focus] — строка под белой рамкой фокуса (чёрным, без своего фона) */
+        private fun drawRow(c: Canvas, r: Row, l: Float, rr: Float, y: Float, rh: Float, focusDay: Long?, focus: Boolean) {
             if (r.separator) {
                 val f = r.day == focusDay
                 if (f) U.roundRect(c, l, y + 0.6f * em, rr, y + rh, 0.5f * em, U.WHITE)
@@ -399,13 +438,7 @@ class ScheduleLayer(
                 U.drawText(c, r.title, l + 0.8f * em, y + rh - 0.95f * em, rr - l, pSep)
                 return
             }
-            val focus = i == index && zone == Zone.LIST
-            val bg = when {
-                focus -> U.WHITE
-                r.playing -> U.FILL_MARKED
-                else -> 0
-            }
-            if (bg != 0) U.roundRect(c, l, y, rr, y + rh, 0.5f * em, bg)
+            if (!focus && r.playing) U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_MARKED)
             val fg = if (focus) U.BLACK else U.WHITE
             val cy = y + rh / 2
             var x = l + 0.8f * em
@@ -415,16 +448,16 @@ class ScheduleLayer(
             }
             pTime.color = if (focus) U.BLACK else U.wa(0.8f)
             c.drawText(r.time, x, cy - (pTime.descent() + pTime.ascent()) / 2, pTime)
-            x += 4.1f * em
+            x += 4.4f * em
             if (r.channel == null) {
                 pSub.color = if (focus) U.BLACK else U.wa(0.5f)
                 c.drawText("›", x, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
                 x += 1.1f * em
             }
-            val isz = 1.1f * em
+            val isz = 2f * em
             val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
             val liveW = if (r.live) pLive.measureText("LIVE") + 1.4f * em else 0f
-            val iw = nIcons * (isz + 0.4f * em) + liveW
+            val iw = nIcons * (isz + 0.5f * em) + liveW
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = if (focus) U.BLACK else if (r.past) U.wa(0.75f) else if (r.future) U.wa(0.85f) else U.WHITE
             if (r.sub.isNotEmpty()) {
@@ -455,12 +488,9 @@ class ScheduleLayer(
             val ic = if (focus) U.BLACK else U.wa(0.8f)
             // архив и напоминание — янтарные (цвет «не эфир»), в белой строке фокуса — чёрные
             val ia = if (focus) U.BLACK else U.ARCHIVE
-            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.4f * em }
-            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.4f * em }
-            if (r.playing) {
-                pIcon.color = ic
-                c.drawText("▶", ix - pIcon.measureText("▶"), cy - (pIcon.descent() + pIcon.ascent()) / 2, pIcon)
-            }
+            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
+            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
+            if (r.playing) { ix -= isz; Icons.draw(c, Icons.Kind.PLAY, ix, cy - isz / 2, isz, ic) }
         }
 
         /** Вкладки дат — колонка слева */
@@ -470,7 +500,7 @@ class ScheduleLayer(
             U.fill.color = U.LINE
             c.drawRect(w - 0.1f * em, 0f, w, height.toFloat(), U.fill)
             if (tabs.isEmpty()) return
-            val th = 3.6f * em
+            val th = 3.9f * em
             val playing = playingDay()
             val activeDay = if (zone == Zone.LIST) rows.getOrNull(index)?.day else null
             // вкладка в фокусе (или активная) — ближе к середине колонки
@@ -494,7 +524,7 @@ class ScheduleLayer(
                 val lines = t.label.split('\n')
                 lines.forEachIndexed { n, s ->
                     val tw = p.measureText(s)
-                    val ly = y + th / 2 + (n - (lines.size - 1) / 2f) * 1.4f * em
+                    val ly = y + th / 2 + (n - (lines.size - 1) / 2f) * 1.55f * em
                     c.drawText(s, l + (tabsW - tw) / 2, ly - (p.descent() + p.ascent()) / 2, p)
                 }
             }

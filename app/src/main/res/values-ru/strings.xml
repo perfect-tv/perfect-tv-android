@@ -325,6 +325,7 @@
     <string name="interface_size">Размер интерфейса</string>
     <string name="size_normal">Обычный</string>
     <string name="size_large">Крупный</string>
+    <string name="size_xlarge">Очень крупный</string>
     <string name="larger_for_a_big_room">крупнее — для большой комнаты и слабого зрения</string>
     <string name="guide_view">Вид гида</string>
     <string name="backup_save">Сохранить резервную копию</string>

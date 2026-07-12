@@ -13,15 +13,17 @@ object Icons {
     private lateinit var remind: Drawable
     private lateinit var fav: Drawable
     private lateinit var lock: Drawable
+    private lateinit var play: Drawable
     private val filters = HashMap<Int, PorterDuffColorFilter>()
 
-    enum class Kind { ARCHIVE, REMIND, FAV, LOCK }
+    enum class Kind { ARCHIVE, REMIND, FAV, LOCK, PLAY }
 
     fun init(context: Context) {
         archive = context.getDrawable(R.drawable.ic_archive)!!.mutate()
         remind = context.getDrawable(R.drawable.ic_remind)!!.mutate()
         fav = context.getDrawable(R.drawable.ic_fav)!!.mutate()
         lock = context.getDrawable(R.drawable.ic_lock)!!.mutate()
+        play = context.getDrawable(R.drawable.ic_play)!!.mutate()
     }
 
     fun drawable(k: Kind) = when (k) {
@@ -29,6 +31,7 @@ object Icons {
         Kind.REMIND -> remind
         Kind.FAV -> fav
         Kind.LOCK -> lock
+        Kind.PLAY -> play
     }
 
     /** Квадратный значок со стороной [size] слева-сверху в (x, y) */

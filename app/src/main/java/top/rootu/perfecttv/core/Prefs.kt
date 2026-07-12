@@ -68,13 +68,16 @@ object Prefs {
         get() = sp.getString("subtitle_lang", "") ?: ""
         set(v) = sp.edit().putString("subtitle_lang", v).apply()
 
-    /** Размер интерфейса: крупный — экран считается высотой 480 dp вместо 540 (всё на 12,5% больше) */
-    var uiLarge: Boolean
-        get() = bool("ui_large", false)
-        set(v) = sp.edit().putBoolean("ui_large", v).apply()
+    /**
+     * Размер интерфейса: 0 — обычный, 1 — крупный, 2 — очень крупный: экран считается высотой
+     * 540, 480 или 432 dp (всё на 12,5% и 25% больше). Старый ключ ui_large — как «крупный».
+     */
+    var uiSize: Int
+        get() = if (sp.contains("ui_size")) int("ui_size", 0).coerceIn(0, 2) else if (bool("ui_large", false)) 1 else 0
+        set(v) = sp.edit().putInt("ui_size", v).remove("ui_large").apply()
 
     /** Высота экрана в dp, под которую подбирается плотность (1 em = 10 dp) */
-    val screenDp: Int get() = if (uiLarge) 480 else 540
+    val screenDp: Int get() = when (uiSize) { 2 -> 432; 1 -> 480; else -> 540 }
 
     var animations: Boolean
         get() = bool("animations", true)

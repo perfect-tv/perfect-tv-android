@@ -8,8 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.ReplacementSpan
 import android.util.AttributeSet
 import android.view.View
 import android.widget.ImageView
@@ -199,11 +199,10 @@ class InfoPanel(val view: View) {
     private fun badgesOf(m: Model): CharSequence {
         val sb = SpannableStringBuilder()
         fun badge(text: String, bg: Int, fg: Int = U.WHITE) {
-            if (sb.isNotEmpty()) sb.append("  ")
+            if (sb.isNotEmpty()) sb.append(" ")
             val s = sb.length
-            sb.append(" ").append(text).append(" ")
-            sb.setSpan(BackgroundColorSpan(bg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(ForegroundColorSpan(fg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.append(text)
+            sb.setSpan(BadgeSpan(bg, fg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         if (m.error) badge(str(R.string.error), U.LIVE)
         if (m.paused) badge("❚❚", U.FILL_ACTIVE)
@@ -215,6 +214,28 @@ class InfoPanel(val view: View) {
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
         if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
+    }
+
+    /** Бейдж: скруглённая плашка с полями вокруг текста (по высоте — на всю строку, она задана в разметке) */
+    private class BadgeSpan(private val bg: Int, private val fg: Int) : ReplacementSpan() {
+        private val padH = U.px(0.6f)
+        private val gap = U.px(0.3f)
+
+        override fun getSize(paint: android.graphics.Paint, text: CharSequence, start: Int, end: Int, fm: android.graphics.Paint.FontMetricsInt?) =
+            Math.round(paint.measureText(text, start, end) + 2 * padH + gap)
+
+        override fun draw(c: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: android.graphics.Paint) {
+            val w = paint.measureText(text, start, end) + 2 * padH
+            // плашка — по росту текста с полями сверху и снизу, а не по строке
+            val mid = y + (paint.ascent() + paint.descent()) / 2
+            val half = paint.textSize * 0.82f
+            val color = paint.color
+            paint.color = bg
+            c.drawRoundRect(x, mid - half, x + w, mid + half, U.px(0.4f), U.px(0.4f), paint)
+            paint.color = fg
+            c.drawText(text, start, end, x + padH, y.toFloat(), paint)
+            paint.color = color
+        }
     }
 
     private fun hhmmss(sec: Long): String {

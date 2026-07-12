@@ -435,7 +435,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 val cw = pCount.measureText(count)
                 c.drawText(count, r - em - cw, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
                 var tx = l + em
-                val isz = 1.2f * em
+                val isz = 1.5f * em
                 val ic = if (white) U.BLACK else U.wa(0.7f)
                 if (g.favorites) { Icons.draw(c, Icons.Kind.FAV, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
                 else if (pin && cat?.isGroupLocked(g.key) == true) { Icons.draw(c, Icons.Kind.LOCK, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
@@ -599,7 +599,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             pn.color = fg
             val fav = tv.catalog?.isFavorite(ch) == true
             val locked = tv.catalog?.isLocked(ch) == true
-            val isz = 1.2f * em
+            val isz = 1.5f * em
             val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0) + (if (locked) 1 else 0)) * (isz + 0.35f * em)
             if (grid) {
                 U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
@@ -646,7 +646,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 var tw = cr - tl - 0.5f * em
                 // запланированное напоминание — значок часов в ячейке
                 if (cell.program != null && cell.start > now && tv.reminders.has(ch, cell.start) && tw > 2 * em) {
-                    val isz = 1.1f * em
+                    val isz = 1.5f * em
                     Icons.draw(c, Icons.Kind.REMIND, cr - 0.5f * em - isz, cy - isz / 2, isz, if (isFocus) U.BLACK else U.ARCHIVE)
                     tw -= isz + 0.4f * em
                 }
