@@ -338,4 +338,5 @@
     <string name="hint_change">Изменить</string>
     <string name="hint_select">Выбрать</string>
     <string name="hint_sections">К разделам</string>
+    <string name="saved">Сохранено</string>
 </resources>

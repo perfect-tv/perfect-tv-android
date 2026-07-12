@@ -565,6 +565,14 @@ class SettingsActivity : Activity() {
         modeBtn = form.button(modeText(mode)) {
             mode = (mode + 1) % 3
             modeBtn.text = modeText(mode)
+            // у готового плейлиста режим (и свои источники из поля выше) сохраняется сразу:
+            // переключатель выглядит как настройка, «Сохранить» после него не ждут
+            if (p != null) {
+                val epg = userEpg.text.toString().split(',', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+                repo.playlist(p.id)?.let { cur -> repo.updatePlaylist(p.id, cur.name, cur.url, mode, epg) }
+                repo.playlist(p.id)?.let { repo.refreshEpg(it, false) }
+                android.widget.Toast.makeText(this, str(R.string.saved), android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
         form.newRow()
         form.button(str(R.string.choose_file_2)) {
