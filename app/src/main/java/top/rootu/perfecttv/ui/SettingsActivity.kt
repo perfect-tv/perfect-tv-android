@@ -278,8 +278,8 @@ class SettingsActivity : Activity() {
             Prefs.language = langs[it]
             recreateHere()
         }
-        choice(col, str(R.string.interface_size), listOf(str(R.string.size_normal), str(R.string.size_large), str(R.string.size_xlarge)), Prefs.uiSize, str(R.string.larger_for_a_big_room)) {
-            Prefs.uiSize = it
+        choice(col, str(R.string.interface_size), listOf(str(R.string.size_small), str(R.string.size_normal), str(R.string.size_large)), Prefs.uiScale, str(R.string.larger_for_a_big_room)) {
+            Prefs.uiScale = it
             recreateHere()
         }
         choice(col, str(R.string.channel_number), listOf(str(R.string.hidden), str(R.string.next_to_the_name), str(R.string.badge_on_the_logo)), Prefs.numberMode,

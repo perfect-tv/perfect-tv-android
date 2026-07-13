@@ -323,9 +323,9 @@
     <string name="appearance">Внешний вид</string>
     <string name="data_and_backup">Данные и резервная копия</string>
     <string name="interface_size">Размер интерфейса</string>
-    <string name="size_normal">Обычный</string>
-    <string name="size_large">Крупный</string>
-    <string name="size_xlarge">Очень крупный</string>
+    <string name="size_small">Меньше</string>
+    <string name="size_normal">Нормальный</string>
+    <string name="size_large">Больше</string>
     <string name="larger_for_a_big_room">крупнее — для большой комнаты и слабого зрения</string>
     <string name="guide_view">Вид гида</string>
     <string name="backup_save">Сохранить резервную копию</string>

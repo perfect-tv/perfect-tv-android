@@ -78,6 +78,13 @@ class InfoPanel(val view: View) {
     init {
         view.background = Scrim(view.resources.getDimension(R.dimen.info_fade), view.resources.getColor(R.color.scrim, null))
         banner.clipToOutline = true
+        // колонки «О передаче» — долями ширины панели (ширина экрана в dp зависит от размера
+        // интерфейса): картинка 25% (16:9), «Далее на канале» 27%, остальное — описание
+        val dm = view.resources.displayMetrics
+        val cw = dm.widthPixels - 2 * view.resources.getDimensionPixelSize(R.dimen.screen_pad)
+        banner.layoutParams.width = Math.round(cw * 0.25f)
+        banner.layoutParams.height = Math.round(cw * 0.25f * 9 / 16)
+        upnext.layoutParams.width = Math.round(cw * 0.27f)
         if (U.touch) {
             // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
             val touch = view.findViewById<LinearLayout>(R.id.info_touch)

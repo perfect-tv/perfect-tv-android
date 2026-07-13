@@ -323,9 +323,9 @@
     <string name="appearance">Appearance</string>
     <string name="data_and_backup">Data and backup</string>
     <string name="interface_size">Interface size</string>
+    <string name="size_small">Smaller</string>
     <string name="size_normal">Normal</string>
-    <string name="size_large">Large</string>
-    <string name="size_xlarge">Extra large</string>
+    <string name="size_large">Larger</string>
     <string name="larger_for_a_big_room">larger — for a big room or weaker eyesight</string>
     <string name="guide_view">Guide view</string>
     <string name="backup_save">Save a backup</string>
