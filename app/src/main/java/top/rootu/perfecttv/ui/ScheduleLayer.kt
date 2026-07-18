@@ -262,7 +262,7 @@ class ScheduleLayer(
     private inner class ListView(context: Context) : View(context) {
         private val em = U.em
         private val rowH = 3.2f * em
-        private val richH = 4.3f * em
+        private val richH = 4.6f * em
         private val sepH = 2.9f * em
         private val viewsW get() = 0f   // вкладки видов — в шапке окна, колонки справа нет
         private val tabsW = 8.5f * em
@@ -270,9 +270,10 @@ class ScheduleLayer(
         private val pDetailTitle = android.text.TextPaint(U.paint(1.6f, bold = true))
         private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
 
-        private val pTime = U.paint(1.3f, U.wa(0.8f))
-        private val pTitle = U.paint(1.3f)
-        private val pTitleBold = U.paint(1.3f, bold = true)
+        // время, название и значки строки — одного роста и одной яркости
+        private val pTime = U.paint(1.45f)
+        private val pTitle = U.paint(1.45f)
+        private val pTitleBold = U.paint(1.45f, bold = true)
         private val pSub = U.paint(1.2f, U.wa(0.6f))
         private val pSep = U.paint(1.15f, U.wa(0.55f), bold = true)
         private val pTab = U.paint(1.25f, U.wa(0.7f))
@@ -446,24 +447,25 @@ class ScheduleLayer(
                 Logos.draw(c, context, r.channel, x, y + 0.6f * em, x + 3.4f * em, y + rh - 0.6f * em, plate = focus) { invalidate() }
                 x += 4.2f * em
             }
-            pTime.color = if (focus) U.BLACK else U.wa(0.8f)
+            val color = if (focus) U.BLACK else if (r.past) U.wa(0.75f) else if (r.future) U.wa(0.85f) else U.WHITE
+            pTime.color = color
             c.drawText(r.time, x, cy - (pTime.descent() + pTime.ascent()) / 2, pTime)
-            x += 4.4f * em
+            x += 4.9f * em
             if (r.channel == null) {
                 pSub.color = if (focus) U.BLACK else U.wa(0.5f)
                 c.drawText("›", x, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
                 x += 1.1f * em
             }
-            val isz = 2f * em
+            val isz = 1.7f * em
             val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
             val liveW = if (r.live) pLive.measureText("LIVE") + 1.4f * em else 0f
             val iw = nIcons * (isz + 0.5f * em) + liveW
             val p = if (r.live || r.playing) pTitleBold else pTitle
-            p.color = if (focus) U.BLACK else if (r.past) U.wa(0.75f) else if (r.future) U.wa(0.85f) else U.WHITE
+            p.color = color
             if (r.sub.isNotEmpty()) {
-                U.drawText(c, r.title, x, cy - 0.75f * em, rr - x - iw - 0.8f * em, p)
+                U.drawText(c, r.title, x, cy - 0.85f * em, rr - x - iw - 0.8f * em, p)
                 pSub.color = if (focus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, r.sub, x, cy + 0.9f * em, rr - x - iw - 0.8f * em, pSub)
+                U.drawText(c, r.sub, x, cy + 1f * em, rr - x - iw - 0.8f * em, pSub)
             } else U.drawText(c, r.title, x, cy, rr - x - iw - 0.8f * em, p)
             // идущая передача: тонкая шкала под названием (в эфире — красная)
             if (r.progress >= 0f) {
@@ -485,7 +487,7 @@ class ScheduleLayer(
                 c.drawText("LIVE", ix + 0.15f * em, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= 0.6f * em
             }
-            val ic = if (focus) U.BLACK else U.wa(0.8f)
+            val ic = color
             // архив и напоминание — янтарные (цвет «не эфир»), в белой строке фокуса — чёрные
             val ia = if (focus) U.BLACK else U.ARCHIVE
             if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
