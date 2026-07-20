@@ -16,8 +16,8 @@ import top.rootu.perfecttv.data.Channel
  * что сделает OK). Вкладки видов «Программа» / «Напоминания · N» — кнопками в шапке окна справа
  * (view_pill.xml), фокус на них — → из списка; если вид один — без кнопок.
  *
- * Подсветка: серым — играющая передача и её дата, открытый вид; белым — фокус (строка и
- * её дата; вкладка даты и заголовок этого дня; вкладка вида).
+ * Подсветка: белая заливка — только фокус (строка, вкладка даты или вида); рамкой — дата строки
+ * в фокусе списка; серым — играющая передача и её дата, открытый вид, заголовок дня при фокусе на датах.
  */
 class ScheduleLayer(
     context: Context,
@@ -434,8 +434,8 @@ class ScheduleLayer(
         private fun drawRow(c: Canvas, r: Row, l: Float, rr: Float, y: Float, rh: Float, focusDay: Long?, focus: Boolean) {
             if (r.separator) {
                 val f = r.day == focusDay
-                if (f) U.roundRect(c, l, y + 0.6f * em, rr, y + rh, 0.5f * em, U.WHITE)
-                pSep.color = if (f) U.BLACK else U.wa(0.55f)
+                if (f) U.roundRect(c, l, y + 0.6f * em, rr, y + rh, 0.5f * em, U.FILL_MARKED)
+                pSep.color = if (f) U.WHITE else U.wa(0.55f)
                 U.drawText(c, r.title, l + 0.8f * em, y + rh - 0.95f * em, rr - l, pSep)
                 return
             }
@@ -459,7 +459,7 @@ class ScheduleLayer(
             val isz = 1.7f * em
             val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
             val liveW = if (r.live) pLive.measureText("LIVE") + 1.4f * em else 0f
-            val iw = nIcons * (isz + 0.5f * em) + liveW
+            val iw = nIcons * (isz + 0.5f * em) + liveW + (if (r.playing && r.live) 0.3f * em else 0f)
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = color
             if (r.sub.isNotEmpty()) {
@@ -482,7 +482,7 @@ class ScheduleLayer(
                 U.fill.style = android.graphics.Paint.Style.STROKE
                 U.fill.strokeWidth = 0.12f * em
                 U.fill.color = fg
-                c.drawRoundRect(ix - 0.15f * em, cy - 0.85f * em, ix + lw + 0.45f * em, cy + 0.85f * em, 0.25f * em, 0.25f * em, U.fill)
+                c.drawRoundRect(ix - 0.15f * em, cy - 0.7f * em, ix + lw + 0.45f * em, cy + 0.7f * em, 0.25f * em, 0.25f * em, U.fill)
                 U.fill.style = android.graphics.Paint.Style.FILL
                 c.drawText("LIVE", ix + 0.15f * em, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= 0.6f * em
@@ -492,7 +492,11 @@ class ScheduleLayer(
             val ia = if (focus) U.BLACK else U.ARCHIVE
             if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
             if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
-            if (r.playing) { ix -= isz; Icons.draw(c, Icons.Kind.PLAY, ix, cy - isz / 2, isz, ic) }
+            if (r.playing) {
+                // треугольник занимает 14/24 высоты значка: рисуем крупнее, чтобы он был ростом с рамку LIVE
+                val ps = 2.4f * em
+                Icons.draw(c, Icons.Kind.PLAY, ix - ps * 19 / 24, cy - ps / 2, ps, ic)
+            }
         }
 
         /** Вкладки дат — колонка слева */
@@ -515,14 +519,23 @@ class ScheduleLayer(
                 if (y + th < 0 || y > height) continue
                 val focus = zone == Zone.TABS && k == tabIndex
                 val active = t.day == activeDay
+                // фокус — белая заливка; день строки в фокусе списка — только рамка (фокус не здесь)
                 val bg = when {
-                    focus || active -> U.WHITE
+                    focus -> U.WHITE
                     t.day == playing -> U.FILL_MARKED
                     else -> 0
                 }
                 if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S), bg)
+                if (active) {
+                    val sw = 0.15f * em
+                    U.fill.style = android.graphics.Paint.Style.STROKE
+                    U.fill.strokeWidth = sw
+                    U.fill.color = U.wa(0.8f)
+                    c.drawRoundRect(l + 0.5f * em + sw / 2, y + sw / 2, w - 0.6f * em - sw / 2, y + th - sw / 2, U.px(U.RADIUS_S), U.px(U.RADIUS_S), U.fill)
+                    U.fill.style = android.graphics.Paint.Style.FILL
+                }
                 val p = if (focus || active) pTabBold else pTab
-                p.color = if (focus || active) U.BLACK else if (t.day == playing) U.WHITE else U.wa(0.7f)
+                p.color = if (focus) U.BLACK else if (active || t.day == playing) U.WHITE else U.wa(0.7f)
                 val lines = t.label.split('\n')
                 lines.forEachIndexed { n, s ->
                     val tw = p.measureText(s)
