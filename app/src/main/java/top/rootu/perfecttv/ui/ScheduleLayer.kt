@@ -16,8 +16,9 @@ import top.rootu.perfecttv.data.Channel
  * что сделает OK). Вкладки видов «Программа» / «Напоминания · N» — кнопками в шапке окна справа
  * (view_pill.xml), фокус на них — → из списка; если вид один — без кнопок.
  *
- * Подсветка: белая заливка — только фокус (строка, вкладка даты или вида); рамкой — дата строки
- * в фокусе списка; серым — играющая передача и её дата, открытый вид, заголовок дня при фокусе на датах.
+ * Подсветка: белая заливка — только фокус (строка, вкладка даты или вида); рамкой — то, куда
+ * вернётся фокус: дата строки, пока фокус в списке, и передача дня, пока фокус на датах; серым —
+ * играющая передача и её дата, открытый вид.
  */
 class ScheduleLayer(
     context: Context,
@@ -193,9 +194,11 @@ class ScheduleLayer(
         val k = (tabIndex + dir).coerceIn(0, tabs.size - 1)
         if (k == tabIndex) return
         tabIndex = k
-        // прокрутить к заголовку дня (он подсвечен), чтобы был виден и сам день
+        // прокрутить к передаче, на которую перейдёт фокус (она в рамке); если это первая
+        // передача дня — к заголовку дня, чтобы был виден и он
+        val t = dayTarget(tabs[k].day)
         val sep = rows.indexOfFirst { it.separator && it.day == tabs[k].day }
-        if (sep >= 0) list.scrollToRow(sep, false)
+        if (t >= 0 && rows[t].playing) list.scrollToRow(t, false) else if (sep >= 0) list.scrollToRow(sep, false)
         list.invalidate()
     }
 
@@ -345,13 +348,23 @@ class ScheduleLayer(
             } else {
                 val save = Fade.begin(c, listL, 0f, listR, height.toFloat())
                 var y = -scrollY0
-                val focusDay = if (zone == Zone.TABS) tabs.getOrNull(tabIndex)?.day else null
+                val focusDay: Long? = null
+                // фокус на датах: рамкой — передача, на которую он перейдёт по →
+                val frame = if (zone == Zone.TABS) tabs.getOrNull(tabIndex)?.let { dayTarget(it.day) } ?: -1 else -1
                 val rl = listL + 0.7f * em
                 val rr = listR - 0.7f * em
                 for (i in rows.indices) {
                     val r = rows[i]
                     val rh = h(r)
                     if (y + rh >= 0 && y <= height) drawRow(c, r, rl, rr, y, rh, focusDay, false)
+                    if (i == frame) {
+                        val sw = 0.15f * em
+                        U.fill.style = android.graphics.Paint.Style.STROKE
+                        U.fill.strokeWidth = sw
+                        U.fill.color = U.wa(0.8f)
+                        c.drawRoundRect(rl + sw / 2, y + sw / 2, rr - sw / 2, y + rh - sw / 2, 0.5f * em, 0.5f * em, U.fill)
+                        U.fill.style = android.graphics.Paint.Style.FILL
+                    }
                     y += rh
                     if (y > height) break
                 }
