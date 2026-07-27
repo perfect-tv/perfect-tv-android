@@ -7,7 +7,7 @@ import android.view.View
  *   key(name, long, digit)  name: left|right|up|down|pgup|pgdown|digit
  *   hasLong(name)           есть ли долгое действие (тогда короткое — на keyup)
  *   keyUp(name)             клавиша без долгого действия отпущена (конец удержания)
- *   media(name)             playpause|play|pause|stop|rewind|forward|guide|info|menu|history
+ *   media(name)             playpause|play|pause|stop|rewind|forward|guide|info|menu|history|search
  */
 interface Layer {
     val view: View?

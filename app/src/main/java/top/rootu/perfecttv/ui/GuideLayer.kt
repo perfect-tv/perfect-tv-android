@@ -271,7 +271,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     }
 
     override fun media(name: String) {
-        if (name == "guide") tv.closeGuide() else if (name == "menu") long()
+        if (name == "guide") tv.closeGuide() else if (name == "menu") long() else if (name == "search") tv.openSearch()
     }
 
     override fun destroy() {

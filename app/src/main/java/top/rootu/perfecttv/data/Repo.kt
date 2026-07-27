@@ -283,6 +283,50 @@ class Repo(context: Context) {
 
     fun epgLoading() = loadingSources.isNotEmpty()
 
+    // ================================================================== поиск
+
+    /** Найденная передача (время — уже со сдвигом tvg-shift) */
+    class Hit(val channel: Channel, val start: Long, val stop: Long, val title: String)
+
+    /** Где искать программу канала */
+    class SearchSource(val channel: Channel, val sourceId: Long, val xmlId: String)
+
+    /** Каналы с программой — для [searchProgrammes]; вызывать с главного потока (кэш сопоставления) */
+    fun searchPlan(channels: List<Channel>): List<SearchSource> =
+        channels.mapNotNull { ch -> mapping(ch.playlistId)[ch.key]?.let { SearchSource(ch, it.first, it.second) } }
+
+    /**
+     * Передачи, в названии которых есть все слова [words] (в нижнем регистре): идущие, будущие
+     * (на неделю вперёд) и прошедшие в пределах архива канала. Сравнение — в коде, а не LIKE:
+     * в SQLite LIKE не различает регистр только у латиницы. Можно звать из фонового потока;
+     * [cancelled] проверяется между каналами.
+     */
+    fun searchProgrammes(plan: List<SearchSource>, words: List<String>, now: Long, cancelled: () -> Boolean): List<Hit> {
+        val out = ArrayList<Hit>()
+        if (words.isEmpty()) return out
+        val rd = db.readableDatabase
+        for (s in plan) {
+            if (cancelled() || out.size >= SEARCH_LIMIT) break
+            val ch = s.channel
+            val shift = Math.round(ch.tvgShift * 3600).toLong()
+            val archFrom = if (ch.hasArchive) now - ch.archiveDays * 86400L else now
+            // идущая передача могла начаться давно — запас в 6 часов
+            val from = minOf(archFrom, now - 6 * 3600L) - shift
+            val to = now + 7 * 86400L - shift
+            rd.rawQuery("SELECT start,stop,title FROM programme WHERE source_id=? AND xml_id=? AND start>=? AND start<? ORDER BY start",
+                arrayOf(s.sourceId.toString(), s.xmlId, from.toString(), to.toString())).use { c ->
+                while (c.moveToNext()) {
+                    val title = c.getString(2)
+                    if (!words.all { title.contains(it, true) }) continue
+                    val start = c.getLong(0) + shift
+                    val stop = c.getLong(1) + shift
+                    if (stop > now || start >= archFrom) out.add(Hit(ch, start, stop, title))
+                }
+            }
+        }
+        return out
+    }
+
     // ================================================================== пользовательские данные
 
     private fun keys(sql: String, id: Long): MutableList<String> {
@@ -372,5 +416,10 @@ class Repo(context: Context) {
 
     fun resetScores(id: Long) {
         db.writableDatabase.delete("score", "playlist_id=?", arrayOf(id.toString()))
+    }
+
+    companion object {
+        /** Больше находок поиск не собирает */
+        const val SEARCH_LIMIT = 400
     }
 }

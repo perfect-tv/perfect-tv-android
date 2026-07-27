@@ -202,6 +202,7 @@ class Keys(
             KeyEvent.KEYCODE_INFO -> "info"
             KeyEvent.KEYCODE_MENU -> "menu"
             KeyEvent.KEYCODE_LAST_CHANNEL -> "history"
+            KeyEvent.KEYCODE_SEARCH -> "search"
             else -> null
         }
     }

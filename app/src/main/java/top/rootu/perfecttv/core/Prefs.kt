@@ -79,6 +79,16 @@ object Prefs {
     /** Высота экрана в dp, под которую подбирается плотность (1 em = 10 dp) */
     val screenDp: Int get() = when (uiScale) { 0 -> 540; 2 -> 432; else -> 480 }
 
+    /** Недавние поисковые запросы, новые — первыми */
+    var searchRecent: List<String>
+        get() = (sp.getString("search_recent", "") ?: "").split('\n').filter { it.isNotEmpty() }
+        set(v) = sp.edit().putString("search_recent", v.joinToString("\n")).apply()
+
+    /** Клавиатура поиска: буквы по алфавиту вместо ЙЦУКЕН / QWERTY */
+    var keyboardAbc: Boolean
+        get() = bool("keyboard_abc", false)
+        set(v) = sp.edit().putBoolean("keyboard_abc", v).apply()
+
     var animations: Boolean
         get() = bool("animations", true)
         set(v) = sp.edit().putBoolean("animations", v).apply()

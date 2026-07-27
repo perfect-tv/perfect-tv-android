@@ -78,6 +78,12 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
                 "OK" to str(R.string.past_from_archive_current_live),
                 str(R.string.hold_ok) to str(R.string.programme_card_watch_from_start)
             ),
+            str(R.string.help_search) to listOf(
+                str(R.string.help_search_keys) to str(R.string.help_search_open),
+                "← ↑ ↓ →" to str(R.string.help_search_nav),
+                "OK" to str(R.string.help_search_ok),
+                str(R.string.hold_ok) to str(R.string.help_search_hold)
+            ),
             str(R.string.programme_card) to listOf(
                 "← / →" to str(R.string.buttons),
                 "↑ / ↓" to str(R.string.scroll_description),

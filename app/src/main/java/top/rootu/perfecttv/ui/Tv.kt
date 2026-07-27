@@ -775,6 +775,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "info" -> return if (info.visible) info.hide() else showInfo(true)
             "menu" -> return state.channel?.let { openMenu(it) } ?: Unit
             "history" -> return openHistory()
+            "search" -> return openSearch()
         }
         main.postDelayed({ showInfo() }, 50)
     }
@@ -1034,6 +1035,29 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (!silent && !hasVideo()) return exitRequest()
         layers.toList().reversed().forEach { if (it !== guide) remove(it) }
         remove(guide)
+    }
+
+    /** Поиск по каналам (без скрытых) и программе; открывается поверх плеера или гида */
+    fun openSearch() {
+        val cat = catalog ?: return
+        if (layers.any { it is SearchLayer }) return
+        var layer: SearchLayer? = null
+        val leave = { layers.toList().reversed().forEach { if (it !== guide) remove(it) } }
+        layer = SearchLayer(activity, repo,
+            channels = { cat.group(Catalog.ALL_KEY)?.channels ?: emptyList() },
+            onChannel = { ch -> leave(); playChannel(ch) },
+            onProgramme = { ch, start, stop ->
+                val now = Clock.now()
+                when {
+                    start <= now && now < stop -> { leave(); playChannel(ch) }
+                    stop <= now && ch.hasArchive -> { leave(); playArchive(ch, start, stop) }
+                    // будущая — карточка с кнопкой «Напомнить»
+                    else -> openDetails(ch, Cell(start, stop, repo.at(ch, start)))
+                }
+            },
+            onLong = { ch -> openSchedule(ch, 0) },
+            onBack = { remove(layer!!) })
+        push(layer)
     }
 
     fun openHistory() {
@@ -1383,6 +1407,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         }))
 
         val app = ArrayList<MenuLayer.Item>()
+        app.add(MenuLayer.Item(str(R.string.search), run = act("search")))
         if (!guide) app.add(MenuLayer.Item(str(R.string.tv_guide), run = act("guide")))
         app.add(MenuLayer.Item(str(R.string.reminders), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", run = act("reminders")))
         app.add(MenuLayer.Item(str(R.string.channel_list), sub = {
@@ -1485,6 +1510,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "live" -> playChannel(ch, state.groupKey)
             "guide" -> openGuide()
             "history" -> openHistory()
+            "search" -> openSearch()
             "reminders" -> openReminders(ch)
             "help" -> openHelp()
             "fav" -> { cat.toggleFavorite(ch); guide.reload() }
