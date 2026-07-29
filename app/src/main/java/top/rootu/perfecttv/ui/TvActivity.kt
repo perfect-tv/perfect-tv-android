@@ -45,6 +45,14 @@ class TvActivity : Activity() {
         reminderFromIntent(intent)
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == Tv.REQ_VOICE && resultCode == RESULT_OK) {
+            data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { tv?.onVoiceResult(it) }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         reminderFromIntent(intent)

@@ -161,10 +161,14 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     // ---------------------------------------------------------- колонка категорий
 
+    /** Фокус на строке «Поиск» над категориями */
+    private var catSearch = false
+
     private fun openCats() {
         if (groups.size < 2) return
         catsFromGroup = groupIndex
         catsFromChannel = focused
+        catSearch = false
         zone = Zone.CATS
         gv.invalidate()
     }
@@ -172,8 +176,18 @@ class GuideLayer(private val tv: Tv) : Layer {
     /** ↑/↓ — категория (список каналов справа меняется сразу), → — к её каналам */
     private fun catsKey(name: String) {
         val n = groups.size
+        // над категориями — строка «Поиск»: ↑ с первой категории — на неё, с неё ↑ — к последней
+        if (catSearch) {
+            when (name) {
+                "up" -> { catSearch = false; setGroup(n - 1) }
+                "down" -> { catSearch = false; setGroup(0) }
+                "right" -> closeCats()
+            }
+            gv.invalidate()
+            return
+        }
         when (name) {
-            "up" -> setGroup((groupIndex - 1 + n) % n)
+            "up" -> if (groupIndex == 0) { catSearch = true; gv.invalidate() } else setGroup(groupIndex - 1)
             "down" -> setGroup((groupIndex + 1) % n)
             "pgup" -> setGroup(maxOf(0, groupIndex - gv.catRows() + 1))
             "pgdown" -> setGroup(minOf(n - 1, groupIndex + gv.catRows() - 1))
@@ -190,6 +204,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     }
 
     private fun closeCats() {
+        catSearch = false
         zone = Zone.CHANNELS
         gv.invalidate()
     }
@@ -239,6 +254,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     override fun enter() {
         if (tv.numberPending()) return tv.applyNumber()
+        if (zone == Zone.CATS && catSearch) return tv.openSearch()
         if (zone == Zone.CATS) return closeCats()
         val ch = focused ?: return
         if (zone == Zone.GRID) {
@@ -415,7 +431,19 @@ class GuideLayer(private val tv: Tv) : Layer {
             val l = padX - (1f - shift) * (padX + catW)
             val r = l + catW
             val headY = padTop + topH + em
-            U.drawText(c, catsTitle, l + em, headY + headH / 2, catW - 2 * em, pCat)
+            // вместо заголовка — строка «Поиск» (↑ с первой категории)
+            val sf = catSearch && zone == Zone.CATS
+            U.roundRect(c, l, headY - 0.3f * em, r, headY + headH - 0.3f * em, U.px(U.RADIUS_S), if (sf) U.WHITE else U.FILL)
+            val scy = headY + headH / 2 - 0.3f * em
+            val sc = if (sf) U.BLACK else U.wa(0.7f)
+            U.fill.style = Paint.Style.STROKE
+            U.fill.strokeWidth = 0.15f * em
+            U.fill.color = sc
+            c.drawCircle(l + 1.6f * em, scy - 0.1f * em, 0.5f * em, U.fill)
+            c.drawLine(l + 1.95f * em, scy + 0.25f * em, l + 2.4f * em, scy + 0.7f * em, U.fill)
+            U.fill.style = Paint.Style.FILL
+            pCatItem.color = if (sf) U.BLACK else U.wa(0.85f)
+            U.drawText(c, catsTitle, l + 3.2f * em, scy, catW - 4.2f * em, pCatItem)
             val rows = catRows()
             val n = groups.size
             val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
@@ -427,7 +455,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 val g = groups[i]
                 val y = bodyTop + k * (catRowH + gap)
                 val focus = i == groupIndex
-                val white = focus && zone == Zone.CATS
+                val white = focus && zone == Zone.CATS && !catSearch
                 if (focus) U.roundRect(c, l, y, r, y + catRowH, U.px(U.RADIUS_S), if (white) U.WHITE else U.FILL_ACTIVE)
                 val cy = y + catRowH / 2
                 val count = counts.getOrPut(g.key + g.channels.size) { g.channels.size.toString() }
@@ -465,7 +493,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (hintZone != zone || catsTitle.isEmpty()) {
                 hintZone = zone
                 hintList = hintsFor(zone)
-                catsTitle = str(R.string.hint_categories)
+                catsTitle = str(R.string.search)
             }
             val cy = height - padBottom - 0.8f * em
             var x = padX
@@ -696,6 +724,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
             if (zone == Zone.CATS) {
                 // тап по категории — открыть её каналы; мимо колонки — закрыть колонку
+                if (x < padX + catW && y < bodyTop && y >= headY) return tv.openSearch()
                 if (x < padX + catW && y >= bodyTop) {
                     val rows = catRows()
                     val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))

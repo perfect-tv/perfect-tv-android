@@ -367,4 +367,7 @@
     <string name="help_search_nav">с клавиатуры: → — результаты, ↓ — запросы; из результатов ← — обратно</string>
     <string name="help_search_ok">канал или эфир — смотреть, архив — с начала, будущее — карточка с напоминанием</string>
     <string name="help_search_hold">на ⌫ — очистить поле, на недавнем запросе — убрать его, на находке — программа канала</string>
+    <string name="voice_unavailable">Голосовой ввод недоступен</string>
+    <string name="help_search_voice">микрофон на клавиатуре или кнопка поиска — голосовой ввод (если на устройстве есть распознавание речи)</string>
+    <string name="help_search_mic">Микрофон</string>
 </resources>

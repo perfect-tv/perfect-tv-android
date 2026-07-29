@@ -33,6 +33,8 @@ class SearchLayer(
     /** Передача: канал, начало, конец (что делать — решает Tv по времени и архиву) */
     private val onProgramme: (Channel, Long, Long) -> Unit,
     private val onLong: (Channel) -> Unit,
+    /** Голосовой ввод (null — распознавания на устройстве нет); результат — в [setQuery] */
+    private val onVoice: (() -> Unit)?,
     private val onBack: () -> Unit
 ) : Layer {
 
@@ -90,10 +92,13 @@ class SearchLayer(
         for (r in letters(l)) out.add(r.map { Key(it.toString(), it.toString()) })
         if (l == SYM) out.add(listOf(Key("http://", "http://", 3), Key("https://", "https://", 3), Key(".m3u8", ".m3u8", 2), Key(".xml.gz", ".xml.gz", 3)))
         out.add("1234567890-".map { Key(it.toString(), it.toString()) })
-        val space = Key(str(R.string.key_space), " ", 5)
-        val del = Key("", "", 2, DEL)
-        out.add(if (l == SYM) listOf(Key("RU", "", 2, TO_RU), Key("EN", "", 2, TO_EN), space, del)
-        else listOf(Key("#&", "", 2, TO_SYM), Key(if (l == RU) "EN" else "RU", "", 2, if (l == RU) TO_EN else TO_RU), space, del))
+        // микрофон — если на устройстве есть распознавание речи; пробел тогда на клавишу уже
+        val mic = onVoice != null
+        val tail = arrayListOf(Key(str(R.string.key_space), " ", if (mic) 4 else 5))
+        if (mic) tail.add(Key("", "", 1, VOICE))
+        tail.add(Key("", "", 2, DEL))
+        out.add((if (l == SYM) listOf(Key("RU", "", 2, TO_RU), Key("EN", "", 2, TO_EN))
+        else listOf(Key("#&", "", 2, TO_SYM), Key(if (l == RU) "EN" else "RU", "", 2, if (l == RU) TO_EN else TO_RU))) + tail)
         for (r in out) { var c = 0; for (k in r) { k.col = c; c += k.span } }
         rows = out
         kr = kr.coerceIn(0, rows.size - 1)
@@ -114,6 +119,7 @@ class SearchLayer(
             TO_RU -> setLang(RU)
             TO_EN -> setLang(EN)
             TO_SYM -> setLang(SYM)
+            VOICE -> onVoice?.invoke()
         }
         list.invalidate()
     }
@@ -200,6 +206,13 @@ class SearchLayer(
         list.invalidate()
     }
 
+    /** Подставить запрос целиком (голосовой ввод) */
+    fun setQuery(text: String) {
+        query.setLength(0)
+        query.append(text.trim().take(MAX_QUERY))
+        changed()
+    }
+
     private fun whenText(t: Long) = Fmt.dayLabel(t).lowercase() + " " + Fmt.hhmm(t)
 
     private fun next(from: Int, dir: Int): Int {
@@ -284,6 +297,11 @@ class SearchLayer(
         if (zone == Zone.KEYS) onBack() else { zone = Zone.KEYS; list.invalidate() }
     }
 
+    /** Кнопка поиска / микрофона на пульте в открытом поиске — голосовой ввод */
+    override fun media(name: String) {
+        if (name == "search") onVoice?.invoke()
+    }
+
     override fun destroy() {
         gen++
         main.removeCallbacks(runSearch)
@@ -328,8 +346,8 @@ class SearchLayer(
         private fun h(i: Item) = if (i.kind == HEAD) headH else rowH
 
         override fun onDraw(c: Canvas) {
-            c.drawColor(U.OVERLAY)
-            c.drawColor(0xC808090B.toInt())
+            // непрозрачный фон: под поиском может быть гид, его текст просвечивал бы сквозь результаты
+            c.drawColor(0xFF0B0C0E.toInt())
             drawField(c)
             drawKeys(c)
             drawQueries(c)
@@ -393,6 +411,7 @@ class SearchLayer(
                     val fg = if (focus) U.BLACK else U.WHITE
                     val cy = y + keyH / 2
                     if (k.action == DEL) drawDel(c, x + w / 2, cy, fg)
+                    else if (k.action == VOICE) drawMic(c, x + w / 2, cy, fg)
                     else {
                         val p = if (k.label.length > 1) pFn else pKey
                         p.color = fg
@@ -421,6 +440,20 @@ class SearchLayer(
             val xx = cx + w * 0.3f
             c.drawLine(xx - d, cy - d, xx + d, cy + d, U.fill)
             c.drawLine(xx - d, cy + d, xx + d, cy - d, U.fill)
+            U.fill.style = Paint.Style.FILL
+        }
+
+        private val micRect = android.graphics.RectF()
+
+        /** Значок микрофона: капсула, дуга под ней и ножка */
+        private fun drawMic(c: Canvas, cx: Float, cy: Float, color: Int) {
+            U.fill.style = Paint.Style.FILL
+            U.fill.color = color
+            c.drawRoundRect(cx - 0.3f * em, cy - 0.95f * em, cx + 0.3f * em, cy + 0.2f * em, 0.3f * em, 0.3f * em, U.fill)
+            stroke(color, 0.15f * em)
+            micRect.set(cx - 0.6f * em, cy - 0.7f * em, cx + 0.6f * em, cy + 0.5f * em)
+            c.drawArc(micRect, 0f, 180f, false, U.fill)
+            c.drawLine(cx, cy + 0.5f * em, cx, cy + 0.95f * em, U.fill)
             U.fill.style = Paint.Style.FILL
         }
 
@@ -568,6 +601,7 @@ class SearchLayer(
         private const val TO_RU = 2
         private const val TO_EN = 3
         private const val TO_SYM = 4
+        private const val VOICE = 5
         private const val HEAD = 0
         private const val CHANNEL = 1
         private const val LIVE = 2
