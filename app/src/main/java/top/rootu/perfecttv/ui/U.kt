@@ -50,6 +50,7 @@ object U {
     val FILL_BTN = c(R.color.fill_btn)          // кнопка в окнах
     val FILL_NOW = c(R.color.fill_now)          // текущая передача
     val FILL_MARKED = c(R.color.fill_marked)    // отмечено (играет)
+    val FILL_PLAYING = c(R.color.fill_playing)  // играет (окно программы)
     val FILL_ACTIVE = c(R.color.fill_active)    // строка в фокусе вне активной зоны
     val LINE = c(R.color.line)
     val PANEL = c(R.color.panel)

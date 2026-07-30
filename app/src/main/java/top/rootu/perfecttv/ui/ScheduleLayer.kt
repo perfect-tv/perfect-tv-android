@@ -70,6 +70,11 @@ class ScheduleLayer(
 
     private enum class Zone { LIST, TABS, VIEWS }
 
+    private companion object {
+        /** Поля между текстом «LIVE» и его рамкой, em */
+        const val LIVE_PAD = 0.8f
+    }
+
     private lateinit var content: Content
     private var rows: List<Row> = emptyList()
     private var tabs: List<Tab> = emptyList()
@@ -274,7 +279,7 @@ class ScheduleLayer(
         private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
 
         // время, название и значки строки — одного роста и одной яркости
-        private val pTime = U.paint(1.45f)
+        private val pTime = U.paint(1.45f, bold = true)
         private val pTitle = U.paint(1.45f)
         private val pTitleBold = U.paint(1.45f, bold = true)
         private val pSub = U.paint(1.2f, U.wa(0.6f))
@@ -452,7 +457,7 @@ class ScheduleLayer(
                 U.drawText(c, r.title, l + 0.8f * em, y + rh - 0.95f * em, rr - l, pSep)
                 return
             }
-            if (!focus && r.playing) U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_MARKED)
+            if (!focus && r.playing) U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_PLAYING)
             val fg = if (focus) U.BLACK else U.WHITE
             val cy = y + rh / 2
             var x = l + 0.8f * em
@@ -465,13 +470,21 @@ class ScheduleLayer(
             c.drawText(r.time, x, cy - (pTime.descent() + pTime.ascent()) / 2, pTime)
             x += 4.9f * em
             if (r.channel == null) {
-                pSub.color = if (focus) U.BLACK else U.wa(0.5f)
-                c.drawText("›", x, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
+                // уголок рисуем линиями, а не символом шрифта: по вертикали он точно в центре строки
+                val s = 0.4f * em
+                U.fill.style = android.graphics.Paint.Style.STROKE
+                U.fill.strokeWidth = 0.13f * em
+                U.fill.strokeCap = android.graphics.Paint.Cap.ROUND
+                U.fill.color = if (focus) U.BLACK else U.wa(0.5f)
+                c.drawLine(x, cy - s, x + s, cy, U.fill)
+                c.drawLine(x + s, cy, x, cy + s, U.fill)
+                U.fill.style = android.graphics.Paint.Style.FILL
+                U.fill.strokeCap = android.graphics.Paint.Cap.BUTT
                 x += 1.1f * em
             }
             val isz = 1.7f * em
             val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
-            val liveW = if (r.live) pLive.measureText("LIVE") + 1.4f * em else 0f
+            val liveW = if (r.live) pLive.measureText("LIVE") + 2f * LIVE_PAD + 0.2f * em else 0f
             val iw = nIcons * (isz + 0.5f * em) + liveW + (if (r.playing && r.live) 0.3f * em else 0f)
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = color
@@ -491,14 +504,15 @@ class ScheduleLayer(
             if (r.live) {
                 pLive.color = fg
                 val lw = pLive.measureText("LIVE")
-                ix -= lw + 0.5f * em
+                val pad = LIVE_PAD * em
+                ix -= lw + pad
                 U.fill.style = android.graphics.Paint.Style.STROKE
                 U.fill.strokeWidth = 0.12f * em
                 U.fill.color = fg
-                c.drawRoundRect(ix - 0.15f * em, cy - 0.7f * em, ix + lw + 0.45f * em, cy + 0.7f * em, 0.25f * em, 0.25f * em, U.fill)
+                c.drawRoundRect(ix - pad, cy - 0.85f * em, ix + lw + pad, cy + 0.85f * em, 0.3f * em, 0.3f * em, U.fill)
                 U.fill.style = android.graphics.Paint.Style.FILL
-                c.drawText("LIVE", ix + 0.15f * em, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
-                ix -= 0.6f * em
+                c.drawText("LIVE", ix, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
+                ix -= pad + 0.4f * em
             }
             val ic = color
             // архив и напоминание — янтарные (цвет «не эфир»), в белой строке фокуса — чёрные
@@ -506,8 +520,8 @@ class ScheduleLayer(
             if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
             if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
             if (r.playing) {
-                // треугольник занимает 14/24 высоты значка: рисуем крупнее, чтобы он был ростом с рамку LIVE
-                val ps = 2.4f * em
+                // треугольник занимает 14/24 высоты значка: рисуем крупнее, чтобы он был ростом с рамку LIVE (1,7 em)
+                val ps = 2.8f * em
                 Icons.draw(c, Icons.Kind.PLAY, ix - ps * 19 / 24, cy - ps / 2, ps, ic)
             }
         }
@@ -535,7 +549,7 @@ class ScheduleLayer(
                 // фокус — белая заливка; день строки в фокусе списка — только рамка (фокус не здесь)
                 val bg = when {
                     focus -> U.WHITE
-                    t.day == playing -> U.FILL_MARKED
+                    t.day == playing -> U.FILL_PLAYING
                     else -> 0
                 }
                 if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S), bg)
