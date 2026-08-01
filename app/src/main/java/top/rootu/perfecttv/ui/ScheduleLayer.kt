@@ -279,7 +279,7 @@ class ScheduleLayer(
         private val pDetailText = android.text.TextPaint(U.paint(1.25f, U.wa(0.8f)))
 
         // время, название и значки строки — одного роста и одной яркости
-        private val pTime = U.paint(1.45f, bold = true)
+        private val pTime = U.paint(1.45f)
         private val pTitle = U.paint(1.45f)
         private val pTitleBold = U.paint(1.45f, bold = true)
         private val pSub = U.paint(1.2f, U.wa(0.6f))
