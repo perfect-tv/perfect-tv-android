@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Палитра интерфейса; в коде — U.* (читается отсюда) -->
 <resources>
-    <color name="white">#FFFFFFFF</color>
+    <color name="white">#FFEBEBEB</color>
     <color name="black">#FF000000</color>
     <!-- белый с прозрачностью: фоны строк, ячеек, кнопок -->
-    <color name="fill">#0DFFFFFF</color>          <!-- строка гида, пункт настроек -->
-    <color name="fill_soft">#0FFFFFFF</color>     <!-- подложка логотипа -->
-    <color name="fill_cell">#17FFFFFF</color>     <!-- ячейка передачи -->
-    <color name="fill_btn">#1FFFFFFF</color>      <!-- кнопка в окнах -->
-    <color name="fill_now">#2BFFFFFF</color>      <!-- текущая передача -->
-    <color name="fill_marked">#2EFFFFFF</color>   <!-- отмечено (играет), подложка шкалы -->
-    <color name="fill_playing">#4DFFFFFF</color>  <!-- играющая передача в окне программы и её дата: заметно светлее обычной подложки -->
-    <color name="fill_active">#38FFFFFF</color>   <!-- строка в фокусе вне активной зоны -->
-    <color name="line">#14FFFFFF</color>
-    <color name="line_strong">#1AFFFFFF</color>  <!-- разделитель инфопанели и описания -->
+    <color name="fill">#0DEBEBEB</color>          <!-- строка гида, пункт настроек -->
+    <color name="fill_soft">#0FEBEBEB</color>     <!-- подложка логотипа -->
+    <color name="fill_cell">#17EBEBEB</color>     <!-- ячейка передачи -->
+    <color name="fill_btn">#1FEBEBEB</color>      <!-- кнопка в окнах -->
+    <color name="fill_now">#2BEBEBEB</color>      <!-- текущая передача -->
+    <color name="fill_marked">#2EEBEBEB</color>   <!-- отмечено (играет), подложка шкалы -->
+    <color name="fill_playing">#4DEBEBEB</color>  <!-- играющая передача в окне программы и её дата: заметно светлее обычной подложки -->
+    <color name="fill_active">#38EBEBEB</color>   <!-- строка в фокусе вне активной зоны -->
+    <color name="line">#14EBEBEB</color>
+    <color name="line_strong">#1AEBEBEB</color>  <!-- разделитель инфопанели и описания -->
     <!-- панели и окна -->
     <color name="panel">#EB1A1B1C</color>
     <color name="panel_card">#D91A1B1C</color>
@@ -30,15 +30,15 @@
     <color name="archive">#FFFFB84D</color>
     <color name="on_archive">#FF201400</color>   <!-- текст на янтарном -->
     <!-- текст: белый с прозрачностью -->
-    <color name="text_95">#F2FFFFFF</color>
-    <color name="text_90">#E6FFFFFF</color>
-    <color name="text_85">#D9FFFFFF</color>
-    <color name="text_80">#CCFFFFFF</color>
-    <color name="text_75">#BFFFFFFF</color>
-    <color name="text_70">#B3FFFFFF</color>
-    <color name="text_65">#A6FFFFFF</color>
-    <color name="text_60">#99FFFFFF</color>
-    <color name="text_55">#8CFFFFFF</color>
-    <color name="text_50">#80FFFFFF</color>
-    <color name="text_40">#66FFFFFF</color>
+    <color name="text_95">#F2EBEBEB</color>
+    <color name="text_90">#E6EBEBEB</color>
+    <color name="text_85">#D9EBEBEB</color>
+    <color name="text_80">#CCEBEBEB</color>
+    <color name="text_75">#BFEBEBEB</color>
+    <color name="text_70">#B3EBEBEB</color>
+    <color name="text_65">#A6EBEBEB</color>
+    <color name="text_60">#99EBEBEB</color>
+    <color name="text_55">#8CEBEBEB</color>
+    <color name="text_50">#80EBEBEB</color>
+    <color name="text_40">#66EBEBEB</color>
 </resources>

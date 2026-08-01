@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.PerfectTv" parent="android:Theme.Material.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:colorAccent">#FFFFFF</item>
+        <item name="android:colorAccent">#EBEBEB</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
 </resources>

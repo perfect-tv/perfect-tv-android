@@ -38,11 +38,13 @@ object U {
     fun pxi(e: Float) = Math.round(e * em)
 
     /** Белый с прозрачностью */
-    fun wa(a: Float) = Color.argb(Math.round(a * 255), 255, 255, 255)
+    fun wa(a: Float) = Color.argb(Math.round(a * 255), SOFT, SOFT, SOFT)
 
     // палитра — из res/values/colors.xml (там же — для XML-разметки)
     private fun c(id: Int) = top.rootu.perfecttv.core.Lang.res.getColor(id, null)
-    val WHITE = Color.WHITE
+    // «белый» — не 100%: чистый белый на телевизоре режет глаза и «цветёт» (то же в colors.xml и значках)
+    private const val SOFT = 235
+    val WHITE = Color.rgb(SOFT, SOFT, SOFT)
     val BLACK = Color.BLACK
     val FILL = c(R.color.fill)                  // строка гида
     val FILL_SOFT = c(R.color.fill_soft)        // область логотипа

@@ -426,7 +426,7 @@ class ScheduleLayer(
             }
             var y = 1.4f * em
             if (row.range.isNotEmpty()) {
-                pRange.color = if (row.archive && !row.live) U.ARCHIVE else if (row.live) U.LIVE else U.wa(0.75f)
+                pRange.color = U.wa(0.75f)
                 U.drawText(c, row.range, x, y + 0.7f * em, w.toFloat(), pRange)
                 y += 2.3f * em
             }
@@ -471,9 +471,9 @@ class ScheduleLayer(
             x += 4.9f * em
             if (r.channel == null) {
                 // уголок рисуем линиями, а не символом шрифта: по вертикали он точно в центре строки
-                val s = 0.4f * em
+                val s = 0.27f * em
                 U.fill.style = android.graphics.Paint.Style.STROKE
-                U.fill.strokeWidth = 0.13f * em
+                U.fill.strokeWidth = 0.11f * em
                 U.fill.strokeCap = android.graphics.Paint.Cap.ROUND
                 U.fill.color = if (focus) U.BLACK else U.wa(0.5f)
                 c.drawLine(x, cy - s, x + s, cy, U.fill)
@@ -498,7 +498,7 @@ class ScheduleLayer(
                 val bw = rr - x - iw - 0.8f * em
                 val by = y + rh - 0.45f * em
                 U.roundRect(c, x, by, x + bw, by + 0.2f * em, 0.1f * em, if (focus) 0x33000000 else U.FILL_MARKED)
-                U.roundRect(c, x, by, x + bw * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.LIVE)
+                U.roundRect(c, x, by, x + bw * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.WHITE)
             }
             var ix = rr - 0.8f * em
             if (r.live) {
@@ -514,9 +514,9 @@ class ScheduleLayer(
                 c.drawText("LIVE", ix, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= pad + 0.4f * em
             }
-            val ic = color
-            // архив и напоминание — янтарные (цвет «не эфир»), в белой строке фокуса — чёрные
-            val ia = if (focus) U.BLACK else U.ARCHIVE
+            val ic = if (focus) U.BLACK else U.wa(0.8f)
+            // значки архива и напоминания — без цвета: белые, в белой строке фокуса — чёрные
+            val ia = ic
             if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
             if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
             if (r.playing) {
