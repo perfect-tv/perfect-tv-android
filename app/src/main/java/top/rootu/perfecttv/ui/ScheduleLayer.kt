@@ -537,7 +537,9 @@ class ScheduleLayer(
             val playing = playingDay()
             val activeDay = if (zone == Zone.LIST) rows.getOrNull(index)?.day else null
             // вкладка в фокусе (или активная) — ближе к середине колонки
-            val center = if (zone == Zone.TABS) tabIndex else tabs.indexOfFirst { it.day == activeDay }.coerceAtLeast(0)
+            // (день строки в фокусе берём и когда фокус на кнопках видов — иначе колонка прыгала бы вверх)
+            val rowDay = rows.getOrNull(index)?.day
+            val center = if (zone == Zone.TABS) tabIndex else tabs.indexOfFirst { it.day == rowDay }.coerceAtLeast(0)
             val totalH = tabs.size * (th + 0.3f * em) + 0.8f * em
             val off = (center * (th + 0.3f * em) - height / 2f + th / 2).coerceIn(0f, maxOf(0f, totalH - height))
             val save = Fade.begin(c, l, 0f, w, height.toFloat())
