@@ -190,7 +190,7 @@ class InfoPanel(val view: View) {
         val inflater = android.view.LayoutInflater.from(view.context)
         fun hint(k: String, action: String) {
             val v = inflater.inflate(R.layout.hint_item, hints, false)
-            v.findViewById<TextView>(R.id.hint_key).text = k
+            v.findViewById<TextView>(R.id.hint_key).text = Keycap.text(k)
             v.findViewById<TextView>(R.id.hint_action).text = action
             hints.addView(v)
         }

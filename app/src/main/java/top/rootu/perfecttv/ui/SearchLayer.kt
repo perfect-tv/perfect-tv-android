@@ -580,11 +580,11 @@ class SearchLayer(
             val cy = height - padY - 0.8f * em
             var x = padX
             for ((key, action) in hintList) {
-                val kw = maxOf(2f * em, pHintKey.measureText(key) + em)
+                val kw = maxOf(2f * em, Keycap.width(key, pHintKey) + em)
                 stroke(U.wa(0.4f), 0.1f * em)
                 c.drawRoundRect(x, cy - 0.85f * em, x + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
                 U.fill.style = Paint.Style.FILL
-                c.drawText(key, x + (kw - pHintKey.measureText(key)) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
+                Keycap.draw(c, key, x + (kw - Keycap.width(key, pHintKey)) / 2, cy, pHintKey)
                 x += kw + 0.6f * em
                 c.drawText(action, x, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
                 x += pHint.measureText(action) + 1.8f * em

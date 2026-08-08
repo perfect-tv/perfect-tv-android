@@ -103,7 +103,7 @@ class SettingsActivity : Activity() {
         box.visibility = View.VISIBLE
         for ((k, action) in listOf("←  →" to str(R.string.hint_change), "OK" to str(R.string.hint_select), str(R.string.key_back) to str(R.string.hint_sections))) {
             val v = layoutInflater.inflate(R.layout.hint_item, box, false)
-            v.findViewById<TextView>(R.id.hint_key).text = k
+            v.findViewById<TextView>(R.id.hint_key).text = Keycap.text(k)
             v.findViewById<TextView>(R.id.hint_action).text = action
             box.addView(v)
         }
