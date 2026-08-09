@@ -370,4 +370,7 @@
     <string name="voice_unavailable">Голосовой ввод недоступен</string>
     <string name="help_search_voice">микрофон на клавиатуре или кнопка поиска — голосовой ввод (если на устройстве есть распознавание речи)</string>
     <string name="help_search_mic">Микрофон</string>
+    <string name="home_favorites">Избранные</string>
+    <string name="home_screen">Главный экран Android TV</string>
+    <string name="home_screen_sub">избранные каналы и «Продолжить просмотр»</string>
 </resources>

@@ -225,6 +225,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             pendingPlay = null
             cat.byKey[r.chKey]?.let { ch -> return if (r.missed(Clock.now())) playArchive(ch, r.start, r.stop) else playChannel(ch) }
         }
+        pendingExternal?.let { pendingExternal = null; return handleExternal(it) }
         val last = cat.byKey[Prefs.lastChannel(p.id)]
         if (last != null && Prefs.autoplayLast) playChannel(last, Prefs.lastGroup(p.id))
         else {
@@ -1038,7 +1039,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     /** Поиск по каналам (без скрытых) и программе; открывается поверх плеера или гида */
-    fun openSearch() {
+    fun openSearch(query: String = "") {
         val cat = catalog ?: return
         if (layers.any { it is SearchLayer }) return
         var layer: SearchLayer? = null
@@ -1065,6 +1066,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             },
             onBack = { remove(layer!!) })
         push(layer)
+        if (query.isNotEmpty()) layer.setQuery(query)
     }
 
     /** Результат голосового ввода (TvActivity.onActivityResult) — в открытый поиск */
@@ -1234,6 +1236,46 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     private var pendingPlay: Reminders.Reminder? = null
+
+    /** Запуск извне: канал с главного экрана ([channelKey]) или голосовая команда ([query]) */
+    class External(val playlistId: Long, val channelKey: String?, val query: String?)
+
+    private var pendingExternal: External? = null
+
+    fun openExternal(e: External) {
+        val p = (if (e.playlistId > 0) repo.playlist(e.playlistId) else null) ?: playlist ?: return
+        if (playlist?.id != p.id) {
+            pendingExternal = e
+            return switchPlaylist(p)
+        }
+        // каталог ещё грузится — выполнится в startFromLast
+        if (catalog == null) { pendingExternal = e; return }
+        handleExternal(e)
+    }
+
+    private fun handleExternal(e: External) {
+        val cat = catalog ?: return
+        layers.toList().reversed().forEach { if (it !== guide) remove(it) }
+        e.channelKey?.let { k -> return cat.byKey[k]?.let { playChannel(it) } ?: toast.show(str(R.string.the_channel_is_no_longer_in_the)) }
+        val q = e.query?.trim().orEmpty()
+        if (q.isEmpty()) return openSearch()
+        // голос: номер или название канала — включить, иначе — поиск с этим запросом
+        val words = q.lowercase().split(' ').filter { it.isNotEmpty() }
+        val all = cat.group(Catalog.ALL_KEY)?.channels ?: cat.channels
+        val match = q.toIntOrNull()?.let { n -> all.firstOrNull { it.num == n } }
+            ?: all.firstOrNull { it.name.equals(q, true) }
+            ?: all.filter { ch -> words.all { ch.name.contains(it, true) } }.minByOrNull { it.name.length }
+        if (match != null) playChannel(match) else openSearch(q)
+    }
+
+    /** Обновить ряды на главном экране Android TV (при уходе из приложения) */
+    fun updateHome() {
+        val cat = catalog ?: return
+        val last = state.channel
+        val favs = cat.favGroup.channels.toList()
+        val ctx = activity.applicationContext
+        Thread { top.rootu.perfecttv.data.Home.update(ctx, repo, favs, last) }.start()
+    }
 
     fun openHelp() {
         var layer: HelpLayer? = null

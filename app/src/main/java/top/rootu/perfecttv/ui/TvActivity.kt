@@ -43,6 +43,7 @@ class TvActivity : Activity() {
         findViewById<PlayerView>(R.id.player).player = pb.player
         tv = Tv(this, root, pb)
         reminderFromIntent(intent)
+        externalFromIntent(intent)
     }
 
     @Deprecated("Deprecated in Java")
@@ -56,6 +57,23 @@ class TvActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         reminderFromIntent(intent)
+        externalFromIntent(intent)
+    }
+
+    // карточка с главного экрана (perfecttv://channel?…) или голосовая команда «включи …»
+    private var pendingExternal: Tv.External? = null
+
+    private fun externalFromIntent(i: Intent?) {
+        i ?: return
+        top.rootu.perfecttv.data.Home.parse(i.data)?.let { (p, k) ->
+            pendingExternal = Tv.External(p, k, null)
+            i.data = null
+            return
+        }
+        if (i.action == "android.media.action.MEDIA_PLAY_FROM_SEARCH") {
+            pendingExternal = Tv.External(0, null, i.getStringExtra(android.app.SearchManager.QUERY) ?: "")
+            i.action = Intent.ACTION_MAIN
+        }
     }
 
     // уведомление о напоминании: включить передачу, когда плейлист откроется
@@ -72,6 +90,10 @@ class TvActivity : Activity() {
         pendingReminder?.let { id ->
             pendingReminder = null
             root.post { tv?.launchReminder(id) }
+        }
+        pendingExternal?.let { e ->
+            pendingExternal = null
+            root.post { tv?.openExternal(e) }
         }
     }
 
@@ -122,6 +144,7 @@ class TvActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
+        tv?.updateHome()
         playback?.stop()
     }
 

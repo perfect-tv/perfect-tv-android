@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.okhttp)
     implementation(libs.coil)
+    implementation(libs.tvprovider)
 
     testImplementation(libs.junit)
     // XmlPullParser для JVM-тестов (на устройстве — встроенный KXml)

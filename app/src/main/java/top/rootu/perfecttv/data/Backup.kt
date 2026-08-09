@@ -23,6 +23,7 @@ object Backup {
         val root = JSONObject().put("version", VERSION)
         val prefs = JSONObject()
         for ((k, v) in Prefs.all()) {
+            if (k.startsWith("home_")) continue   // id карточек главного экрана — свои у каждого устройства
             val t = when (v) { is Boolean -> "b"; is Int -> "i"; is Long -> "l"; is Float -> "f"; is String -> "s"; else -> continue }
             prefs.put(k, JSONObject().put("t", t).put("v", v))
         }

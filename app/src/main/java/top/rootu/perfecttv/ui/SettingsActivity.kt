@@ -268,6 +268,11 @@ class SettingsActivity : Activity() {
         number(col, str(R.string.remind_about_a_programme), listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore,
             label = { if (it == 0) str(R.string.when_it_starts) else str(R.string.x_min_before, it) }) { Prefs.remindBefore = it; showMain() }
         toggle(col, str(R.string.start_with_the_last_channel), Prefs.autoplayLast, str(R.string.off_the_guide_opens_on_start)) { Prefs.autoplayLast = it; showMain() }
+        toggle(col, str(R.string.home_screen), Prefs.homeScreen, str(R.string.home_screen_sub)) {
+            Prefs.homeScreen = it
+            if (!it) Thread { top.rootu.perfecttv.data.Home.remove(applicationContext) }.start()
+            showMain()
+        }
         number(col, str(R.string.reload_programme_every), listOf(6, 12, 24), Prefs.epgRefreshHours, label = { str(R.string.x_h, it) }) { Prefs.epgRefreshHours = it; showMain() }
         return first
     }

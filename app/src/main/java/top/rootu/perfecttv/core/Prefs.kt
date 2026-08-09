@@ -89,6 +89,19 @@ object Prefs {
         get() = bool("keyboard_abc", false)
         set(v) = sp.edit().putBoolean("keyboard_abc", v).apply()
 
+    /** Главный экран Android TV: избранные каналы и «Продолжить просмотр» */
+    var homeScreen: Boolean
+        get() = bool("home_screen", true)
+        set(v) = sp.edit().putBoolean("home_screen", v).apply()
+
+    /** Служебное: id своего канала-превью и карточки «Продолжить» в провайдере ТВ (в копию не входят) */
+    var homeChannelId: Long
+        get() = sp.getLong("home_channel_id", 0L)
+        set(v) = sp.edit().putLong("home_channel_id", v).apply()
+    var homeWatchNextId: Long
+        get() = sp.getLong("home_watch_next_id", 0L)
+        set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
+
     var animations: Boolean
         get() = bool("animations", true)
         set(v) = sp.edit().putBoolean("animations", v).apply()
