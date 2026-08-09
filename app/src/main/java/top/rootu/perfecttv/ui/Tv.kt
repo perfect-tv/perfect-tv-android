@@ -600,7 +600,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private var scoreFor: Channel? = null
     private val scoreRun = Runnable {
         val ch = scoreFor
-        if (ch != null && state.channel === ch && Prefs.adaptiveSort) catalog?.addScore(ch)
+        // очки копятся всегда, и при выключенной адаптивной сортировке: после включения порядок готов,
+        // а ряд «Популярные» на главном экране берёт их же
+        if (ch != null && state.channel === ch) catalog?.addScore(ch)
     }
 
     fun playArchive(ch: Channel, start0: Long, programEnd: Long = 0) {
@@ -1272,9 +1274,12 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     fun updateHome() {
         val cat = catalog ?: return
         val last = state.channel
-        val favs = cat.favGroup.channels.toList()
+        // скрытые и заблокированные каналы на главный экран не выносим — он виден всем в комнате
+        fun open(l: List<Channel>) = l.filter { !cat.isHidden(it) && !cat.isLocked(it) }
+        val favs = open(cat.favGroup.channels)
+        val popular = open(cat.popular())
         val ctx = activity.applicationContext
-        Thread { top.rootu.perfecttv.data.Home.update(ctx, repo, favs, last) }.start()
+        Thread { top.rootu.perfecttv.data.Home.update(ctx, repo, favs, popular, last?.takeIf { open(listOf(it)).isNotEmpty() }) }.start()
     }
 
     fun openHelp() {

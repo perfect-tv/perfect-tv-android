@@ -98,6 +98,9 @@ object Prefs {
     var homeChannelId: Long
         get() = sp.getLong("home_channel_id", 0L)
         set(v) = sp.edit().putLong("home_channel_id", v).apply()
+    var homePopularId: Long
+        get() = sp.getLong("home_popular_id", 0L)
+        set(v) = sp.edit().putLong("home_popular_id", v).apply()
     var homeWatchNextId: Long
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()

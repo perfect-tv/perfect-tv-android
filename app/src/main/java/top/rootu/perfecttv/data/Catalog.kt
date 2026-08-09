@@ -176,6 +176,10 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
         repo.setScore(playlist.id, ch.key, v)
     }
 
+    /** Самые смотримые каналы по очкам (адаптивная сортировка; очки копятся и при её отключении) */
+    fun popular(limit: Int = POPULAR_SIZE): List<Channel> =
+        channels.filter { (scores[it.key] ?: 0) > 0 }.sortedWith(compareByDescending<Channel> { scores[it.key] ?: 0 }.thenBy { it.num }).take(limit)
+
     fun resetScores() {
         scores.clear()
         repo.resetScores(playlist.id)
@@ -187,5 +191,6 @@ class Catalog(val playlist: Playlist, val channels: List<Channel>, private val r
          *  допустим в XML SharedPreferences, куда сохраняется последняя категория) */
         const val ALL_KEY = "\uE000all"
         const val HISTORY_SIZE = 11
+        const val POPULAR_SIZE = 12
     }
 }

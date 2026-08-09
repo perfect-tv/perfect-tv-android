@@ -15,7 +15,7 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 
 /**
- * Главный экран Android TV: ряд «Избранные» (канал-превью с избранными каналами) и «Продолжить
+ * Главный экран Android TV: ряды «Избранные» и «Популярные» (каналы-превью) и «Продолжить
  * просмотр» (последний канал). Карточка запускает приложение глубокой ссылкой
  * `perfecttv://channel?p=<плейлист>&k=<ключ канала>` ([link], [parse]). Обновляется, когда
  * приложение уходит с экрана. На устройствах без провайдера ТВ (телефон) ничего не делает.
@@ -40,13 +40,16 @@ object Home {
     }
 
     /** Обновить ряды; звать из фонового потока. [last] — канал для «Продолжить просмотр» */
-    fun update(context: Context, repo: Repo, favorites: List<Channel>, last: Channel?) {
+    fun update(context: Context, repo: Repo, favorites: List<Channel>, popular: List<Channel>, last: Channel?) {
         if (!Prefs.homeScreen) return remove(context)
         try {
             val helper = PreviewChannelHelper(context)
-            publishFavorites(context, helper, repo, favorites)
+            // «Избранные» — канал по умолчанию (виден на главном экране сразу); «Популярные» — второй,
+            // его пользователь включает в «Настроить каналы» главного экрана
+            publishRow(context, helper, repo, R.string.home_favorites, favorites, true, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
+            publishRow(context, helper, repo, R.string.home_popular, popular, false, { Prefs.homePopularId }, { Prefs.homePopularId = it })
             publishContinue(context, helper, repo, last)
-            Log.i(TAG, "home screen: избранных ${favorites.size}, продолжить: ${last?.name}")
+            Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.name}")
         } catch (e: Exception) {
             // нет провайдера ТВ или нет права — не ТВ-устройство; на главный экран не публикуем
             Log.w(TAG, "home screen: $e")
@@ -57,9 +60,9 @@ object Home {
     fun remove(context: Context) {
         try {
             val helper = PreviewChannelHelper(context)
-            val id = Prefs.homeChannelId
-            if (id > 0) helper.deletePreviewChannel(id)
+            for (id in listOf(Prefs.homeChannelId, Prefs.homePopularId)) if (id > 0) helper.deletePreviewChannel(id)
             Prefs.homeChannelId = 0
+            Prefs.homePopularId = 0
             Prefs.homeWatchNextId = 0
             context.contentResolver.delete(TvContractCompat.WatchNextPrograms.CONTENT_URI, null, null)
         } catch (e: Exception) {
@@ -74,25 +77,26 @@ object Home {
 
     private fun nowTitle(repo: Repo, ch: Channel) = repo.at(ch, Clock.now())?.title ?: ch.group
 
-    private fun publishFavorites(context: Context, helper: PreviewChannelHelper, repo: Repo, favorites: List<Channel>) {
-        var id = Prefs.homeChannelId
-        if (favorites.isEmpty()) {
+    private fun publishRow(context: Context, helper: PreviewChannelHelper, repo: Repo, title: Int, list: List<Channel>, default: Boolean,
+                           getId: () -> Long, setId: (Long) -> Unit) {
+        var id = getId()
+        if (list.isEmpty()) {
             if (id > 0) helper.deletePreviewChannel(id)
-            Prefs.homeChannelId = 0
+            setId(0)
             return
         }
         if (id <= 0) {
             val channel = PreviewChannel.Builder()
-                .setDisplayName(context.getString(R.string.home_favorites))
+                .setDisplayName(context.getString(title))
                 .setAppLinkIntent(Intent(Intent.ACTION_MAIN).setClassName(context, ACTIVITY))
                 .setLogo(context.getDrawable(R.drawable.icon)!!.toBitmap(160, 160))
                 .build()
-            id = helper.publishDefaultChannel(channel)
-            Prefs.homeChannelId = id
+            id = if (default) helper.publishDefaultChannel(channel) else helper.publishChannel(channel)
+            setId(id)
         }
-        // карточки пересобираются целиком: набор избранного и текущие передачи меняются
+        // карточки пересобираются целиком: набор каналов и текущие передачи меняются
         context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
-        for (ch in favorites.take(MAX_FAVORITES)) {
+        for (ch in list.take(MAX_FAVORITES)) {
             val p = PreviewProgram.Builder()
                 .setChannelId(id)
                 .setType(TvContractCompat.PreviewPrograms.TYPE_CLIP)

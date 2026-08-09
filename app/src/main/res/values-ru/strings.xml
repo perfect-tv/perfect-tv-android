@@ -373,4 +373,5 @@
     <string name="home_favorites">Избранные</string>
     <string name="home_screen">Главный экран Android TV</string>
     <string name="home_screen_sub">избранные каналы и «Продолжить просмотр»</string>
+    <string name="home_popular">Популярные</string>
 </resources>
