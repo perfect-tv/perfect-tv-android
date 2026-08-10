@@ -98,6 +98,10 @@ object Prefs {
     var homeChannelId: Long
         get() = sp.getLong("home_channel_id", 0L)
         set(v) = sp.edit().putLong("home_channel_id", v).apply()
+    /** Версия раскладки рядов: 2 — «Популярные» по умолчанию, «Избранные» по выбору */
+    var homeLayout: Int
+        get() = int("home_layout", 0)
+        set(v) = sp.edit().putInt("home_layout", v).apply()
     var homePopularId: Long
         get() = sp.getLong("home_popular_id", 0L)
         set(v) = sp.edit().putLong("home_popular_id", v).apply()

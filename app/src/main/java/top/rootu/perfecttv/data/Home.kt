@@ -15,7 +15,7 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 
 /**
- * Главный экран Android TV: ряды «Избранные» и «Популярные» (каналы-превью) и «Продолжить
+ * Главный экран Android TV: ряды «Популярные» (по умолчанию) и «Избранные» (каналы-превью) и «Продолжить
  * просмотр» (последний канал). Карточка запускает приложение глубокой ссылкой
  * `perfecttv://channel?p=<плейлист>&k=<ключ канала>` ([link], [parse]). Обновляется, когда
  * приложение уходит с экрана. На устройствах без провайдера ТВ (телефон) ничего не делает.
@@ -44,10 +44,17 @@ object Home {
         if (!Prefs.homeScreen) return remove(context)
         try {
             val helper = PreviewChannelHelper(context)
-            // «Избранные» — канал по умолчанию (виден на главном экране сразу); «Популярные» — второй,
-            // его пользователь включает в «Настроить каналы» главного экрана
-            publishRow(context, helper, repo, R.string.home_favorites, favorites, true, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
-            publishRow(context, helper, repo, R.string.home_popular, popular, false, { Prefs.homePopularId }, { Prefs.homePopularId = it })
+            // раньше по умолчанию был ряд «Избранные»: канал по умолчанию не переназначить — пересоздаём оба
+            if (Prefs.homeLayout < 2) {
+                for (id in listOf(Prefs.homeChannelId, Prefs.homePopularId)) if (id > 0) helper.deletePreviewChannel(id)
+                Prefs.homeChannelId = 0
+                Prefs.homePopularId = 0
+                Prefs.homeLayout = 2
+            }
+            // «Популярные» — канал по умолчанию (виден на главном экране сразу, работает без настройки);
+            // «Избранные» — второй, его пользователь включает в «Настроить каналы» главного экрана
+            publishRow(context, helper, repo, R.string.home_popular, popular, true, { Prefs.homePopularId }, { Prefs.homePopularId = it })
+            publishRow(context, helper, repo, R.string.home_favorites, favorites, false, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
             publishContinue(context, helper, repo, last)
             Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.name}")
         } catch (e: Exception) {
