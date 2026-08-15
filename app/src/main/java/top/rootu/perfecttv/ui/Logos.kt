@@ -49,6 +49,23 @@ object Logos {
             .build()
     }
 
+    /**
+     * Картинка целиком в битмап для фонового потока (баннеры главного экрана): через тот же
+     * загрузчик и дисковый кэш. null — нет адреса, не загрузилась или загрузчик не готов.
+     */
+    fun fetchBlocking(context: Context, url: String, w: Int, h: Int): Bitmap? {
+        if (!::loader.isInitialized || url.isEmpty()) return null
+        return try {
+            kotlinx.coroutines.runBlocking {
+                val r = loader.execute(ImageRequest.Builder(context).data(url).size(w, h).allowHardware(false).build())
+                (r.drawable as? BitmapDrawable)?.bitmap
+            }
+        } catch (e: Exception) { null }
+    }
+
+    /** Цвет плашки монограммы канала (по ключу названия) */
+    fun monoColor(ch: Channel): Int = mono(ch).color
+
     /** Размер кэша логотипов на диске, байт */
     fun cacheSize(): Long = if (::loader.isInitialized) loader.diskCache?.size ?: 0L else 0L
 
@@ -163,7 +180,7 @@ object Logos {
     }
 
     /** Цветная плашка с монограммой названия по центру */
-    private fun drawMonogram(c: Canvas, ch: Channel, l: Float, t: Float, r: Float, b: Float, radius: Float) {
+    fun drawMonogram(c: Canvas, ch: Channel, l: Float, t: Float, r: Float, b: Float, radius: Float) {
         val m = mono(ch)
         U.roundRect(c, l, t, r, b, radius, m.color)
         val h = b - t

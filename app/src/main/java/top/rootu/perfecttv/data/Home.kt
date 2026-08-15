@@ -39,11 +39,17 @@ object Home {
         return (uri.getQueryParameter("p")?.toLongOrNull() ?: 0L) to key
     }
 
+    /** Канал и его передача сейчас (определяется в главном потоке: кэш программы не потокобезопасен) */
+    class Row(val channel: Channel, val programme: Programme?)
+
     /** Обновить ряды; звать из фонового потока. [last] — канал для «Продолжить просмотр» */
-    fun update(context: Context, repo: Repo, favorites: List<Channel>, popular: List<Channel>, last: Channel?) {
+    fun update(context: Context, favorites: List<Row>, popular: List<Row>, last: Row?) {
         if (!Prefs.homeScreen) return remove(context)
         try {
             val helper = PreviewChannelHelper(context)
+            tmdbUntil = System.currentTimeMillis() + TMDB_TOTAL
+            withArt = 0
+            Posters.artFailures = 0
             // раньше по умолчанию был ряд «Избранные»: канал по умолчанию не переназначить — пересоздаём оба
             if (Prefs.homeLayout < 2) {
                 for (id in listOf(Prefs.homeChannelId, Prefs.homePopularId)) if (id > 0) helper.deletePreviewChannel(id)
@@ -53,10 +59,13 @@ object Home {
             }
             // «Популярные» — канал по умолчанию (виден на главном экране сразу, работает без настройки);
             // «Избранные» — второй, его пользователь включает в «Настроить каналы» главного экрана
-            publishRow(context, helper, repo, R.string.home_popular, popular, true, { Prefs.homePopularId }, { Prefs.homePopularId = it })
-            publishRow(context, helper, repo, R.string.home_favorites, favorites, false, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
-            publishContinue(context, helper, repo, last)
-            Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.name}")
+            publishRow(context, helper, R.string.home_popular, popular, true, { Prefs.homePopularId }, { Prefs.homePopularId = it })
+            publishRow(context, helper, R.string.home_favorites, favorites, false, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
+            publishContinue(context, helper, last)
+            Posters.cleanup(context, posters)
+            posters.clear()
+            Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.channel?.name}, баннеров с картинкой передачи: $withArt")
+            withArt = 0
         } catch (e: Exception) {
             // нет провайдера ТВ или нет права — не ТВ-устройство; на главный экран не публикуем
             Log.w(TAG, "home screen: $e")
@@ -77,14 +86,47 @@ object Home {
         }
     }
 
-    private fun poster(context: Context, ch: Channel): Uri {
-        val logo = ch.logo.ifEmpty { ch.epgIcon }
+    /** Имена баннеров, использованных в этом обновлении (остальные файлы удаляются) */
+    private val posters = HashSet<String>()
+
+    /** Сколько ждать TMDB на одну передачу и на всё обновление, мс (картинка — по возможности) */
+    private const val TMDB_WAIT = 4000L
+    private const val TMDB_TOTAL = 30_000L
+    private var tmdbUntil = 0L
+
+    /** Картинка передачи: TMDB (если включён и успел ответить), иначе EPG; пусто — рисуем без неё */
+    private fun artUrl(p: Programme?): String {
+        if (p == null) return ""
+        var url = p.icon
+        if (Prefs.tmdbKey.isNotBlank() && System.currentTimeMillis() < tmdbUntil) {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var found = ""
+            top.rootu.perfecttv.core.Tmdb.find(p.title, p.desc) { r ->
+                if (r != null) found = r.backdrop.ifEmpty { r.poster }
+                latch.countDown()
+            }
+            latch.await(TMDB_WAIT, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (found.isNotEmpty()) url = found
+        }
+        if (url.isNotEmpty()) withArt++
+        return url
+    }
+
+    private var withArt = 0
+
+    /** Баннер карточки: свой (логотип + картинка передачи) или, если не вышло, логотип как есть */
+    private fun poster(context: Context, row: Row): Uri {
+        Posters.make(context, row.channel, row.programme, artUrl(row.programme))?.let {
+            posters.add(it.name)
+            return it.uri
+        }
+        val logo = row.channel.logoUrl()
         return if (logo.startsWith("http")) Uri.parse(logo) else Uri.parse("android.resource://" + context.packageName + "/" + R.drawable.banner)
     }
 
-    private fun nowTitle(repo: Repo, ch: Channel) = repo.at(ch, Clock.now())?.title ?: ch.group
+    private fun nowTitle(row: Row) = row.programme?.title ?: row.channel.group
 
-    private fun publishRow(context: Context, helper: PreviewChannelHelper, repo: Repo, title: Int, list: List<Channel>, default: Boolean,
+    private fun publishRow(context: Context, helper: PreviewChannelHelper, title: Int, list: List<Row>, default: Boolean,
                            getId: () -> Long, setId: (Long) -> Unit) {
         var id = getId()
         if (list.isEmpty()) {
@@ -103,14 +145,15 @@ object Home {
         }
         // карточки пересобираются целиком: набор каналов и текущие передачи меняются
         context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
-        for (ch in list.take(MAX_FAVORITES)) {
+        for (row in list.take(MAX_FAVORITES)) {
+            val ch = row.channel
             val p = PreviewProgram.Builder()
                 .setChannelId(id)
                 .setType(TvContractCompat.PreviewPrograms.TYPE_CLIP)
                 .setLive(true)
                 .setTitle(ch.name)
-                .setDescription(nowTitle(repo, ch))
-                .setPosterArtUri(poster(context, ch))
+                .setDescription(nowTitle(row))
+                .setPosterArtUri(poster(context, row))
                 .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
                 .setIntent(link(context, ch))
                 .build()
@@ -118,7 +161,7 @@ object Home {
         }
     }
 
-    private fun publishContinue(context: Context, helper: PreviewChannelHelper, repo: Repo, last: Channel?) {
+    private fun publishContinue(context: Context, helper: PreviewChannelHelper, last: Row?) {
         val old = Prefs.homeWatchNextId
         if (old > 0) {
             try { context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(old), null, null) } catch (e: Exception) { Log.w(TAG, "watch next delete: $e") }
@@ -130,11 +173,11 @@ object Home {
             .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
             .setLastEngagementTimeUtcMillis(Clock.now() * 1000)
             .setLive(true)
-            .setTitle(last.name)
-            .setDescription(nowTitle(repo, last))
+            .setTitle(last.channel.name)
+            .setDescription(nowTitle(last))
             .setPosterArtUri(poster(context, last))
             .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
-            .setIntent(link(context, last))
+            .setIntent(link(context, last.channel))
             .build()
         Prefs.homeWatchNextId = helper.publishWatchNextProgram(p)
     }

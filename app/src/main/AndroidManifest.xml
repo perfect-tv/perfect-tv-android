@@ -65,6 +65,12 @@
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- баннеры карточек главного экрана: файлы из cacheDir/posters, читает лаунчер -->
+        <provider
+            android:name=".data.Posters$Provider"
+            android:authorities="top.rootu.perfecttv.posters"
+            android:exported="true" />
+
         <receiver android:name=".core.Alarms$Receiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

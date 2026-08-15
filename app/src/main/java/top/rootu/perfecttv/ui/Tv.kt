@@ -1276,10 +1276,13 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val last = state.channel
         // скрытые и заблокированные каналы на главный экран не выносим — он виден всем в комнате
         fun open(l: List<Channel>) = l.filter { !cat.isHidden(it) && !cat.isLocked(it) }
-        val favs = open(cat.favGroup.channels)
-        val popular = open(cat.popular())
+        val now = Clock.now()
+        fun rows(l: List<Channel>) = open(l).map { top.rootu.perfecttv.data.Home.Row(it, repo.at(it, now)) }
+        val favs = rows(cat.favGroup.channels)
+        val popular = rows(cat.popular())
+        val lastRow = last?.let { rows(listOf(it)).firstOrNull() }
         val ctx = activity.applicationContext
-        Thread { top.rootu.perfecttv.data.Home.update(ctx, repo, favs, popular, last?.takeIf { open(listOf(it)).isNotEmpty() }) }.start()
+        Thread { top.rootu.perfecttv.data.Home.update(ctx, favs, popular, lastRow) }.start()
     }
 
     fun openHelp() {
