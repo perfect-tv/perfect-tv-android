@@ -114,14 +114,11 @@ object Home {
 
     private var withArt = 0
 
-    /** Баннер карточки: свой (логотип + картинка передачи) или, если не вышло, логотип как есть */
+    /** Баннер карточки: свой; не вышло — баннер приложения */
     private fun poster(context: Context, row: Row): Uri {
-        Posters.make(context, row.channel, row.programme, artUrl(row.programme))?.let {
-            posters.add(it.name)
-            return it.uri
-        }
-        val logo = row.channel.logoUrl()
-        return if (logo.startsWith("http")) Uri.parse(logo) else Uri.parse("android.resource://" + context.packageName + "/" + R.drawable.banner)
+        val made = Posters.make(context, row.channel, row.programme, artUrl(row.programme)) ?: Posters.appBanner(context)
+        made?.let { posters.add(it.name); return it.uri }
+        return Uri.parse("android.resource://" + context.packageName + "/" + R.drawable.banner)
     }
 
     private fun nowTitle(row: Row) = row.programme?.title ?: row.channel.group

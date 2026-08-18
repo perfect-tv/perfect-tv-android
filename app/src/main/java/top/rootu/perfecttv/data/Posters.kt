@@ -13,27 +13,28 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import top.rootu.perfecttv.R
 import top.rootu.perfecttv.ui.Logos
 import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Баннеры карточек главного экрана (16:9, [W] × [H]): логотипы бывают квадратными, круглыми
- * и вытянутыми, поэтому карточка рисуется самими — не отдаётся как есть.
- *
+ * Баннеры карточек главного экрана (16:9, [W] × [H]). Логотипы бывают квадратными, круглыми
+ * и вытянутыми, поэтому карточка рисуется самими — не отдаётся как есть:
  *  - есть картинка передачи (TMDB или EPG): она на весь баннер, снизу затемнение, логотип канала —
- *    на тёмной плашке в левом нижнем углу;
- *  - картинки нет: фон в цвет канала (тот же тон, что у монограммы в приложении), логотип — крупно
- *    по центру на плашке.
- * Плашка подстраивается под логотип: квадратный или круглый — квадратная, широкий — шире (до 2,4 : 1).
- * Логотипа нет — монограмма названия. Файлы лежат в cacheDir/posters и отдаются лаунчеру
- * через [Provider]; имя файла зависит от канала и передачи, готовый файл не рисуется заново.
+ *    в прямоугольнике (как логотипы в программе) в левом нижнем углу;
+ *  - картинки нет: логотип канала на сером фоне (как баннер «О передаче» в плеере);
+ *  - логотипа у канала нет (или он не загрузился): баннер самого приложения.
+ * Файлы лежат в cacheDir/posters и отдаются лаунчеру через [Provider]; имя файла зависит от канала
+ * и передачи, готовый файл не рисуется заново.
  */
 object Posters {
     const val AUTHORITY = "top.rootu.perfecttv.posters"
     const val W = 800
     const val H = 450
-    private const val MAX_ASPECT = 2.4f
+    /** Прямоугольник логотипа, ширина к высоте (как подложка логотипа в инфопанели: 96 × 66) */
+    private const val LOGO_ASPECT = 1.45f
+    private val GRAY = Color.rgb(42, 44, 47)
 
     fun dir(context: Context) = File(context.cacheDir, "posters").also { it.mkdirs() }
 
@@ -63,6 +64,9 @@ object Posters {
         val withArt = File(dir(context), fileName(ch, p, true))
         if (withArt.length() > 0) return Made(uri(withArt.name), withArt.name)
         return try {
+            val logo = if (ch.logoUrl().isNotEmpty()) Logos.fetchBlocking(context, ch.logoUrl(), 400, 250) else null
+            // нет логотипа — баннер приложения (и картинку передачи не ищем: без логотипа канал не узнать)
+            if (logo == null) return appBanner(context)
             var art: Bitmap? = null
             if (imageUrl.isNotEmpty() && artFailures < 3) {
                 art = Logos.fetchBlocking(context, imageUrl, W, H)
@@ -70,59 +74,62 @@ object Posters {
             }
             val file = if (art != null) withArt else File(dir(context), fileName(ch, p, false))
             if (art == null && file.length() > 0) return Made(uri(file.name), file.name)
-            val logo = if (ch.logoUrl().isNotEmpty()) Logos.fetchBlocking(context, ch.logoUrl(), 400, 250) else null
-            val bm = render(ch, art, logo)
-            val tmp = File(file.parentFile, "${file.name}.tmp")
-            FileOutputStream(tmp).use { bm.compress(Bitmap.CompressFormat.JPEG, 88, it) }
-            bm.recycle()
-            if (!tmp.renameTo(file)) return null
-            Made(uri(file.name), file.name)
+            save(file, render(art, logo))
         } catch (e: Exception) {
             android.util.Log.w("IPTV", "poster ${ch.name}: $e")
             null
         }
     }
 
+    private const val APP_BANNER = "app.jpg"
+
+    /** Баннер приложения (banner.xml) в размер карточки — для каналов без логотипа */
+    fun appBanner(context: Context): Made? {
+        val file = File(dir(context), APP_BANNER)
+        if (file.length() > 0) return Made(uri(APP_BANNER), APP_BANNER)
+        val d = context.getDrawable(R.drawable.banner) ?: return null
+        val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, W, H)
+        d.draw(Canvas(bm))
+        return save(file, bm)
+    }
+
+    private fun save(file: File, bm: Bitmap): Made? {
+        val tmp = File(file.parentFile, "${file.name}.tmp")
+        FileOutputStream(tmp).use { bm.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+        bm.recycle()
+        return if (tmp.renameTo(file)) Made(uri(file.name), file.name) else null
+    }
+
     private val plate = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pic = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val hsv = FloatArray(3)
 
     /** Баннер целиком (отдельная функция — чтобы рисование не зависело от сети) */
-    fun render(ch: Channel, art: Bitmap?, logo: Bitmap?): Bitmap {
+    fun render(art: Bitmap?, logo: Bitmap): Bitmap {
         val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(bm)
-        val hasArt = art != null
-        if (art != null) {
-            // картинка — по центру, с обрезкой под 16:9
-            val s = maxOf(W.toFloat() / art.width, H.toFloat() / art.height)
-            val w = art.width * s
-            val h = art.height * s
-            c.drawBitmap(art, null, RectF((W - w) / 2, (H - h) / 2, (W + w) / 2, (H + h) / 2), pic)
-            plate.shader = LinearGradient(0f, H * 0.4f, 0f, H.toFloat(), 0x00000000, 0xD90B0C0E.toInt(), Shader.TileMode.CLAMP)
-            c.drawRect(0f, 0f, W.toFloat(), H.toFloat(), plate)
-            plate.shader = null
-        } else {
-            // фон — тон канала, темнее к низу
-            Color.colorToHSV(Logos.monoColor(ch), hsv)
-            val top = Color.HSVToColor(floatArrayOf(hsv[0], 0.45f, 0.36f))
-            val bottom = Color.HSVToColor(floatArrayOf(hsv[0], 0.40f, 0.17f))
-            plate.shader = LinearGradient(0f, 0f, 0f, H.toFloat(), top, bottom, Shader.TileMode.CLAMP)
-            c.drawRect(0f, 0f, W.toFloat(), H.toFloat(), plate)
-            plate.shader = null
-        }
-        // плашка логотипа
-        val ph = if (hasArt) H * 0.25f else H * 0.56f
-        val aspect = if (logo != null) (logo.width.toFloat() / logo.height).coerceIn(1f, MAX_ASPECT) else 1.6f
-        val pw = ph * aspect
-        val margin = H * 0.06f
-        val l = if (hasArt) margin else (W - pw) / 2
-        val t = if (hasArt) H - margin - ph else (H - ph) / 2
-        val radius = ph * 0.2f
-        if (logo == null) {
-            Logos.drawMonogram(c, ch, l, t, l + pw, t + ph, radius)
+        if (art == null) {
+            // серый фон и логотип на нём — как «О передаче» в плеере
+            c.drawColor(GRAY)
+            drawLogo(c, logo, 0f, 0f, W.toFloat(), H.toFloat(), H * 0.14f)
             return bm
         }
-        plate.color = Color.argb(if (hasArt) 235 else 215, 30, 32, 34)
+        // картинка — по центру, с обрезкой под 16:9
+        val s = maxOf(W.toFloat() / art.width, H.toFloat() / art.height)
+        val w = art.width * s
+        val h = art.height * s
+        c.drawBitmap(art, null, RectF((W - w) / 2, (H - h) / 2, (W + w) / 2, (H + h) / 2), pic)
+        plate.shader = LinearGradient(0f, H * 0.4f, 0f, H.toFloat(), 0x00000000, 0xD90B0C0E.toInt(), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, W.toFloat(), H.toFloat(), plate)
+        plate.shader = null
+        // логотип — в прямоугольнике, как в программе
+        val ph = H * 0.26f
+        val pw = ph * LOGO_ASPECT
+        val margin = H * 0.06f
+        val l = margin
+        val t = H - margin - ph
+        val radius = ph * 0.14f
+        plate.color = Color.argb(235, 30, 32, 34)
         c.drawRoundRect(l, t, l + pw, t + ph, radius, radius, plate)
         // тонкая светлая кайма: на тёмной картинке плашка не сливается с ней
         plate.style = Paint.Style.STROKE
@@ -130,12 +137,16 @@ object Posters {
         plate.color = Color.argb(46, 255, 255, 255)
         c.drawRoundRect(l, t, l + pw, t + ph, radius, radius, plate)
         plate.style = Paint.Style.FILL
-        val pad = ph * 0.13f
-        val s = minOf((pw - 2 * pad) / logo.width, (ph - 2 * pad) / logo.height)
+        drawLogo(c, logo, l, t, l + pw, t + ph, ph * 0.14f)
+        return bm
+    }
+
+    /** Логотип по центру прямоугольника, вписанный с отступом [pad] */
+    private fun drawLogo(c: Canvas, logo: Bitmap, l: Float, t: Float, r: Float, b: Float, pad: Float) {
+        val s = minOf((r - l - 2 * pad) / logo.width, (b - t - 2 * pad) / logo.height)
         val w = logo.width * s
         val h = logo.height * s
-        c.drawBitmap(logo, null, RectF(l + (pw - w) / 2, t + (ph - h) / 2, l + (pw + w) / 2, t + (ph + h) / 2), pic)
-        return bm
+        c.drawBitmap(logo, null, RectF((l + r - w) / 2, (t + b - h) / 2, (l + r + w) / 2, (t + b + h) / 2), pic)
     }
 
     /** Отдаёт лаунчеру файлы баннеров (только чтение, только свой каталог) */

@@ -63,9 +63,6 @@ object Logos {
         } catch (e: Exception) { null }
     }
 
-    /** Цвет плашки монограммы канала (по ключу названия) */
-    fun monoColor(ch: Channel): Int = mono(ch).color
-
     /** Размер кэша логотипов на диске, байт */
     fun cacheSize(): Long = if (::loader.isInitialized) loader.diskCache?.size ?: 0L else 0L
 
