@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import androidx.core.graphics.drawable.toBitmap
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.ui.Logos
 import java.io.File
@@ -24,7 +25,8 @@ import java.io.FileOutputStream
  *  - есть картинка передачи (TMDB или EPG): она на весь баннер, снизу затемнение, логотип канала —
  *    в прямоугольнике (как логотипы в программе) в левом нижнем углу;
  *  - картинки нет: логотип канала на сером фоне (как баннер «О передаче» в плеере);
- *  - логотипа у канала нет (или он не загрузился): баннер самого приложения.
+ *  - логотипа у канала нет (или он не загрузился): на картинке передачи — значок приложения вместо
+ *    логотипа (в той же рамке), без картинки — баннер самого приложения.
  * Файлы лежат в cacheDir/posters и отдаются лаунчеру через [Provider]; имя файла зависит от канала
  * и передачи, готовый файл не рисуется заново.
  */
@@ -65,13 +67,16 @@ object Posters {
         if (withArt.length() > 0) return Made(uri(withArt.name), withArt.name)
         return try {
             val logo = if (ch.logoUrl().isNotEmpty()) Logos.fetchBlocking(context, ch.logoUrl(), 400, 250) else null
-            // нет логотипа — баннер приложения (и картинку передачи не ищем: без логотипа канал не узнать)
-            if (logo == null) return appBanner(context)
-            var art: Bitmap? = null
-            if (imageUrl.isNotEmpty() && artFailures < 3) {
-                art = Logos.fetchBlocking(context, imageUrl, W, H)
-                if (art == null) artFailures++ else artFailures = 0
+            if (logo == null) {
+                // нет логотипа: на картинке передачи — значок приложения вместо него (в той же рамке),
+                // без картинки — баннер приложения
+                val withIcon = File(dir(context), fileName(ch, p, true).replace("a.jpg", "i.jpg"))
+                if (withIcon.length() > 0) return Made(uri(withIcon.name), withIcon.name)
+                val art = fetchArt(context, imageUrl) ?: return appBanner(context)
+                val icon = context.getDrawable(R.drawable.icon)!!.toBitmap(256, 256)
+                return save(withIcon, render(art, icon))
             }
+            val art = fetchArt(context, imageUrl)
             val file = if (art != null) withArt else File(dir(context), fileName(ch, p, false))
             if (art == null && file.length() > 0) return Made(uri(file.name), file.name)
             save(file, render(art, logo))
@@ -79,6 +84,14 @@ object Posters {
             android.util.Log.w("IPTV", "poster ${ch.name}: $e")
             null
         }
+    }
+
+    /** Картинка передачи или null (адреса нет, не загрузилась или уже три неудачи подряд) */
+    private fun fetchArt(context: Context, url: String): Bitmap? {
+        if (url.isEmpty() || artFailures >= 3) return null
+        val art = Logos.fetchBlocking(context, url, W, H)
+        if (art == null) artFailures++ else artFailures = 0
+        return art
     }
 
     private const val APP_BANNER = "app.jpg"
