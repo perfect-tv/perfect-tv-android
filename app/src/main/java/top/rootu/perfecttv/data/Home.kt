@@ -81,6 +81,7 @@ object Home {
             Prefs.homePopularId = 0
             Prefs.homeWatchNextId = 0
             context.contentResolver.delete(TvContractCompat.WatchNextPrograms.CONTENT_URI, null, null)
+            Posters.clear(context)   // карточек нет — баннеры не нужны
         } catch (e: Exception) {
             Log.w(TAG, "home screen remove: $e")
         }

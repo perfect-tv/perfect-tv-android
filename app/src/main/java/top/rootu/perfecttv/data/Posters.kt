@@ -46,6 +46,14 @@ object Posters {
     private fun fileName(ch: Channel, p: Programme?, art: Boolean) =
         "${ch.playlistId}_${Math.abs(ch.key.hashCode())}_${p?.start ?: 0}${if (art) "a" else "n"}.jpg"
 
+    /** Все баннеры удалить (настройка главного экрана выключена, очистка кэша): при следующем обновлении нарисуются заново */
+    fun clear(context: Context) {
+        dir(context).deleteRecursively()
+    }
+
+    /** Размер баннеров на диске, байт */
+    fun size(context: Context): Long = dir(context).listFiles()?.sumOf { it.length() } ?: 0L
+
     /** Готовый баннер: адрес для лаунчера и имя файла (для [cleanup]) */
     class Made(val uri: Uri, val name: String)
 

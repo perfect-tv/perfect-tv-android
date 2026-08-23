@@ -192,9 +192,9 @@
     <string name="rows_like_google">Ряды (как Google)</string>
     <string name="keypad">Клавиатура</string>
     <string name="all_channels">Все каналы</string>
-    <string name="logo_cache">Кэш логотипов каналов</string>
+    <string name="logo_cache">Кэш логотипов и баннеров</string>
     <string name="logo_cache_sub">хранится на устройстве, показывается без сети; OK — очистить</string>
-    <string name="logo_cache_cleared">Кэш логотипов очищен</string>
+    <string name="logo_cache_cleared">Кэш логотипов и баннеров очищен</string>
     <string name="size_kb">%1$d КБ</string>
     <string name="size_mb">%1$s МБ</string>
     <string name="press_back_again_to_leave_locked">Нажмите «Назад» ещё раз — к последнему открытому каналу</string>

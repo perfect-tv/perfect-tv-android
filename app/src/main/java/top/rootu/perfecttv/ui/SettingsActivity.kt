@@ -324,8 +324,9 @@ class SettingsActivity : Activity() {
     private fun sectionData(col: LinearLayout): View? {
         val first = item(col, str(R.string.backup_save), "", str(R.string.backup_save_sub)) { backupSave() }
         item(col, str(R.string.backup_restore), "", str(R.string.backup_restore_sub)) { backupOpen() }
-        item(col, str(R.string.logo_cache), Fmt.size(Logos.cacheSize()), str(R.string.logo_cache_sub)) {
+        item(col, str(R.string.logo_cache), Fmt.size(Logos.cacheSize() + top.rootu.perfecttv.data.Posters.size(this)), str(R.string.logo_cache_sub)) {
             Logos.clearCache()
+            top.rootu.perfecttv.data.Posters.clear(this)   // баннеры главного экрана — тоже кэш, нарисуются заново
             android.widget.Toast.makeText(this, str(R.string.logo_cache_cleared), android.widget.Toast.LENGTH_SHORT).show()
             showMain()
         }

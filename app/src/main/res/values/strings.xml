@@ -196,9 +196,9 @@
     <string name="rows_like_google">Rows (like Google)</string>
     <string name="keypad">Keypad</string>
     <string name="all_channels">All channels</string>
-    <string name="logo_cache">Channel logo cache</string>
+    <string name="logo_cache">Logo and banner cache</string>
     <string name="logo_cache_sub">kept on the device, shown without network; OK — clear</string>
-    <string name="logo_cache_cleared">Logo cache cleared</string>
+    <string name="logo_cache_cleared">Logo and banner cache cleared</string>
     <string name="size_kb">%1$d KB</string>
     <string name="size_mb">%1$s MB</string>
     <string name="press_back_again_to_leave_locked">Press Back again to return to the last unlocked channel</string>
