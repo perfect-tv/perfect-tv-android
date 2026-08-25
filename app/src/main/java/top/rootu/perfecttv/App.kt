@@ -13,6 +13,8 @@ class App : Application() {
         Net.init(this)
         repo = Repo(this)
         top.rootu.perfecttv.ui.Logos.init(this)
+        // баннеры карточек главного экрана, которые давно не публиковались, больше не нужны
+        Thread { top.rootu.perfecttv.data.Posters.expire(this) }.start()
     }
 
     companion object {

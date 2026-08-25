@@ -63,6 +63,7 @@ object Home {
             publishRow(context, helper, R.string.home_favorites, favorites, false, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
             publishContinue(context, helper, last)
             Posters.cleanup(context, posters)
+            Posters.expire(context)
             posters.clear()
             Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.channel?.name}, баннеров с картинкой передачи: $withArt")
             withArt = 0

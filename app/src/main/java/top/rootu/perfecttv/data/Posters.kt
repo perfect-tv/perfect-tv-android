@@ -46,6 +46,23 @@ object Posters {
     private fun fileName(ch: Channel, p: Programme?, art: Boolean) =
         "${ch.playlistId}_${Math.abs(ch.key.hashCode())}_${p?.start ?: 0}${if (art) "a" else "n"}.jpg"
 
+    /** Сколько живёт баннер после последней публикации: карточки обновляются при каждом уходе из приложения, дольше они лаунчеру не нужны */
+    private const val TTL_MS = 24 * 3600_000L
+
+    /**
+     * Удалить баннеры, которые не публиковались дольше [TTL_MS]. Зовётся при старте процесса
+     * (в том числе когда лаунчер сам поднял провайдер) и при каждом обновлении главного экрана;
+     * опубликованный заново баннер «обновляет» файл ([touch]).
+     */
+    fun expire(context: Context) {
+        val limit = System.currentTimeMillis() - TTL_MS
+        dir(context).listFiles()?.forEach { if (it.lastModified() < limit) it.delete() }
+    }
+
+    private fun touch(file: File) {
+        file.setLastModified(System.currentTimeMillis())
+    }
+
     /** Все баннеры удалить (настройка главного экрана выключена, очистка кэша): при следующем обновлении нарисуются заново */
     fun clear(context: Context) {
         dir(context).deleteRecursively()
@@ -72,21 +89,21 @@ object Posters {
      */
     fun make(context: Context, ch: Channel, p: Programme?, imageUrl: String): Made? {
         val withArt = File(dir(context), fileName(ch, p, true))
-        if (withArt.length() > 0) return Made(uri(withArt.name), withArt.name)
+        if (withArt.length() > 0) { touch(withArt); return Made(uri(withArt.name), withArt.name) }
         return try {
             val logo = if (ch.logoUrl().isNotEmpty()) Logos.fetchBlocking(context, ch.logoUrl(), 400, 250) else null
             if (logo == null) {
                 // нет логотипа: на картинке передачи — значок приложения вместо него (в той же рамке),
                 // без картинки — баннер приложения
                 val withIcon = File(dir(context), fileName(ch, p, true).replace("a.jpg", "i.jpg"))
-                if (withIcon.length() > 0) return Made(uri(withIcon.name), withIcon.name)
+                if (withIcon.length() > 0) { touch(withIcon); return Made(uri(withIcon.name), withIcon.name) }
                 val art = fetchArt(context, imageUrl) ?: return appBanner(context)
                 val icon = context.getDrawable(R.drawable.icon)!!.toBitmap(256, 256)
                 return save(withIcon, render(art, icon))
             }
             val art = fetchArt(context, imageUrl)
             val file = if (art != null) withArt else File(dir(context), fileName(ch, p, false))
-            if (art == null && file.length() > 0) return Made(uri(file.name), file.name)
+            if (art == null && file.length() > 0) { touch(file); return Made(uri(file.name), file.name) }
             save(file, render(art, logo))
         } catch (e: Exception) {
             android.util.Log.w("IPTV", "poster ${ch.name}: $e")
@@ -107,7 +124,7 @@ object Posters {
     /** Баннер приложения (banner.xml) в размер карточки — для каналов без логотипа */
     fun appBanner(context: Context): Made? {
         val file = File(dir(context), APP_BANNER)
-        if (file.length() > 0) return Made(uri(APP_BANNER), APP_BANNER)
+        if (file.length() > 0) { touch(file); return Made(uri(APP_BANNER), APP_BANNER) }
         val d = context.getDrawable(R.drawable.banner) ?: return null
         val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         d.setBounds(0, 0, W, H)
