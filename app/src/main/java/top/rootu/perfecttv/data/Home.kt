@@ -62,9 +62,7 @@ object Home {
             publishRow(context, helper, R.string.home_popular, popular, true, { Prefs.homePopularId }, { Prefs.homePopularId = it })
             publishRow(context, helper, R.string.home_favorites, favorites, false, { Prefs.homeChannelId }, { Prefs.homeChannelId = it })
             publishContinue(context, helper, last)
-            Posters.cleanup(context, posters)
             Posters.expire(context)
-            posters.clear()
             Log.i(TAG, "home screen: избранных ${favorites.size}, популярных ${popular.size}, продолжить: ${last?.channel?.name}, баннеров с картинкой передачи: $withArt")
             withArt = 0
         } catch (e: Exception) {
@@ -87,9 +85,6 @@ object Home {
             Log.w(TAG, "home screen remove: $e")
         }
     }
-
-    /** Имена баннеров, использованных в этом обновлении (остальные файлы удаляются) */
-    private val posters = HashSet<String>()
 
     /** Сколько ждать TMDB на одну передачу и на всё обновление, мс (картинка — по возможности) */
     private const val TMDB_WAIT = 4000L
@@ -119,7 +114,7 @@ object Home {
     /** Баннер карточки: свой; не вышло — баннер приложения */
     private fun poster(context: Context, row: Row): Uri {
         val made = Posters.make(context, row.channel, row.programme, artUrl(row.programme)) ?: Posters.appBanner(context)
-        made?.let { posters.add(it.name); return it.uri }
+        made?.let { return it.uri }
         return Uri.parse("android.resource://" + context.packageName + "/" + R.drawable.banner)
     }
 
