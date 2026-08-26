@@ -49,15 +49,28 @@ object Posters {
     /** Сколько живёт баннер после последней публикации: карточки обновляются при каждом уходе из приложения, дольше они лаунчеру не нужны */
     private const val TTL_MS = 24 * 3600_000L
 
+    /** Предел размера баннеров на диске: сверх него удаляются самые старые (баннер — 10–60 КБ) */
+    private const val MAX_BYTES = 10L * 1024 * 1024
+
     /**
-     * Удалить баннеры, которые не публиковались дольше [TTL_MS] — единственное правило очистки
-     * (по набору текущих карточек не удаляем: лаунчер может ещё показывать прежние). Зовётся при старте процесса
+     * Удалить баннеры, которые не публиковались дольше [TTL_MS], а если остальные занимают больше
+     * [MAX_BYTES] — самые старые из них (по набору текущих карточек не удаляем: лаунчер может ещё
+     * показывать прежние). Зовётся при старте процесса
      * (в том числе когда лаунчер сам поднял провайдер) и при каждом обновлении главного экрана;
      * опубликованный заново баннер «обновляет» файл ([touch]).
      */
     fun expire(context: Context) {
         val limit = System.currentTimeMillis() - TTL_MS
-        dir(context).listFiles()?.forEach { if (it.lastModified() < limit) it.delete() }
+        val left = ArrayList<File>()
+        dir(context).listFiles()?.forEach { if (it.lastModified() < limit) it.delete() else left.add(it) }
+        // и предел размера: больше — удаляем самые старые, пока не уложимся
+        var total = left.sumOf { it.length() }
+        if (total <= MAX_BYTES) return
+        for (f in left.sortedBy { it.lastModified() }) {
+            if (total <= MAX_BYTES) break
+            total -= f.length()
+            f.delete()
+        }
     }
 
     private fun touch(file: File) {
