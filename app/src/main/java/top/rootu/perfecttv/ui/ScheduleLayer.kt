@@ -144,7 +144,12 @@ class ScheduleLayer(
         index = i
         // у напоминаний счётчик уже стоит на кнопке вида — справа в шапке его не повторять
         subView?.text = if (pills.isNotEmpty() && content.channel == null) "" else content.sub()
-        list.scrollToFocus(true)
+        // обновление приходит и в фоне (загрузка программы, напоминания): при выборе даты список должен
+        // остаться на выбранном дне, а не уехать к строке, с которой ушли на даты
+        if (zone == Zone.TABS && tabs.isNotEmpty()) {
+            tabIndex = tabIndex.coerceIn(0, tabs.size - 1)
+            scrollToTab(tabIndex, true)
+        } else list.scrollToFocus(true)
         list.invalidate()
     }
 
@@ -199,12 +204,19 @@ class ScheduleLayer(
         val k = (tabIndex + dir).coerceIn(0, tabs.size - 1)
         if (k == tabIndex) return
         tabIndex = k
-        // прокрутить к передаче, на которую перейдёт фокус (она в рамке); если это первая
-        // передача дня — к заголовку дня, чтобы был виден и он
-        val t = dayTarget(tabs[k].day)
-        val sep = rows.indexOfFirst { it.separator && it.day == tabs[k].day }
-        if (t >= 0 && rows[t].playing) list.scrollToRow(t, false) else if (sep >= 0) list.scrollToRow(sep, false)
+        scrollToTab(k, false)
         list.invalidate()
+    }
+
+    /**
+     * Прокрутить к выбранной дате: к передаче, на которую перейдёт фокус (она в рамке), а если это
+     * первая передача дня — к заголовку дня, чтобы был виден и он
+     */
+    private fun scrollToTab(k: Int, jump: Boolean) {
+        val day = tabs.getOrNull(k)?.day ?: return
+        val t = dayTarget(day)
+        val sep = rows.indexOfFirst { it.separator && it.day == day }
+        if (t >= 0 && rows[t].playing) list.scrollToRow(t, jump) else if (sep >= 0) list.scrollToRow(sep, jump)
     }
 
     private fun switchView(k: Int) {
