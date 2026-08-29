@@ -346,6 +346,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             if (name == "digit") return digit(digit)
             if (long && name == "down") return openHistory()
             if (long && name == "up") return openReminders(state.channel)
+            // в архиве (и на паузе эфира у канала с архивом) ←/→ мотают, а не листают каналы — панель при
+            // этом скрыта или показана, значения не имеет
             val seekable = state.archive != null && state.channel?.hasArchive == true
             when (name) {
                 "left" -> if (seekable) seekStep(-1) else switchRelative(-1)
@@ -353,22 +355,27 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 "pgup" -> switchRelative(1)
                 "pgdown" -> switchRelative(-1)
                 "up" -> {
-                    // закреплённая инфопанель закрывается ↑, иначе — программа/архив или история
+                    // показанная инфопанель — закреплённая она или сама скроется по таймеру — закрывается ↑,
+                    // иначе — программа/архив или история
                     if (info.visible && info.more) return info.collapse()
-                    if (info.visible && info.sticky) return info.hide()
+                    if (info.visible) return info.hide()
                     if (Prefs.upArchive) state.channel?.let { openSchedule(it, 0) } ?: openGuide() else openHistory()
                 }
                 "down" -> {
-                    if (!info.visible || !info.sticky) showInfo(true)
-                    else if (!info.more) expandInfo()
+                    // панель уже на экране (в том числе показанная по таймеру после смены канала) —
+                    // закрепить её (автоскрытие отменяется) и развернуть описание; скрытая — только закрепить
+                    val shown = info.visible
+                    if (!info.sticky) showInfo(true)
+                    if (shown && !info.more) expandInfo()
                 }
             }
         }
 
         override fun enter() {
             if (numBuf.isNotEmpty()) return applyNumber()
-            // при закреплённой (↓) инфопанели OK — пауза/продолжить
-            if (info.visible && info.sticky) return togglePause()
+            // при показанной инфопанели OK — пауза/продолжить (при перемотке — применить её сразу)
+            if (seek != null) return applySeek()
+            if (info.visible) return togglePause()
             openGuide()
         }
 
@@ -701,7 +708,11 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     /** Архив догнал эфир — считаем, что смотрим эфир */
     private fun checkArchiveLive() {
         val a = state.archive ?: return
-        if (a.base != null && seek == null && position() >= Clock.now() - 3) state.archive = null
+        if (a.base != null && seek == null && position() >= Clock.now() - 3) {
+            // позиция «догнала» эфир — архив считается законченным и ←/→ снова листают каналы
+            Log.i(TAG, "archive: position caught up with live, back to live (base=${a.base}, position=${position()}, now=${Clock.now()})")
+            state.archive = null
+        }
     }
 
     /** pos — позиция плеера, shown — показанное время (с) на момент at */
