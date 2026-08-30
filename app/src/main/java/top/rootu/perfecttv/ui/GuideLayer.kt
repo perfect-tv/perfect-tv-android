@@ -19,6 +19,7 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Catalog
 import top.rootu.perfecttv.data.Channel
+import top.rootu.perfecttv.data.Programme
 
 /**
  * ТВ-гид: список каналов и сетка программы (вид «ТВ-гид») или текущая передача и «далее»
@@ -45,7 +46,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     private var focusTime = 0L
     private var live = true
 
-    private enum class Zone { CATS, CHANNELS, GRID }
+    private enum class Zone { CATS, CHANNELS, GRID, PROGRAMS, DATES }
 
     // колонка категорий: куда вернуться по «Назад» (отмена выбора)
     private var catsFromGroup = 0
@@ -54,6 +55,145 @@ class GuideLayer(private val tv: Tv) : Layer {
     private val group get() = groups.getOrNull(groupIndex)
     private val channels get() = group?.channels ?: emptyList()
     private val focused get() = channels.getOrNull(index)
+
+    /** Описание в гиде (настройка): только в виде «Список» */
+    private val descOn get() = Prefs.guideDesc && !grid
+
+    // ---------------------------------------------------------- вид «Список»: программа канала в фокусе
+    // три колонки: каналы · программа (идущая — со шкалой) · компактные даты; фокус ходит по ←/→
+
+    private var plCh: Channel? = null          // канал, для которого собраны передачи
+    private var plLast: Channel? = null        // тот же канал до обновления программы (сохранить фокус)
+    private var plRows: List<Programme> = emptyList()
+    private var plIndex = 0
+    private var plKeep = -1L                   // начало передачи в фокусе на момент обновления программы
+    private var plJump = true                  // канал сменился — прокрутка без анимации
+    private var plDays: List<Long> = emptyList()
+    private var plDayLabels: List<Pair<String, String>> = emptyList()
+    private var dateIndex = 0
+
+    private fun dayOf(i: Int) = Fmt.dayIndex(plRows[i].start)
+
+    /** Индекс идущей передачи (нет — ближайшая следующая, нет — последняя) */
+    private fun liveIndex(): Int {
+        val now = Clock.now()
+        var next = -1
+        for (i in plRows.indices) {
+            val p = plRows[i]
+            if (p.start <= now && now < p.stop) return i
+            if (next < 0 && p.start > now) next = i
+        }
+        return if (next >= 0) next else maxOf(0, plRows.size - 1)
+    }
+
+    /**
+     * Передачи канала в фокусе — от начала архива до недели вперёд, как в окне «Программа». Пересобираются
+     * при смене канала и после обновления программы (фокус остаётся на той же передаче).
+     */
+    private fun ensureRows() {
+        val ch = focused
+        if (ch == null) {
+            plCh = null; plLast = null
+            plRows = emptyList(); plDays = emptyList(); plDayLabels = emptyList()
+            return
+        }
+        if (ch === plCh) return
+        val keep = if (ch === plLast) plKeep else -1L
+        plKeep = -1L
+        val now = Clock.now()
+        val from = Fmt.dayStart(now - maxOf(ch.archiveDays, 1) * 86400L)
+        val to = Fmt.dayStart(now) + 8 * 86400L
+        plRows = tv.repo.range(ch, from, to).filter { it.start >= from }
+        plCh = ch
+        plLast = ch
+        val days = ArrayList<Long>()
+        val labels = ArrayList<Pair<String, String>>()
+        for (p in plRows) {
+            val d = Fmt.dayIndex(p.start)
+            if (days.isEmpty() || days.last() != d) {
+                days.add(d)
+                val t = Fmt.dayTabShort(p.start).split('\n')
+                labels.add(t[0] to t.getOrElse(1) { "" })
+            }
+        }
+        plDays = days
+        plDayLabels = labels
+        if (keep >= 0) {
+            var i = 0
+            for (k in plRows.indices) if (plRows[k].start <= keep) i = k
+            plIndex = i
+        } else {
+            plIndex = liveIndex()
+            plJump = true
+        }
+        dateIndex = plDays.indexOf(if (plRows.isEmpty()) 0L else dayOf(plIndex.coerceIn(0, plRows.size - 1))).coerceAtLeast(0)
+    }
+
+    private fun toPrograms() {
+        ensureRows()
+        if (plRows.isEmpty()) return
+        plIndex = liveIndex()
+        zone = Zone.PROGRAMS
+        gv.invalidate()
+    }
+
+    private fun programKey(name: String) {
+        val n = plRows.size
+        if (n == 0) { zone = Zone.CHANNELS; return gv.invalidate() }
+        when (name) {
+            "up" -> plIndex = (plIndex - 1).coerceAtLeast(0)
+            "down" -> plIndex = (plIndex + 1).coerceAtMost(n - 1)
+            "pgup" -> plIndex = (plIndex - 8).coerceAtLeast(0)
+            "pgdown" -> plIndex = (plIndex + 8).coerceAtMost(n - 1)
+            // ← — назад к каналам (у включённого описания список каналов разворачивается, панель уезжает)
+            "left" -> zone = Zone.CHANNELS
+            "right" -> {
+                dateIndex = plDays.indexOf(dayOf(plIndex)).coerceAtLeast(0)
+                zone = Zone.DATES
+            }
+        }
+        gv.invalidate()
+    }
+
+    private fun datesKey(name: String) {
+        when (name) {
+            "up" -> moveDate(-1)
+            "down" -> moveDate(1)
+            "left" -> zone = Zone.PROGRAMS
+        }
+        gv.invalidate()
+    }
+
+    private fun moveDate(d: Int) {
+        val k = (dateIndex + d).coerceIn(0, maxOf(0, plDays.size - 1))
+        if (k == dateIndex) return
+        dateIndex = k
+        plIndex = dayTarget(plDays[k]).coerceAtLeast(0)
+    }
+
+    /** Передача дня, на которую встаёт фокус: идущая, иначе первая */
+    private fun dayTarget(day: Long): Int {
+        val now = Clock.now()
+        var first = -1
+        for (i in plRows.indices) {
+            if (dayOf(i) != day) continue
+            val p = plRows[i]
+            if (p.start <= now && now < p.stop) return i
+            if (first < 0) first = i
+        }
+        return first
+    }
+
+    /** Что делает OK на передаче — как в окне «Программа»: эфир, архив или карточка */
+    private fun programAction(p: Programme) {
+        val ch = focused ?: return
+        val now = Clock.now()
+        when {
+            p.start <= now && now < p.stop -> tv.playChannel(ch, group?.key)
+            p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> tv.playArchive(ch, p.start, p.stop)
+            else -> tv.openDetails(ch, Cell(p.start, p.stop, p))
+        }
+    }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -76,6 +216,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         live = true
         winStart = liveStart()
         grid = Prefs.guideGrid
+        plCh = null; plLast = null; plKeep = -1L
         gv.resetShift()
         if (toGrid && grid) toGrid()
         main.removeCallbacks(tick)
@@ -113,13 +254,19 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     fun setView(gridView: Boolean) {
         grid = gridView
-        if (zone == Zone.GRID) zone = Zone.CHANNELS
+        if (zone == Zone.GRID || zone == Zone.PROGRAMS || zone == Zone.DATES) zone = Zone.CHANNELS
+        plCh = null
         live = true
         winStart = liveStart()
         gv.invalidate()
     }
 
-    fun refresh() = gv.invalidate()
+    fun refresh() {
+        // программа обновилась: передачи пересоберутся, фокус останется на той же передаче
+        plKeep = plRows.getOrNull(plIndex)?.start ?: -1L
+        plCh = null
+        gv.invalidate()
+    }
 
     fun focusNumber(num: Int) {
         val i = channels.indexOfFirst { it.num == num }
@@ -148,14 +295,16 @@ class GuideLayer(private val tv: Tv) : Layer {
         if (name == "digit") return tv.digit(digit)
         if (zone == Zone.GRID) return gridKey(name)
         if (zone == Zone.CATS) return catsKey(name)
+        if (zone == Zone.PROGRAMS) return programKey(name)
+        if (zone == Zone.DATES) return datesKey(name)
         when (name) {
             "up" -> move(-1)
             "down" -> move(1)
             "pgup" -> move(-pageSize())
             "pgdown" -> move(pageSize())
             "left" -> if (long) focused?.let { tv.openSchedule(it, 0) } else openCats()
-            // → в сетку программы; в виде «Список» сетки нет — программа канала
-            "right" -> if (grid) toGrid() else focused?.let { tv.openSchedule(it, 0) }
+            // → в сетку программы; в виде «Список» — в список программ канала
+            "right" -> if (grid) toGrid() else toPrograms()
         }
     }
 
@@ -261,10 +410,18 @@ class GuideLayer(private val tv: Tv) : Layer {
             focusCell()?.let { tv.openDetails(ch, it) }
             return
         }
+        if (zone == Zone.PROGRAMS) return plRows.getOrNull(plIndex)?.let { programAction(it) } ?: Unit
+        if (zone == Zone.DATES) { zone = Zone.PROGRAMS; gv.invalidate(); return }
         tv.playChannel(ch, group?.key)
     }
 
     override fun long() {
+        // в списке программ удержание — карточка передачи, на каналах и датах — меню канала
+        if (zone == Zone.PROGRAMS) {
+            val ch = focused ?: return
+            plRows.getOrNull(plIndex)?.let { tv.openDetails(ch, Cell(it.start, it.stop, it)) }
+            return
+        }
         focused?.let { tv.openMenu(it, guide = true) }
     }
 
@@ -280,6 +437,11 @@ class GuideLayer(private val tv: Tv) : Layer {
             zone = Zone.CHANNELS
             live = true
             winStart = liveStart()
+            gv.invalidate()
+            return
+        }
+        if (zone == Zone.PROGRAMS || zone == Zone.DATES) {
+            zone = Zone.CHANNELS
             gv.invalidate()
             return
         }
@@ -349,11 +511,32 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val padTop get() = 2.4f * em
         private val padBottom get() = 2.4f * em
         private val topH get() = 7.6f * em
+        private val top1H get() = 4.8f * em
         private val headH get() = 2.6f * em
         private val rowH get() = 3.4f * em
         private val gap get() = 0.25f * em
-        private val bodyTop get() = padTop + topH + em + headH
-        private val chW get() = (width - 2 * padX) * (if (grid) 0.30f else 0.45f)
+
+        // шапка гида (настройка): 0 — канал и передача, 1 — только канал, 2 — скрыть. При выезде панели описания
+        // шапка «канал и передача» сжимается до «только канала»
+        private fun topBlock(mode: Int) = when (mode) { 2 -> 0f; 1 -> top1H + em; else -> topH + em }
+        private val topBlockNow: Float get() {
+            val m = Prefs.guideHeader
+            val a = topBlock(m)
+            return a + (topBlock(maxOf(m, 1)) - a) * rail
+        }
+        private val bodyTop get() = padTop + topBlockNow + headH
+
+        // вид «Список»: rail 0 — каналы целиком, 1 — колонка логотипов и панель передачи справа
+        private var rail = 0f
+        private val contentW get() = width - 2 * padX
+        private val railW get() = 5.6f * em
+        private val datesW get() = 5.4f * em
+        private val panelFullW get() = contentW * 0.30f
+        private val chW get() = (contentW * 0.30f).let { full -> if (grid) full else full + (railW - full) * rail }
+        private val datesR get() = width - padX - (if (rail > 0f) panelFullW * rail + em else 0f)
+        private val datesL get() = datesR - datesW
+        private val progL get() = padX + chW + 1.2f * em
+        private val progR get() = datesL - em
 
         fun visibleRows() = maxOf(1, ((height - bodyTop - padBottom - hintsH + gap) / (rowH + gap)).toInt())
 
@@ -370,6 +553,13 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (now / 60 != nowMinute) {
                 nowMinute = now / 60
                 nowText = Fmt.hhmm(now)
+            }
+            // панель описания: каналы сжимаются до логотипов, справа выезжает панель
+            val wantRail = if (descOn && (zone == Zone.PROGRAMS || zone == Zone.DATES)) 1f else 0f
+            if (!Anim.on || Math.abs(wantRail - rail) < 0.01f) rail = wantRail
+            else {
+                rail += (wantRail - rail) * 0.3f
+                postInvalidateOnAnimation()
             }
             drawTop(c, now)
             // колонка категорий выезжает слева, список и сетка уезжают вправо за край экрана
@@ -423,14 +613,18 @@ class GuideLayer(private val tv: Tv) : Layer {
                     U.roundRect(c, cx - hw, cy - 0.85f * em, cx + hw, cy + 0.85f * em, 0.35f * em, U.LIVE)
                     c.drawText(nowText, cx - pNowChip.measureText(nowText) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
                 }
-            } else drawSide(c, now)
+            } else {
+                drawPrograms(c, now)
+                drawDates(c)
+                drawPanel(c, now)
+            }
         }
 
         /** Колонка категорий: название, число каналов, замок; в фокусе — белая */
         private fun drawCats(c: Canvas) {
             val l = padX - (1f - shift) * (padX + catW)
             val r = l + catW
-            val headY = padTop + topH + em
+            val headY = padTop + topBlockNow
             // вместо заголовка — строка «Поиск» (↑ с первой категории)
             val sf = catSearch && zone == Zone.CATS
             U.roundRect(c, l, headY - 0.3f * em, r, headY + headH - 0.3f * em, U.px(U.RADIUS_S), if (sf) U.WHITE else U.FILL)
@@ -482,6 +676,8 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
             Zone.CATS -> listOf("↑ ↓" to str(R.string.category), "→" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
+            Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_to_channels), "→" to str(R.string.hint_dates), "↑ ↓" to str(R.string.hint_programme_pick))
+            Zone.DATES -> listOf("↑ ↓" to str(R.string.hint_date), "←" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))
             Zone.GRID -> listOf("OK" to str(R.string.about), "← →" to str(R.string.hint_programmes), str(R.string.key_back) to str(R.string.hint_to_channels))
             Zone.CHANNELS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_categories),
                 "→" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
@@ -519,14 +715,37 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         private fun drawTop(c: Canvas, now: Long) {
             val ch = focused ?: return
+            val mode = Prefs.guideHeader
+            if (mode == 2) return
+            if (mode == 0) {
+                // «канал и передача» плавно переходит в «только канал», когда выезжает панель описания
+                val h = padTop + topH + em
+                if (rail < 0.99f) {
+                    val s = if (rail > 0f) c.saveLayerAlpha(0f, 0f, width.toFloat(), h, Math.round(255 * (1 - rail))) else -1
+                    drawTopFull(c, ch, now)
+                    if (s >= 0) c.restoreToCount(s)
+                }
+                if (rail > 0f) {
+                    val s = c.saveLayerAlpha(0f, 0f, width.toFloat(), h, Math.round(255 * rail))
+                    drawTopChannel(c, ch)
+                    c.restoreToCount(s)
+                }
+            } else drawTopChannel(c, ch)
+            drawClock(c, now)
+        }
+
+        /** Шапка «канал + передача»: логотип, канал, название, время, описание (передача — в фокусе гида) */
+        private fun drawTopFull(c: Canvas, ch: Channel, now: Long) {
             val t = padTop
             val logoW = 9f * em
             Logos.draw(c, context, ch, padX, t, padX + logoW, t + 6.2f * em) { invalidate() }
             val x = padX + logoW + 1.2f * em
             val clockW = pClock.measureText("00:00") + em
             val w = width - padX - x - clockW
+            // в списке программ — передача в фокусе списка, в сетке — под фокусом сетки, иначе — идущая
+            val listP = if ((zone == Zone.PROGRAMS || zone == Zone.DATES) && !grid) plRows.getOrNull(plIndex) else null
             val ref = if (zone == Zone.GRID) focusTime else now
-            val cell = Cells.at(tv.repo.programmes(ch), ref)
+            val cell = if (listP != null) Cell(listP.start, listP.stop, listP) else Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
             U.drawText(c, ch.title(), x, t + 0.6f * em, w, pChannel)
             U.drawText(c, p?.title ?: str(R.string.no_programme), x, t + 2.35f * em, w, pTitle)
@@ -544,6 +763,23 @@ class GuideLayer(private val tv: Tv) : Layer {
                 descLayout?.draw(c)
                 c.restore()
             }
+        }
+
+        /** Шапка «только канал»: логотип, название канала, категория и глубина архива */
+        private fun drawTopChannel(c: Canvas, ch: Channel) {
+            val t = padTop
+            val logoW = 6.8f * em
+            Logos.draw(c, context, ch, padX, t + 0.2f * em, padX + logoW, t + 0.2f * em + 4.4f * em) { invalidate() }
+            val x = padX + logoW + 1.2f * em
+            val clockW = pClock.measureText("00:00") + em
+            val w = width - padX - x - clockW
+            U.drawText(c, ch.title(), x, t + 1.5f * em, w, pTitle)
+            val sub = ch.group + if (ch.hasArchive) " · " + str(R.string.archive_x_d, ch.archiveDays) else ""
+            U.drawText(c, sub, x, t + 3.5f * em, w, pChannel)
+        }
+
+        private fun drawClock(c: Canvas, now: Long) {
+            val t = padTop
             val clock = Fmt.hhmm(now)
             // на сенсорных (не ТВ) — ✕ закрыть, часы левее
             val closeW = if (U.touch) 2.6f * em else 0f
@@ -556,7 +792,8 @@ class GuideLayer(private val tv: Tv) : Layer {
         }
 
         private fun drawHead(c: Canvas, now: Long) {
-            val y = padTop + topH + em
+            if (rail > 0.5f) return   // каналы сжаты до логотипов — заголовка категории нет
+            val y = padTop + topBlockNow
             val cy = y + headH / 2
             val g = group
             val arrowW = 1.6f * em
@@ -611,10 +848,14 @@ class GuideLayer(private val tv: Tv) : Layer {
             val chFocus = focus && zone == Zone.CHANNELS
             val bg = if (chFocus) U.WHITE else if (focus) U.FILL_ACTIVE else U.FILL
             U.roundRect(c, l, y, r, y + rowH, U.px(U.RADIUS_S), bg)
+            // фокус ушёл в программу или на даты — канал остаётся обведённым: сюда он вернётся
+            if (focus && !chFocus && !grid && (zone == Zone.PROGRAMS || zone == Zone.DATES)) outline(c, l, y, r, y + rowH)
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
             var x = l + 0.35f * em
             Logos.draw(c, context, ch, x, y + 0.25f * em, x + 4.3f * em, y + rowH - 0.25f * em, plate = chFocus) { invalidate() }
+            // колонка логотипов (выехало описание): только логотип
+            if (!grid && r - l < 10f * em) return
             x += 4.3f * em + 0.7f * em
             // колонка номеров — только в режиме «рядом с названием»
             if (Prefs.numberMode == Prefs.NUMBER_NEAR_NAME) {
@@ -629,20 +870,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val locked = tv.catalog?.isLocked(ch) == true
             val isz = 1.5f * em
             val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0) + (if (locked) 1 else 0)) * (isz + 0.35f * em)
-            if (grid) {
-                U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
-            } else {
-                // вид «Список»: название и текущая передача с прогрессом
-                U.drawText(c, ch.name, x, y + 1.05f * em, r - x - 0.8f * em - iw, pn)
-                val p = tv.repo.at(ch, now)
-                pCellTime.color = if (chFocus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, p?.title ?: str(R.string.no_programme), x, y + 2.3f * em, r - x - 0.8f * em - iw, pCellTime)
-                if (p != null) {
-                    val bw = r - x - 0.8f * em
-                    U.roundRect(c, x, y + 2.95f * em, x + bw, y + 3.15f * em, 0.1f * em, if (chFocus) 0x33000000 else U.FILL_MARKED)
-                    U.roundRect(c, x, y + 2.95f * em, x + bw * Fmt.progress(p.start, p.stop, now), y + 3.15f * em, 0.1f * em, if (chFocus) U.BLACK else U.WHITE)
-                }
-            }
+            U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
             val ic = if (chFocus) U.BLACK else U.wa(0.7f)
             var ix = r - 0.8f * em
             if (ch.hasArchive) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.35f * em }
@@ -685,27 +913,214 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
         }
 
-        /** Вид «Список»: справа — программа канала в фокусе, что дальше */
-        private fun drawSide(c: Canvas, now: Long) {
-            val ch = focused ?: return
-            val l = padX + chW + 1.5f * em
-            val r = width - padX
-            var y = bodyTop
-            val list = tv.repo.programmes(ch).filter { it.stop > now }.take(visibleRows() + 2)
-            if (list.isEmpty()) {
-                U.drawText(c, str(R.string.no_programme), l, y + rowH / 2, r - l, pEmpty)
+        private fun outline(c: Canvas, l: Float, t: Float, r: Float, b: Float) {
+            val sw = 0.15f * em
+            U.fill.style = Paint.Style.STROKE
+            U.fill.strokeWidth = sw
+            U.fill.color = U.wa(0.8f)
+            c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, U.px(U.RADIUS_S), U.px(U.RADIUS_S), U.fill)
+            U.fill.style = Paint.Style.FILL
+        }
+
+        private val pProgTime = U.paint(1.3f)
+        private val pProgTitle = U.paint(1.35f)
+        private val pProgTitleBold = U.paint(1.35f, bold = true)
+        private val pLive = U.paint(1.2f, bold = true)
+        private val pTab = U.paint(1.25f)
+        private val pTabBold = U.paint(1.25f, bold = true)
+        private var plScroll = 0f
+
+        private val listBottom get() = height - padBottom - hintsH
+
+        private fun progH(p: Programme, now: Long) = if (p.start <= now && now < p.stop) rowH + 0.9f * em else rowH
+
+        /** Список передач канала в фокусе: идущая — со шкалой, прошедшая — со значком архива */
+        private fun drawPrograms(c: Canvas, now: Long) {
+            ensureRows()
+            val l = progL
+            val r = progR
+            val top = bodyTop
+            val bottom = listBottom
+            val rows = plRows
+            if (rows.isEmpty()) {
+                U.drawText(c, str(R.string.no_programme), l + em, top + rowH / 2, r - l, pEmpty)
                 return
             }
-            for (p in list) {
-                if (y + 1.8f * em > height) break
-                val isNow = p.start <= now
-                pCellTime.color = U.wa(0.6f)
-                c.drawText(Fmt.hhmm(p.start), l, y + 1.3f * em, pCellTime)
-                val pn = if (isNow) pNameBold else pName
-                pn.color = U.WHITE
-                U.drawText(c, p.title, l + 4.6f * em, y + 0.9f * em, r - l - 4.6f * em, pn)
-                y += 2.5f * em
+            // фокус — по центру, у краёв — без пустоты; на каналах показана идущая передача
+            val fi = if (zone == Zone.CHANNELS) liveIndex() else plIndex
+            var total = 0f
+            var fy = 0f
+            var fh = 0f
+            for (i in rows.indices) {
+                val h = progH(rows[i], now)
+                if (i == fi) { fy = total; fh = h }
+                total += h + gap
             }
+            val viewH = bottom - top
+            val target = (fy - viewH / 2 + fh / 2).coerceIn(0f, maxOf(0f, total - viewH))
+            if (plJump || !Anim.on) { plScroll = target; plJump = false }
+            else if (Math.abs(target - plScroll) > 0.5f) {
+                plScroll += (target - plScroll) * 0.35f
+                postInvalidateOnAnimation()
+            } else plScroll = target
+            val save = Fade.begin(c, l, top, r, bottom)
+            var y = top - plScroll
+            for (i in rows.indices) {
+                val h = progH(rows[i], now)
+                if (y + h >= top && y <= bottom) drawProgRow(c, rows[i], i, l, r, y, h, now)
+                y += h + gap
+                if (y > bottom) break
+            }
+            Fade.end(c, save, l, top, r, bottom, plScroll / Fade.length, (total - viewH - plScroll) / Fade.length)
+        }
+
+        private fun drawProgRow(c: Canvas, p: Programme, i: Int, l: Float, r: Float, y: Float, h: Float, now: Long) {
+            val ch = focused ?: return
+            val live = p.start <= now && now < p.stop
+            val past = p.stop <= now
+            val pf = zone == Zone.PROGRAMS && i == plIndex
+            val ghost = zone == Zone.DATES && i == plIndex
+            val bg = when { pf -> U.WHITE; ghost -> U.FILL_ACTIVE; live -> U.FILL_PLAYING; else -> 0 }
+            if (bg != 0) U.roundRect(c, l, y, r, y + h, U.px(U.RADIUS_S), bg)
+            if (ghost) outline(c, l, y, r, y + h)
+            val fg = if (pf) U.BLACK else if (past) U.wa(0.62f) else U.WHITE
+            val cy = if (live) y + rowH / 2 - 0.1f * em else y + h / 2
+            pProgTime.color = fg
+            c.drawText(Fmt.hhmm(p.start), l + 0.8f * em, cy - (pProgTime.descent() + pProgTime.ascent()) / 2, pProgTime)
+            // значки справа: LIVE, архив, напоминание — белые (в строке фокуса чёрные)
+            val ic = if (pf) U.BLACK else U.wa(0.8f)
+            val isz = 1.7f * em
+            var ix = r - 0.8f * em
+            if (live) {
+                pLive.color = ic
+                val lw = pLive.measureText("LIVE")
+                val pad = 0.8f * em
+                ix -= lw + 2 * pad
+                U.fill.style = Paint.Style.STROKE
+                U.fill.strokeWidth = 0.12f * em
+                U.fill.color = ic
+                c.drawRoundRect(ix, cy - 0.85f * em, ix + lw + 2 * pad, cy + 0.85f * em, 0.3f * em, 0.3f * em, U.fill)
+                U.fill.style = Paint.Style.FILL
+                c.drawText("LIVE", ix + pad, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
+                ix -= 0.5f * em
+            }
+            if (past && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.5f * em }
+            if (p.start > now && tv.reminders.has(ch, p.start)) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ic); ix -= 0.5f * em }
+            val tx = l + 5.4f * em
+            val pt = if (live) pProgTitleBold else pProgTitle
+            pt.color = fg
+            U.drawText(c, p.title, tx, cy, ix - tx - 0.3f * em, pt)
+            if (live) {
+                // шкала прогресса идущей передачи
+                val by = y + h - 0.95f * em
+                val bw = r - 0.8f * em - tx
+                U.roundRect(c, tx, by, tx + bw, by + 0.25f * em, 0.12f * em, if (pf) 0x33000000 else U.wa(0.22f))
+                U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, now), by + 0.25f * em, 0.12f * em, if (pf) U.BLACK else U.WHITE)
+            }
+        }
+
+        /** Колонка дат: день недели и число; в фокусе — белая, день выбранной передачи — рамкой */
+        private fun drawDates(c: Canvas) {
+            val days = plDays
+            if (days.isEmpty()) return
+            val l = datesL
+            val r = datesR
+            val th = 3.6f * em
+            val step = th + 0.3f * em
+            val top = bodyTop
+            val bottom = listBottom
+            val cur = if (zone == Zone.DATES) dateIndex
+            else days.indexOf(dayOf(if (zone == Zone.CHANNELS) liveIndex() else plIndex.coerceIn(0, plRows.size - 1))).coerceAtLeast(0)
+            val viewH = bottom - top
+            val off = (cur * step - viewH / 2 + th / 2).coerceIn(0f, maxOf(0f, days.size * step - viewH))
+            val save = Fade.begin(c, l, top, r, bottom)
+            for (k in days.indices) {
+                val y = top + k * step - off
+                if (y + th < top || y > bottom) continue
+                val focus = zone == Zone.DATES && k == dateIndex
+                if (focus) U.roundRect(c, l, y, r, y + th, U.px(U.RADIUS_S), U.WHITE)
+                else if (k == cur) outline(c, l, y, r, y + th)
+                val p = if (focus || k == cur) pTabBold else pTab
+                p.color = if (focus) U.BLACK else if (k == cur) U.WHITE else U.wa(0.72f)
+                val (a, b) = plDayLabels[k]
+                c.drawText(a, (l + r - p.measureText(a)) / 2, y + th / 2 - 0.6f * em - (p.descent() + p.ascent()) / 2, p)
+                c.drawText(b, (l + r - p.measureText(b)) / 2, y + th / 2 + 0.75f * em - (p.descent() + p.ascent()) / 2, p)
+            }
+            Fade.end(c, save, l, top, r, bottom, off / Fade.length, (days.size * step - viewH - off) / Fade.length)
+        }
+
+        // панель передачи (настройка «Описание в ТВ-гиде»): раскладка текста пересобирается при смене передачи
+        private val pPanelTitle = TextPaint(U.paint(1.6f, bold = true))
+        private val pPanelDesc = TextPaint(U.paint(1.25f, U.wa(0.8f)))
+        private val pPanelSub = U.paint(1.2f, U.wa(0.6f))
+        private var panelKey = ""
+        private var panelTitle: StaticLayout? = null
+        private var panelDesc: StaticLayout? = null
+        private val clip = android.graphics.Path()
+        private val srcR = android.graphics.Rect()
+        private val dstR = android.graphics.RectF()
+        private val bmPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+
+        private fun layoutOf(s: String, p: TextPaint, w: Int, lines: Int) =
+            StaticLayout.Builder.obtain(s, 0, s.length, p, w).setMaxLines(lines)
+                .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(0f, 1.12f).build()
+
+        /** Справа: картинка передачи (нет — логотип канала), время, название, описание, что сделает OK */
+        private fun drawPanel(c: Canvas, now: Long) {
+            if (rail <= 0.01f) return
+            val ch = focused ?: return
+            val p = plRows.getOrNull(plIndex) ?: return
+            val pw = panelFullW
+            val l = width - padX - pw + (1f - rail) * (pw + padX)
+            val top = bodyTop
+            val bottom = listBottom
+            val s = c.saveLayerAlpha(l, top, l + pw, bottom, Math.round(255 * rail))
+            val ih = minOf(pw * 9f / 16f, (bottom - top) * 0.4f)
+            val bm = if (p.icon.isNotEmpty()) Logos.bitmapUrl(context, p.icon, 512, 288) { invalidate() } else null
+            if (bm != null) {
+                // кадр передачи — по центру, обрезка под рамку
+                val k = maxOf(pw / bm.width, ih / bm.height)
+                val sw = pw / k
+                val sh = ih / k
+                srcR.set(((bm.width - sw) / 2).toInt(), ((bm.height - sh) / 2).toInt(), ((bm.width + sw) / 2).toInt(), ((bm.height + sh) / 2).toInt())
+                dstR.set(l, top, l + pw, top + ih)
+                c.save()
+                clip.rewind()
+                clip.addRoundRect(dstR, U.px(U.RADIUS_S), U.px(U.RADIUS_S), android.graphics.Path.Direction.CW)
+                c.clipPath(clip)
+                c.drawBitmap(bm, srcR, dstR, bmPaint)
+                c.restore()
+            } else Logos.draw(c, context, ch, l, top, l + pw, top + ih, badge = false) { invalidate() }
+            val w = pw.toInt()
+            val key = ch.key + ":" + p.start + ":" + w
+            if (key != panelKey) {
+                panelKey = key
+                panelTitle = layoutOf(p.title, pPanelTitle, w, 3)
+                panelDesc = if (p.desc.isEmpty()) null else layoutOf(p.desc, pPanelDesc, w, maxOf(2, ((bottom - top - ih - 9f * em) / (pPanelDesc.textSize * 1.4f)).toInt()))
+            }
+            var y = top + ih + 1.2f * em
+            pPanelSub.color = U.wa(0.7f)
+            U.drawText(c, Fmt.dayTimeRange(p.start, p.stop), l, y + 0.6f * em, pw, pPanelSub)
+            y += 1.9f * em
+            panelTitle?.let { c.save(); c.translate(l, y); it.draw(c); c.restore(); y += it.height + 0.7f * em }
+            panelDesc?.let { c.save(); c.translate(l, y); it.draw(c); c.restore() }
+            // клавиша OK в рамке и действие — как в окне «Программа»
+            val live = p.start <= now && now < p.stop
+            val action = str(when {
+                live -> R.string.watch_live
+                p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> R.string.watch_from_archive
+                else -> R.string.about
+            })
+            val cy = bottom - 0.9f * em
+            val kw = maxOf(2f * em, pHintKey.measureText("OK") + em)
+            U.fill.style = Paint.Style.STROKE
+            U.fill.strokeWidth = 0.1f * em
+            U.fill.color = U.wa(0.4f)
+            c.drawRoundRect(l, cy - 0.85f * em, l + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
+            U.fill.style = Paint.Style.FILL
+            c.drawText("OK", l + (kw - pHintKey.measureText("OK")) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
+            c.drawText(action, l + kw + 0.6f * em, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
+            c.restoreToCount(s)
         }
 
         // ---------------------------------------------------------- тач и мышь
@@ -720,7 +1135,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         /** Тап: ‹ › — категория, ✕ — закрыть, канал — смотреть, передача — карточка */
         private fun tap(x: Float, y: Float) {
-            val headY = padTop + topH + em
+            val headY = padTop + topBlockNow
             if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
             if (zone == Zone.CATS) {
                 // тап по категории — открыть её каналы; мимо колонки — закрыть колонку
@@ -734,10 +1149,12 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             if (y in headY..headY + headH && x < padX + chW) return openCats()
             if (y < bodyTop) return
+            if (!grid && x > padX + chW) return listTap(x, y)
             val i = rowAt(y)
             if (i !in channels.indices) return
             index = i
             if (x < gridL || !grid) {
+                if (!grid) zone = Zone.CHANNELS
                 zone = Zone.CHANNELS
                 enter()
             } else {
@@ -747,6 +1164,34 @@ class GuideLayer(private val tv: Tv) : Layer {
                 enter()
             }
             invalidate()
+        }
+
+        /** Тап в виде «Список»: по дате — выбрать день, по передаче — то же, что OK */
+        private fun listTap(x: Float, y: Float) {
+            ensureRows()
+            val now = Clock.now()
+            if (x >= datesL && x <= datesR) {
+                val step = 3.9f * em
+                val cur = plDays.indexOf(dayOf(plIndex.coerceIn(0, maxOf(0, plRows.size - 1)))).coerceAtLeast(0)
+                val viewH = listBottom - bodyTop
+                val off = (cur * step - viewH / 2 + 1.8f * em).coerceIn(0f, maxOf(0f, plDays.size * step - viewH))
+                val k = ((y - bodyTop + off) / step).toInt()
+                if (k in plDays.indices) { dateIndex = k; plIndex = dayTarget(plDays[k]).coerceAtLeast(0); zone = Zone.PROGRAMS }
+                return invalidate()
+            }
+            if (x < progL || x > progR) return
+            var yy = bodyTop - plScroll
+            for (i in plRows.indices) {
+                val h = progH(plRows[i], now)
+                if (y >= yy && y < yy + h) {
+                    plIndex = i
+                    zone = Zone.PROGRAMS
+                    invalidate()
+                    programAction(plRows[i])
+                    return
+                }
+                yy += h + gap
+            }
         }
 
         private var dragY = 0f

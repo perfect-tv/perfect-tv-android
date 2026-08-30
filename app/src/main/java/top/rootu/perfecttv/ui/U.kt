@@ -149,6 +149,12 @@ object Fmt {
         return WEEK[c.get(Calendar.DAY_OF_WEEK) - 1].lowercase() + ",\n" + c.get(Calendar.DAY_OF_MONTH) + " " + MONTH[c.get(Calendar.MONTH)]
     }
 
+    /** Компактная подпись дня: «ср\n28» (колонка дат вида «Список») */
+    fun dayTabShort(sec: Long): String {
+        val c = at(sec)
+        return WEEK[c.get(Calendar.DAY_OF_WEEK) - 1].lowercase() + "\n" + c.get(Calendar.DAY_OF_MONTH)
+    }
+
     fun timeRange(start: Long, end: Long) = hhmm(start) + " – " + hhmm(end)
 
     fun dayTimeRange(start: Long, end: Long) = dayLabel(start) + ", " + timeRange(start, end)

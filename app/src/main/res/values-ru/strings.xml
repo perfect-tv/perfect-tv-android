@@ -318,7 +318,7 @@
     <string name="hint_programmes">Передачи</string>
     <string name="hint_into_grid">В программу</string>
     <string name="categories_up_down_right_to_channels">колонка категорий: ↑/↓ — категория, → — к её каналам, «Назад» — отмена</string>
-    <string name="into_the_grid_in_list_view_programme">в сетку программы (в виде «Список» — программа канала)</string>
+    <string name="into_the_grid_in_list_view_programme">в сетку программы (в виде «Список» — в список передач канала)</string>
     <string name="hint_cancel">Отмена</string>
     <string name="appearance">Внешний вид</string>
     <string name="data_and_backup">Данные и резервная копия</string>
@@ -374,4 +374,14 @@
     <string name="home_screen">Главный экран Android TV</string>
     <string name="home_screen_sub">избранные каналы и «Продолжить просмотр»</string>
     <string name="home_popular">Популярные</string>
+    <string name="guide_header">Шапка гида</string>
+    <string name="guide_header_sub">в таблице и в списке</string>
+    <string name="header_full">Канал + передача</string>
+    <string name="header_channel">Канал</string>
+    <string name="header_hide">Скрыть</string>
+    <string name="guide_desc">Описание в ТВ-гиде</string>
+    <string name="guide_desc_sub">в виде «Список» при переходе в программу выезжает панель передачи</string>
+    <string name="hint_dates">Даты</string>
+    <string name="hint_date">Дата</string>
+    <string name="hint_programme_pick">Передача</string>
 </resources>

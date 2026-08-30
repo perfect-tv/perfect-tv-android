@@ -78,13 +78,15 @@ object Logos {
     private const val CACHE_BYTES = 64L * 1024 * 1024
 
     /** Битмап логотипа или null (ещё грузится / нет). [ready] — вызвать, когда загрузится */
-    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? {
-        val url = ch.logoUrl()
+    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? = bitmapUrl(context, ch.logoUrl(), 256, 160, ready)
+
+    /** То же по адресу картинки (панель передачи в гиде): размер загрузки — [w] × [h] */
+    fun bitmapUrl(context: Context, url: String, w: Int, h: Int, ready: () -> Unit): Bitmap? {
         if (url.isEmpty() || url in failed) return null
         bitmaps.get(url)?.let { return it }
         waiters.getOrPut(url) { ArrayList() }.add(ready)
         if (pending.add(url)) {
-            loader.enqueue(ImageRequest.Builder(context).data(url).size(256, 160)
+            loader.enqueue(ImageRequest.Builder(context).data(url).size(w, h)
                 .allowHardware(false)
                 .listener(onError = { _, r -> android.util.Log.w("IPTV", "logo $url: ${r.throwable}") })
                 .target(

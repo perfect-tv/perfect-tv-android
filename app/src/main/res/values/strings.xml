@@ -318,7 +318,7 @@
     <string name="hint_programmes">Programmes</string>
     <string name="hint_into_grid">Into the grid</string>
     <string name="categories_up_down_right_to_channels">category column: ↑/↓ — category, → — to its channels, Back — cancel</string>
-    <string name="into_the_grid_in_list_view_programme">into the programme grid (in List view — the channel schedule)</string>
+    <string name="into_the_grid_in_list_view_programme">into the programme grid (in List view — the channel programme list)</string>
     <string name="hint_cancel">Cancel</string>
     <string name="appearance">Appearance</string>
     <string name="data_and_backup">Data and backup</string>
@@ -374,4 +374,14 @@
     <string name="home_screen">Android TV home screen</string>
     <string name="home_screen_sub">favourite channels and “Continue watching”</string>
     <string name="home_popular">Popular</string>
+    <string name="guide_header">Guide header</string>
+    <string name="guide_header_sub">in the grid and in the list</string>
+    <string name="header_full">Channel + programme</string>
+    <string name="header_channel">Channel</string>
+    <string name="header_hide">Hide</string>
+    <string name="guide_desc">Description in the TV guide</string>
+    <string name="guide_desc_sub">in the List view a programme panel slides in when you move into the programme</string>
+    <string name="hint_dates">Dates</string>
+    <string name="hint_date">Date</string>
+    <string name="hint_programme_pick">Programme</string>
 </resources>

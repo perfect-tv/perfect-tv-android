@@ -109,6 +109,16 @@ object Prefs {
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
+    /** Шапка гида: 0 — канал и передача, 1 — только канал, 2 — скрыть */
+    var guideHeader: Int
+        get() = int("guide_header", 0).coerceIn(0, 2)
+        set(v) = sp.edit().putInt("guide_header", v).apply()
+
+    /** Вид «Список»: при переходе в программу каналы сжимаются до логотипов, справа выезжает панель передачи */
+    var guideDesc: Boolean
+        get() = bool("guide_desc", false)
+        set(v) = sp.edit().putBoolean("guide_desc", v).apply()
+
     var animations: Boolean
         get() = bool("animations", true)
         set(v) = sp.edit().putBoolean("animations", v).apply()
