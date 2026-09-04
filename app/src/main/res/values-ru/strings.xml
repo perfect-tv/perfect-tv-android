@@ -27,7 +27,7 @@
     <string name="channel">Канал</string>
     <string name="category">Категория</string>
     <string name="hold_left">удерж. ←</string>
-    <string name="channel_programme_and_archive">Программа и архив канала</string>
+    <string name="channel_programme_and_archive">Программа и архив канала (в таблице)</string>
     <string name="hold_right">удерж. →</string>
     <string name="go_to_the_programme_grid">Перейти в сетку программы</string>
     <string name="ok_hold_ok">OK / удерж. OK</string>

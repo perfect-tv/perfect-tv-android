@@ -31,7 +31,7 @@
     <string name="channel">Channel</string>
     <string name="category">Category</string>
     <string name="hold_left">hold ←</string>
-    <string name="channel_programme_and_archive">Channel programme &amp; archive</string>
+    <string name="channel_programme_and_archive">Channel programme &amp; archive (in the grid)</string>
     <string name="hold_right">hold →</string>
     <string name="go_to_the_programme_grid">Go to the programme grid</string>
     <string name="ok_hold_ok">OK / hold OK</string>

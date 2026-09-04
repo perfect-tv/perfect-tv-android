@@ -289,7 +289,8 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     // ------------------------------------------------------------------ клавиши
 
-    override fun hasLong(name: String) = zone == Zone.CHANNELS && name == "left"
+    // удержание ← — «Программа и архив» канала; в виде «Список» программа и так справа — там это не нужно
+    override fun hasLong(name: String) = zone == Zone.CHANNELS && name == "left" && grid
 
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") return tv.digit(digit)
