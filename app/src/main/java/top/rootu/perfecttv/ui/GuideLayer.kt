@@ -19,6 +19,7 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Catalog
 import top.rootu.perfecttv.data.Channel
+import top.rootu.perfecttv.data.Playlist
 import top.rootu.perfecttv.data.Programme
 
 /**
@@ -46,7 +47,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     private var focusTime = 0L
     private var live = true
 
-    private enum class Zone { CATS, CHANNELS, GRID, PROGRAMS, DATES }
+    private enum class Zone { PLAYLISTS, CATS, CHANNELS, GRID, PROGRAMS, DATES }
 
     // колонка категорий: куда вернуться по «Назад» (отмена выбора)
     private var catsFromGroup = 0
@@ -295,6 +296,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") return tv.digit(digit)
         if (zone == Zone.GRID) return gridKey(name)
+        if (zone == Zone.PLAYLISTS) return playlistsKey(name)
         if (zone == Zone.CATS) return catsKey(name)
         if (zone == Zone.PROGRAMS) return programKey(name)
         if (zone == Zone.DATES) return datesKey(name)
@@ -314,6 +316,38 @@ class GuideLayer(private val tv: Tv) : Layer {
     /** Фокус на строке «Поиск» над категориями */
     private var catSearch = false
 
+    // ---------------------------------------------------------- колонка плейлистов (← в колонке категорий)
+
+    private var pls: List<Playlist> = emptyList()
+    private var plsIndex = 0
+
+    /** ← в колонке категорий: левее выезжает список плейлистов (нужны хотя бы два) */
+    private fun openPlaylists() {
+        pls = tv.repo.playlists()
+        if (pls.size < 2) return
+        plsIndex = pls.indexOfFirst { it.id == tv.playlist?.id }.coerceAtLeast(0)
+        zone = Zone.PLAYLISTS
+        gv.invalidate()
+    }
+
+    /** ↑/↓ — плейлист, OK — открыть его, → — обратно к категориям */
+    private fun playlistsKey(name: String) {
+        val n = pls.size
+        when (name) {
+            "up" -> plsIndex = (plsIndex - 1 + n) % n
+            "down" -> plsIndex = (plsIndex + 1) % n
+            "pgup" -> plsIndex = maxOf(0, plsIndex - gv.catRows() + 1)
+            "pgdown" -> plsIndex = minOf(n - 1, plsIndex + gv.catRows() - 1)
+            "right" -> zone = Zone.CATS
+        }
+        gv.invalidate()
+    }
+
+    private fun choosePlaylist() {
+        val p = pls.getOrNull(plsIndex) ?: return
+        if (p.id == tv.playlist?.id) { zone = Zone.CATS; gv.invalidate() } else tv.switchPlaylist(p)
+    }
+
     private fun openCats() {
         if (groups.size < 2) return
         catsFromGroup = groupIndex
@@ -331,6 +365,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             when (name) {
                 "up" -> { catSearch = false; setGroup(n - 1) }
                 "down" -> { catSearch = false; setGroup(0) }
+                "left" -> openPlaylists()
                 "right" -> closeCats()
             }
             gv.invalidate()
@@ -341,6 +376,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             "down" -> setGroup((groupIndex + 1) % n)
             "pgup" -> setGroup(maxOf(0, groupIndex - gv.catRows() + 1))
             "pgdown" -> setGroup(minOf(n - 1, groupIndex + gv.catRows() - 1))
+            "left" -> openPlaylists()
             "right" -> closeCats()
         }
     }
@@ -404,6 +440,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     override fun enter() {
         if (tv.numberPending()) return tv.applyNumber()
+        if (zone == Zone.PLAYLISTS) return choosePlaylist()
         if (zone == Zone.CATS && catSearch) return tv.openSearch()
         if (zone == Zone.CATS) return closeCats()
         val ch = focused ?: return
@@ -428,6 +465,11 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     override fun back() {
         if (tv.numberPending()) return tv.cancelNumber()
+        if (zone == Zone.PLAYLISTS) {
+            zone = Zone.CATS
+            gv.invalidate()
+            return
+        }
         if (zone == Zone.CATS) {
             // отмена: категория и канал — как до открытия колонки
             groupIndex = catsFromGroup.coerceIn(0, maxOf(0, groups.size - 1))
@@ -498,6 +540,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         // колонка категорий: 0 — убрана, 1 — выехала; список и сетка сдвинуты на shift * (catW + зазор)
         private var shift = 0f
+        private var shift2 = 0f          // колонка плейлистов левее категорий
         private val catW get() = 19f * em
         private val catRowH get() = 3.2f * em
 
@@ -564,18 +607,25 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             drawTop(c, now)
             // колонка категорий выезжает слева, список и сетка уезжают вправо за край экрана
-            val target = if (zone == Zone.CATS) 1f else 0f
+            val target = if (zone == Zone.CATS || zone == Zone.PLAYLISTS) 1f else 0f
             if (!Anim.on || Math.abs(target - shift) < 0.01f) shift = target
             else {
                 shift += (target - shift) * 0.3f
                 postInvalidateOnAnimation()
             }
+            val target2 = if (zone == Zone.PLAYLISTS) 1f else 0f
+            if (!Anim.on || Math.abs(target2 - shift2) < 0.01f) shift2 = target2
+            else {
+                shift2 += (target2 - shift2) * 0.3f
+                postInvalidateOnAnimation()
+            }
             drawHints(c)
+            if (shift2 > 0f) drawPlaylists(c)
             if (shift > 0f) drawCats(c)
             val moved = shift > 0f
             if (moved) {
                 c.save()
-                val dx = shift * (catW + em)
+                val dx = (shift + shift2) * (catW + em)
                 c.clipRect(padX + dx - gap, 0f, width.toFloat(), height.toFloat())
                 c.translate(dx, 0f)
             }
@@ -621,9 +671,40 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
         }
 
+        /** Колонка плейлистов: название и число каналов; открытый сейчас — выделен, в фокусе — белая */
+        private fun drawPlaylists(c: Canvas) {
+            val l = padX - (1f - shift2) * (padX + catW)
+            val r = l + catW
+            val headY = padTop + topBlockNow
+            pCat.color = U.wa(0.85f)
+            U.drawText(c, str(R.string.playlists_title), l + em, headY + headH / 2 - 0.3f * em, catW - 2 * em, pCat)
+            val rows = catRows()
+            val n = pls.size
+            val first = (plsIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
+            for (k in 0 until rows) {
+                val i = first + k
+                if (i >= n) break
+                val p = pls[i]
+                val y = bodyTop + k * (catRowH + gap)
+                val focus = i == plsIndex && zone == Zone.PLAYLISTS
+                val open = p.id == tv.playlist?.id
+                val bg = if (focus) U.WHITE else if (open) U.FILL_ACTIVE else U.FILL
+                U.roundRect(c, l, y, r, y + catRowH, U.px(U.RADIUS_S), bg)
+                val cy = y + catRowH / 2
+                val count = if (p.channelsCount > 0) p.channelsCount.toString() else ""
+                pCount.color = if (focus) U.BLACK else U.wa(0.5f)
+                val cw = pCount.measureText(count)
+                c.drawText(count, r - em - cw, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
+                val pt = if (open) pCatItemBold else pCatItem
+                pt.color = if (focus) U.BLACK else U.WHITE
+                U.drawText(c, p.name.ifEmpty { "—" }, l + em, cy, r - em - cw - 2 * em, pt)
+            }
+            pCount.color = U.wa(0.5f)
+        }
+
         /** Колонка категорий: название, число каналов, замок; в фокусе — белая */
         private fun drawCats(c: Canvas) {
-            val l = padX - (1f - shift) * (padX + catW)
+            val l = padX - (1f - shift) * (padX + catW) + shift2 * (catW + em)
             val r = l + catW
             val headY = padTop + topBlockNow
             // вместо заголовка — строка «Поиск» (↑ с первой категории)
@@ -676,6 +757,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var hintList: List<Pair<String, String>> = emptyList()
 
         private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
+            Zone.PLAYLISTS -> listOf("↑ ↓" to str(R.string.hint_playlist), "OK" to str(R.string.hint_select), "→" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
             Zone.CATS -> listOf("↑ ↓" to str(R.string.category), "→" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
             Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_to_channels), "→" to str(R.string.hint_dates), "↑ ↓" to str(R.string.hint_programme_pick))
             Zone.DATES -> listOf("↑ ↓" to str(R.string.hint_date), "←" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))
@@ -1138,6 +1220,17 @@ class GuideLayer(private val tv: Tv) : Layer {
         private fun tap(x: Float, y: Float) {
             val headY = padTop + topBlockNow
             if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
+            if (zone == Zone.PLAYLISTS) {
+                // тап по плейлисту — открыть; мимо колонки — вернуться к категориям
+                if (x < padX + catW && y >= bodyTop) {
+                    val rows = catRows()
+                    val first = (plsIndex - rows / 2).coerceIn(0, maxOf(0, pls.size - rows))
+                    val i = first + ((y - bodyTop) / (catRowH + gap)).toInt()
+                    if (i in pls.indices) { plsIndex = i; return choosePlaylist() }
+                }
+                zone = Zone.CATS
+                return invalidate()
+            }
             if (zone == Zone.CATS) {
                 // тап по категории — открыть её каналы; мимо колонки — закрыть колонку
                 if (x < padX + catW && y < bodyTop && y >= headY) return tv.openSearch()

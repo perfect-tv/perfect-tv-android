@@ -384,4 +384,6 @@
     <string name="hint_dates">Dates</string>
     <string name="hint_date">Date</string>
     <string name="hint_programme_pick">Programme</string>
+    <string name="playlists_title">Playlists</string>
+    <string name="hint_playlist">Playlist</string>
 </resources>

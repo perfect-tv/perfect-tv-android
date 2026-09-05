@@ -384,4 +384,6 @@
     <string name="hint_dates">Даты</string>
     <string name="hint_date">Дата</string>
     <string name="hint_programme_pick">Передача</string>
+    <string name="playlists_title">Плейлисты</string>
+    <string name="hint_playlist">Плейлист</string>
 </resources>
