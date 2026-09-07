@@ -42,7 +42,13 @@ class GuideLayer(private val tv: Tv) : Layer {
     private var groupIndex = 0
     private var index = 0
     private var zone = Zone.CHANNELS
-    private var grid = Prefs.guideGrid
+    // вид гида: 0 — «ТВ-гид» (сетка), 1 — «Каналы + программа», 2 — «Категории + каналы», 3 — «Каналы»
+    private var mode = Prefs.guideMode
+    private val grid get() = mode == 0
+    /** Колонка категорий всегда на экране (вид «Категории + каналы») */
+    private val catsFixed get() = mode == 2
+    /** Программа канала появляется только по → (виды «Категории + каналы» и «Каналы») */
+    private val progHidden get() = mode >= 2
     private var winStart = 0L
     private var focusTime = 0L
     private var live = true
@@ -216,7 +222,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         zone = Zone.CHANNELS
         live = true
         winStart = liveStart()
-        grid = Prefs.guideGrid
+        mode = Prefs.guideMode
         plCh = null; plLast = null; plKeep = -1L
         gv.resetShift()
         if (toGrid && grid) toGrid()
@@ -253,9 +259,10 @@ class GuideLayer(private val tv: Tv) : Layer {
         open(ch, gk)
     }
 
-    fun setView(gridView: Boolean) {
-        grid = gridView
+    fun setView(newMode: Int) {
+        mode = newMode
         if (zone == Zone.GRID || zone == Zone.PROGRAMS || zone == Zone.DATES) zone = Zone.CHANNELS
+        gv.resetShift()
         plCh = null
         live = true
         winStart = liveStart()
@@ -541,10 +548,17 @@ class GuideLayer(private val tv: Tv) : Layer {
         // колонка категорий: 0 — убрана, 1 — выехала; список и сетка сдвинуты на shift * (catW + зазор)
         private var shift = 0f
         private var shift2 = 0f          // колонка плейлистов левее категорий
+        private var rv = 1f              // программа канала: 0 — скрыта, 1 — выехала (виды 2 и 3)
         private val catW get() = 19f * em
         private val catRowH get() = 3.2f * em
 
-        fun resetShift() { shift = 0f }
+        fun resetShift() {
+            // сразу в состояние вида, без выезда: категории стоят на экране, программа скрыта — по виду
+            shift = if (catsFixed) 1f else 0f
+            shift2 = 0f
+            rail = 0f
+            rv = if (progHidden) 0f else 1f
+        }
 
         fun catRows() = maxOf(1, ((height - bodyTop - padBottom - hintsH + gap) / (catRowH + gap)).toInt())
 
@@ -590,8 +604,14 @@ class GuideLayer(private val tv: Tv) : Layer {
         }
 
         override fun onDraw(c: Canvas) {
-            bgPaint.shader = gradient
-            c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+            // программа канала выезжает из-под списка каналов (виды «Категории + каналы» и «Каналы»)
+            val wantRv = if (!progHidden || zone == Zone.PROGRAMS || zone == Zone.DATES) 1f else 0f
+            if (!Anim.on || Math.abs(wantRv - rv) < 0.01f) rv = wantRv
+            else {
+                rv += (wantRv - rv) * 0.3f
+                postInvalidateOnAnimation()
+            }
+            drawBackground(c)
             val now = Clock.now()
             if (live) winStart = liveStart()
             if (now / 60 != nowMinute) {
@@ -607,7 +627,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             drawTop(c, now)
             // колонка категорий выезжает слева, список и сетка уезжают вправо за край экрана
-            val target = if (zone == Zone.CATS || zone == Zone.PLAYLISTS) 1f else 0f
+            val target = if (zone == Zone.CATS || zone == Zone.PLAYLISTS || (catsFixed && zone == Zone.CHANNELS)) 1f else 0f
             if (!Anim.on || Math.abs(target - shift) < 0.01f) shift = target
             else {
                 shift += (target - shift) * 0.3f
@@ -664,10 +684,60 @@ class GuideLayer(private val tv: Tv) : Layer {
                     U.roundRect(c, cx - hw, cy - 0.85f * em, cx + hw, cy + 0.85f * em, 0.35f * em, U.LIVE)
                     c.drawText(nowText, cx - pNowChip.measureText(nowText) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
                 }
-            } else {
-                drawPrograms(c, now)
-                drawDates(c)
-                drawPanel(c, now)
+            } else if (rv > 0.01f) {
+                if (rv >= 0.99f) {
+                    drawPrograms(c, now)
+                    drawDates(c)
+                    drawPanel(c, now)
+                } else {
+                    // выезд из-под списка каналов: справа от него, со сдвигом влево и появлением
+                    c.save()
+                    c.clipRect(padX + chW + gap, 0f, width.toFloat(), height.toFloat())
+                    c.translate(-(1f - rv) * contentW * 0.5f, 0f)
+                    val sv = c.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), Math.round(255 * rv))
+                    drawPrograms(c, now)
+                    drawDates(c)
+                    drawPanel(c, now)
+                    c.restoreToCount(sv)
+                    c.restore()
+                }
+            }
+        }
+
+        // фон: «ТВ-гид» и «Каналы + программа» — затемнён целиком; «Категории + каналы» и «Каналы» — затемнены
+        // слева, правая часть (видео) открыта и плавно переходит в затемнение; когда выезжает программа — всё затемняется
+        private val maskPaint = Paint().apply { xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN) }
+        private val topPaint = Paint()
+        private var maskKey = ""
+        private var topKey = -1
+        private fun drawBackground(c: Canvas) {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            bgPaint.shader = gradient
+            if (!progHidden || rv >= 0.99f) {
+                c.drawRect(0f, 0f, w, h, bgPaint)
+                return
+            }
+            val s = c.saveLayer(0f, 0f, w, h, null)
+            c.drawRect(0f, 0f, w, h, bgPaint)
+            val xA = (padX + (if (catsFixed) catW + em else 0f) + chW + 1.5f * em).coerceAtMost(w * 0.7f)
+            val key = "${xA.toInt()}:${(rv * 50).toInt()}"
+            if (key != maskKey) {
+                maskKey = key
+                maskPaint.shader = LinearGradient(xA, 0f, xA + w * 0.22f, 0f, android.graphics.Color.argb(255, 0, 0, 0),
+                    android.graphics.Color.argb(Math.round(255 * rv), 0, 0, 0), Shader.TileMode.CLAMP)
+            }
+            c.drawRect(0f, 0f, w, h, maskPaint)
+            c.restoreToCount(s)
+            // под шапкой, поверх видео, — мягкое затемнение сверху (шапка не «тонет» в кадре)
+            val th = padTop + topBlockNow + headH
+            if (Prefs.guideHeader != 2 && th.toInt() != topKey) {
+                topKey = th.toInt()
+                topPaint.shader = LinearGradient(0f, 0f, 0f, th + 2f * em, android.graphics.Color.argb(190, 8, 9, 11), android.graphics.Color.argb(0, 8, 9, 11), Shader.TileMode.CLAMP)
+            }
+            if (Prefs.guideHeader != 2) {
+                topPaint.alpha = Math.round(255 * (1f - rv))
+                c.drawRect(0f, 0f, w, th + 2f * em, topPaint)
             }
         }
 
@@ -883,7 +953,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val l = padX
             val r = padX + chW - em
             // «‹ Эфирные 20»: стрелка напоминает, что категории — слева (←)
-            if (groups.size > 1) c.drawText("‹", l, cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
+            if (groups.size > 1 && !catsFixed) c.drawText("‹", l, cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
             val title = g?.title?.ifEmpty { "—" } ?: "—"
             val count = g?.let { counts.getOrPut(it.key + it.channels.size) { it.channels.size.toString() } } ?: ""
             val cw = pCount.measureText(count)
@@ -1241,7 +1311,26 @@ class GuideLayer(private val tv: Tv) : Layer {
                 }
                 return closeCats()
             }
-            if (y in headY..headY + headH && x < padX + chW) return openCats()
+            // категории стоят на экране: тап по ним — выбор категории, по остальному — как обычно, со сдвигом тела
+            if (catsFixed && shift > 0.99f) {
+                if (x < padX + catW) {
+                    if (y < bodyTop && y >= headY) return tv.openSearch()
+                    if (y >= bodyTop) {
+                        val rows = catRows()
+                        val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                        catsFromChannel = focused
+                        setGroup(first + ((y - bodyTop) / (catRowH + gap)).toInt())
+                    }
+                    return invalidate()
+                }
+                return tapBody(x - (catW + em), y)
+            }
+            tapBody(x, y)
+        }
+
+        private fun tapBody(x: Float, y: Float) {
+            val headY = padTop + topBlockNow
+            if (y in headY..headY + headH && x < padX + chW && !catsFixed) return openCats()
             if (y < bodyTop) return
             if (!grid && x > padX + chW) return listTap(x, y)
             val i = rowAt(y)

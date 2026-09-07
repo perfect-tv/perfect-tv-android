@@ -289,7 +289,7 @@ class SettingsActivity : Activity() {
         }
         choice(col, str(R.string.channel_number), listOf(str(R.string.hidden), str(R.string.next_to_the_name), str(R.string.badge_on_the_logo)), Prefs.numberMode,
             str(R.string.without_a_logo_the_number_is_always)) { Prefs.numberMode = it; showMain() }
-        choice(col, str(R.string.guide_view), listOf(str(R.string.list), str(R.string.tv_guide)), if (Prefs.guideGrid) 1 else 0) { Prefs.guideGrid = it == 1; showMain() }
+        choice(col, str(R.string.guide_view), listOf(str(R.string.tv_guide), str(R.string.view_channels_programme), str(R.string.view_categories_channels), str(R.string.view_channels)), Prefs.guideMode) { Prefs.guideMode = it; showMain() }
         choice(col, str(R.string.guide_header), listOf(str(R.string.header_full), str(R.string.header_channel), str(R.string.header_hide)), Prefs.guideHeader,
             str(R.string.guide_header_sub)) { Prefs.guideHeader = it; showMain() }
         toggle(col, str(R.string.guide_desc), Prefs.guideDesc, str(R.string.guide_desc_sub)) { Prefs.guideDesc = it; showMain() }

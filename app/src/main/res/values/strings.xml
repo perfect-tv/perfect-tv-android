@@ -386,4 +386,7 @@
     <string name="hint_programme_pick">Programme</string>
     <string name="playlists_title">Playlists</string>
     <string name="hint_playlist">Playlist</string>
+    <string name="view_channels_programme">Channels + programme</string>
+    <string name="view_categories_channels">Categories + channels</string>
+    <string name="view_channels">Channels</string>
 </resources>

@@ -127,10 +127,13 @@ object Prefs {
         get() = bool("adaptive_sort", false)
         set(v) = sp.edit().putBoolean("adaptive_sort", v).apply()
 
-    /** Вид гида: true — сетка «ТВ-гид», false — «Список» */
-    var guideGrid: Boolean
-        get() = bool("guide_grid", true)
-        set(v) = sp.edit().putBoolean("guide_grid", v).apply()
+    /**
+     * Вид гида: 0 — «ТВ-гид» (сетка), 1 — «Каналы + программа», 2 — «Категории + каналы», 3 — «Каналы».
+     * Прежняя настройка guide_grid (сетка / список) читается, пока новая не выбрана.
+     */
+    var guideMode: Int
+        get() = if (sp.contains("guide_mode")) int("guide_mode", 0).coerceIn(0, 3) else if (bool("guide_grid", true)) 0 else 1
+        set(v) = sp.edit().putInt("guide_mode", v).apply()
 
     /** Обновлять программу каждые N часов */
     var epgRefreshHours: Int

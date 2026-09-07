@@ -1430,6 +1430,14 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         push(layer)
     }
 
+    /** Названия видов гида (меню канала, настройки) */
+    private fun guideModeName(m: Int) = str(when (m) {
+        1 -> R.string.view_channels_programme
+        2 -> R.string.view_categories_channels
+        3 -> R.string.view_channels
+        else -> R.string.tv_guide
+    })
+
     private fun onOff(v: Boolean) = str(if (v) R.string.on else R.string.off)
 
     private fun menuPage(ch: Channel, guide: Boolean): MenuLayer.Page {
@@ -1485,7 +1493,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         app.add(MenuLayer.Item(str(R.string.reminders), reminders.all().size.takeIf { it > 0 }?.toString() ?: "", run = act("reminders")))
         app.add(MenuLayer.Item(str(R.string.channel_list), sub = {
             val l = arrayListOf(
-                MenuLayer.Item(str(R.string.view), if (Prefs.guideGrid) str(R.string.tv_guide) else str(R.string.list), keep = true, run = act("view")),
+                MenuLayer.Item(str(R.string.view), guideModeName(Prefs.guideMode), keep = true, run = act("view")),
                 MenuLayer.Item(str(R.string.adaptive_sorting), onOff(Prefs.adaptiveSort), keep = true, run = act("adaptive"))
             )
             if (cat.hiddenCount() > 0) l.add(MenuLayer.Item(str(R.string.hidden_2), cat.hiddenCount().toString(), run = act("hidden")))
@@ -1597,7 +1605,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "unlock" -> askPin(str(R.string.unlock_channel), { cat.setLocked("channel", ch.key, false); guide.refresh() })
             "unlock_group" -> askPin(str(R.string.unlock_category), { cat.setLocked("group", ch.groupKey, false); guide.refresh() })
             "adaptive" -> { Prefs.adaptiveSort = !Prefs.adaptiveSort; cat.applyView(); guide.reload() }
-            "view" -> { Prefs.guideGrid = !Prefs.guideGrid; guide.setView(Prefs.guideGrid) }
+            "view" -> { Prefs.guideMode = (Prefs.guideMode + 1) % 4; guide.setView(Prefs.guideMode) }
             "playlist" -> openPlaylists()
             "reload" -> playlist?.let { p -> toast.show(str(R.string.reloading_playlist)); repo.refresh(p, true) { err -> onRefreshed(p, err) } }
             "reload_epg" -> playlist?.let { p -> toast.show(str(R.string.reloading_programme)); repo.refreshEpg(p, true) }

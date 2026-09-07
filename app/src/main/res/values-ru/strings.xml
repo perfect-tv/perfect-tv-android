@@ -386,4 +386,7 @@
     <string name="hint_programme_pick">Передача</string>
     <string name="playlists_title">Плейлисты</string>
     <string name="hint_playlist">Плейлист</string>
+    <string name="view_channels_programme">Каналы + программа</string>
+    <string name="view_categories_channels">Категории + каналы</string>
+    <string name="view_channels">Каналы</string>
 </resources>
