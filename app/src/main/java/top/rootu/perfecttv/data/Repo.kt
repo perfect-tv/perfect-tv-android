@@ -221,8 +221,29 @@ class Repo(context: Context) {
         return out
     }
 
+    // иконки каналов из программы: "источник:xml_id" → адрес (пусто — у канала иконки нет или программа ещё не загружена)
+    private val iconCache = HashMap<String, String>()
+
+    /**
+     * Иконка канала из программы (XMLTV) — для логотипа, когда он не загружается из плейлиста или выбран
+     * приоритет программы. Кэшируется; сбрасывается вместе с программой. Звать из главного потока.
+     */
+    fun epgIcon(ch: Channel): String {
+        if (ch.epgIcon.isNotEmpty()) return ch.epgIcon
+        val m = mapping(ch.playlistId)[ch.key] ?: return ""
+        val k = m.first.toString() + ":" + m.second
+        val icon = iconCache.getOrPut(k) {
+            db.readableDatabase.rawQuery("SELECT icon FROM epg_channel WHERE source_id=? AND xml_id=?", arrayOf(m.first.toString(), m.second)).use {
+                if (it.moveToFirst()) it.getString(0) else ""
+            }
+        }
+        if (icon.isNotEmpty()) ch.epgIcon = icon
+        return icon
+    }
+
     private fun invalidateEpg(sourceId: Long) {
         mapFor.clear()
+        iconCache.clear()
         cache.entries.removeAll { it.value.sourceId == sourceId || it.value.sourceId < 0 }
     }
 
@@ -249,11 +270,7 @@ class Repo(context: Context) {
                 if (p.stop > p.start) list.add(p)
             }
         }
-        if (ch.logo.isEmpty() && ch.epgIcon.isEmpty()) {
-            db.readableDatabase.rawQuery("SELECT icon FROM epg_channel WHERE source_id=? AND xml_id=?", arrayOf(m.first.toString(), m.second)).use {
-                if (it.moveToFirst()) ch.epgIcon = it.getString(0)
-            }
-        }
+        epgIcon(ch)
         cache[ck] = CachedEpg(m.first, list)
         return list
     }

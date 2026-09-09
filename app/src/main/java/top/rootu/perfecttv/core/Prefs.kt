@@ -109,6 +109,11 @@ object Prefs {
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
+    /** Приоритет логотипов: 0 — из плейлиста, 1 — из программы (XMLTV); не загрузился — берётся другой источник */
+    var logoPriority: Int
+        get() = int("logo_priority", 0).coerceIn(0, 1)
+        set(v) = sp.edit().putInt("logo_priority", v).apply()
+
     /** Шапка гида: 0 — канал и передача, 1 — только канал, 2 — скрыть */
     var guideHeader: Int
         get() = int("guide_header", 0).coerceIn(0, 2)

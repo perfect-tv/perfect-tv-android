@@ -389,4 +389,8 @@
     <string name="view_channels_programme">Channels + programme</string>
     <string name="view_categories_channels">Categories + channels</string>
     <string name="view_channels">Channels</string>
+    <string name="logo_priority">Logo priority</string>
+    <string name="logo_from_playlist">Playlist</string>
+    <string name="logo_from_programme">Programme (EPG)</string>
+    <string name="logo_priority_sub">if one fails, the other source is used; failed addresses are remembered</string>
 </resources>

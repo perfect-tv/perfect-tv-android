@@ -54,12 +54,19 @@ class Channel(
     /** Категория для навигации (с учётом разбиения на страницы «#2») */
     var groupKey: String = group
 
-    /** Логотип из EPG, если в плейлисте его нет */
+    /** Логотип канала из программы (XMLTV); подставляется из БД ([Repo.epgIcon]) */
     var epgIcon: String = ""
 
     val hasArchive get() = catchupType != null
 
-    fun logoUrl(): String = logo.ifEmpty { epgIcon }
+    /**
+     * Адреса логотипа по приоритету (настройка «Приоритет логотипов»): из плейлиста и из программы,
+     * без пустых и повторов. Первый, который не загрузился, пропускается ([top.rootu.perfecttv.ui.Logos]).
+     */
+    fun logoUrls(): List<String> =
+        (if (top.rootu.perfecttv.core.Prefs.logoPriority == 1) listOf(epgIcon, logo) else listOf(logo, epgIcon)).filter { it.isNotEmpty() }.distinct()
+
+    fun logoUrl(): String = logoUrls().firstOrNull() ?: ""
 
     /** Название для показа: с номером («2. Россия 1»), если номер показывается рядом с названием */
     fun title(): String = if (top.rootu.perfecttv.core.Prefs.numberMode == top.rootu.perfecttv.core.Prefs.NUMBER_NEAR_NAME) "$num. $name" else name

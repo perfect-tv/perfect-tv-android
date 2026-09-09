@@ -389,4 +389,8 @@
     <string name="view_channels_programme">Каналы + программа</string>
     <string name="view_categories_channels">Категории + каналы</string>
     <string name="view_channels">Каналы</string>
+    <string name="logo_priority">Приоритет логотипов</string>
+    <string name="logo_from_playlist">Плейлист</string>
+    <string name="logo_from_programme">Программа</string>
+    <string name="logo_priority_sub">не загрузился — берётся другой источник; неудачные адреса запоминаются</string>
 </resources>

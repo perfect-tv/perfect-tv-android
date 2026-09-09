@@ -21,7 +21,15 @@ import top.rootu.perfecttv.data.Channel
 object Logos {
     private lateinit var loader: ImageLoader
     private val bitmaps = LruCache<String, Bitmap>(400)
-    private val failed = HashSet<String>()
+    // адреса, которые не загрузились, и до какого времени (unix-секунды) их не пробуем: чтобы не стучаться
+    // в недоступный источник на каждой отрисовке. Ошибка сервера и битая картинка — на 12 часов (и между
+    // запусками), нет сети или таймаут — на 3 минуты (связь вернётся). Очистка кэша логотипов сбрасывает всё.
+    private val failedUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private const val FAIL_LONG = 12 * 3600L
+    private const val FAIL_SHORT = 180L
+    private var failFile: java.io.File? = null
+    private val failHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var failSaving = false
     private val pending = HashSet<String>()
     private val waiters = HashMap<String, MutableList<() -> Unit>>()
 
@@ -34,6 +42,8 @@ object Logos {
     fun init(context: Context) {
         if (::loader.isInitialized) return
         val app = context.applicationContext
+        failFile = java.io.File(app.cacheDir, "picons_failed.txt")
+        loadFails()
         // прежний общий кэш Coil (до своего кэша логотипов) — убрать
         java.io.File(app.cacheDir, "image_cache").deleteRecursively()
         loader = ImageLoader.Builder(app)
@@ -58,9 +68,66 @@ object Logos {
         return try {
             kotlinx.coroutines.runBlocking {
                 val r = loader.execute(ImageRequest.Builder(context).data(url).size(w, h).allowHardware(false).build())
-                (r.drawable as? BitmapDrawable)?.bitmap
+                val bm = (r.drawable as? BitmapDrawable)?.bitmap
+                if (bm == null) markFailed(url, (r as? coil.request.ErrorResult)?.throwable)
+                bm
             }
         } catch (e: Exception) { null }
+    }
+
+    private fun isFailed(url: String): Boolean {
+        val until = failedUntil[url] ?: return false
+        if (until > top.rootu.perfecttv.core.Clock.now()) return true
+        failedUntil.remove(url)
+        return false
+    }
+
+    private fun markFailed(url: String, error: Throwable?) {
+        // ошибка ответа сервера (404, 403…) и битая картинка — надолго; нет связи / таймаут — ненадолго
+        val network = error is java.io.IOException && error !is coil.network.HttpException
+        failedUntil[url] = top.rootu.perfecttv.core.Clock.now() + if (network) FAIL_SHORT else FAIL_LONG
+        if (!network) saveFailsLater()
+    }
+
+    private fun loadFails() {
+        try {
+            val now = top.rootu.perfecttv.core.Clock.now()
+            failFile?.takeIf { it.exists() }?.forEachLine { line ->
+                val i = line.indexOf('\t')
+                if (i > 0) line.substring(0, i).toLongOrNull()?.takeIf { it > now }?.let { failedUntil[line.substring(i + 1)] = it }
+            }
+        } catch (e: Exception) { android.util.Log.w("IPTV", "logo failures: $e") }
+    }
+
+    // сохраняем не чаще раза в пару секунд: при запуске могут не загрузиться сразу десятки
+    private fun saveFailsLater() {
+        if (failSaving) return
+        failSaving = true
+        failHandler.postDelayed({
+            failSaving = false
+            try {
+                val now = top.rootu.perfecttv.core.Clock.now()
+                failFile?.printWriter()?.use { w -> failedUntil.forEach { (u, t) -> if (t - now > FAIL_SHORT) w.println("$t\t$u") } }
+            } catch (e: Exception) { android.util.Log.w("IPTV", "logo failures save: $e") }
+        }, 2000)
+    }
+
+    /**
+     * Адрес логотипа канала, который стоит пробовать: первый по приоритету (плейлист / программа), не
+     * числящийся неудачным. Пусто — логотипа нет ни в одном источнике (или все недоступны): монограмма.
+     */
+    fun urlFor(ch: Channel): String {
+        if (ch.epgIcon.isEmpty()) try { top.rootu.perfecttv.App.repo.epgIcon(ch) } catch (e: Exception) { }
+        return ch.logoUrls().firstOrNull { !isFailed(it) } ?: ""
+    }
+
+    /** Логотип в битмап для фонового потока (баннеры): по очереди источники, неудачные запоминаются */
+    fun fetchLogoBlocking(context: Context, ch: Channel): Bitmap? {
+        for (u in ch.logoUrls()) {
+            if (isFailed(u)) continue
+            fetchBlocking(context, u, 400, 250)?.let { return it }
+        }
+        return null
     }
 
     /** Размер кэша логотипов на диске, байт */
@@ -72,33 +139,37 @@ object Logos {
         loader.diskCache?.clear()
         loader.memoryCache?.clear()
         bitmaps.evictAll()
-        failed.clear()
+        failedUntil.clear()
+        failFile?.delete()
     }
 
     private const val CACHE_BYTES = 64L * 1024 * 1024
 
     /** Битмап логотипа или null (ещё грузится / нет). [ready] — вызвать, когда загрузится */
-    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? = bitmapUrl(context, ch.logoUrl(), 256, 160, ready)
+    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? = bitmapUrl(context, urlFor(ch), 256, 160, ready)
 
     /** То же по адресу картинки (панель передачи в гиде): размер загрузки — [w] × [h] */
     fun bitmapUrl(context: Context, url: String, w: Int, h: Int, ready: () -> Unit): Bitmap? {
-        if (url.isEmpty() || url in failed) return null
+        if (url.isEmpty() || isFailed(url)) return null
         bitmaps.get(url)?.let { return it }
         waiters.getOrPut(url) { ArrayList() }.add(ready)
         if (pending.add(url)) {
             loader.enqueue(ImageRequest.Builder(context).data(url).size(w, h)
                 .allowHardware(false)
-                .listener(onError = { _, r -> android.util.Log.w("IPTV", "logo $url: ${r.throwable}") })
+                .listener(onError = { _, r ->
+                    android.util.Log.w("IPTV", "logo $url: ${r.throwable}")
+                    markFailed(url, r.throwable)
+                })
                 .target(
                     onSuccess = { d ->
                         pending.remove(url)
                         val bm = (d as? BitmapDrawable)?.bitmap
-                        if (bm != null) bitmaps.put(url, bm) else failed.add(url)
+                        if (bm != null) bitmaps.put(url, bm) else markFailed(url, null)
                         waiters.remove(url)?.forEach { it() }
                     },
                     onError = {
+                        // ошибка уже записана слушателем; перерисовка выберет следующий источник
                         pending.remove(url)
-                        failed.add(url)
                         waiters.remove(url)?.forEach { it() }
                     }
                 ).build())
@@ -145,8 +216,7 @@ object Logos {
         U.roundRect(c, l, t, r, b, radius, if (plate) PLATE else U.FILL_SOFT)
         val showBadge = badge && Prefs.numberMode == Prefs.NUMBER_BADGE && ch.num > 0
         if (bm == null) {
-            val url = ch.logoUrl()
-            if (url.isEmpty() || url in failed) {
+            if (urlFor(ch).isEmpty()) {
                 drawMonogram(c, ch, l, t, r, b, radius)
                 if (showBadge) drawBadge(c, ch.num, l, t, h, radius)
             }

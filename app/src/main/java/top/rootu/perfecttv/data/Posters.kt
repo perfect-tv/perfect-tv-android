@@ -100,7 +100,7 @@ object Posters {
         val withArt = File(dir(context), fileName(ch, p, true))
         if (withArt.length() > 0) { touch(withArt); return Made(uri(withArt.name), withArt.name) }
         return try {
-            val logo = if (ch.logoUrl().isNotEmpty()) Logos.fetchBlocking(context, ch.logoUrl(), 400, 250) else null
+            val logo = Logos.fetchLogoBlocking(context, ch)
             if (logo == null) {
                 // нет логотипа: на картинке передачи — значок приложения вместо него (в той же рамке),
                 // без картинки — баннер приложения
