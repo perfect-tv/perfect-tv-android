@@ -12,9 +12,16 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import org.json.JSONObject
 import top.rootu.perfecttv.core.Net
@@ -32,6 +39,8 @@ class Playback(context: Context) {
         fun onEnded() {}
         fun onError(e: PlaybackException) {}
         fun onVideoSize(width: Int, height: Int) {}
+        /** Сторож зависания включил поправку: 1 — программный видеодекодер, 2 — звук отключён */
+        fun onFix(step: Int) {}
     }
 
     private var headers: Map<String, String> = emptyMap()
@@ -41,7 +50,17 @@ class Playback(context: Context) {
     private val dataSource = OkHttpDataSource.Factory(Net.client)
         .setUserAgent(Net.USER_AGENT)
 
-    val player: ExoPlayer = ExoPlayer.Builder(context)
+    // программный видеодекодер (поправка для потоков, у которых аппаратный зависает на первом кадре): при включённом
+    // флаге программные декодеры идут в списке первыми; флаг читается при каждом запуске декодера
+    @Volatile private var softwareVideo = false
+    private val codecSelector = MediaCodecSelector { mime, secure, tunneling ->
+        val list = MediaCodecSelector.DEFAULT.getDecoderInfos(mime, secure, tunneling)
+        if (softwareVideo && MimeTypes.isVideo(mime)) list.sortedBy { if (it.softwareOnly) 0 else 1 } else list
+    }
+
+    val player: ExoPlayer = ExoPlayer.Builder(context, DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+        .setMediaCodecSelector(codecSelector))
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory {
             dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource()
         })
@@ -53,7 +72,42 @@ class Playback(context: Context) {
 
     private val main = Handler(Looper.getMainLooper())
 
+    /**
+     * HLS-источник с разбором MPEG-TS, который считает ключевыми и non-IDR I-кадры с recovery point.
+     * Вещательные кодеры (у них же чересстрочное H.264 и несколько звуковых дорожек) часто не ставят IDR вовсе:
+     * без этого флага ExoPlayer не видит ни одного ключевого кадра — поток «висит» на буферизации или стоит
+     * на первом кадре. Для обычных потоков (с IDR) разницы нет.
+     */
+    private val hlsFactory = HlsMediaSource.Factory(DataSource.Factory { dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource() })
+        .setExtractorFactory(DefaultHlsExtractorFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES, false))
+
     init {
+        // диагностика: какие декодеры взяты и что не так — для разбора «зависает на первом кадре» (тег IPTV в logcat)
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                android.util.Log.i("IPTV", "video decoder $decoderName (${initializationDurationMs} ms)")
+            }
+
+            override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                android.util.Log.i("IPTV", "audio decoder $decoderName")
+            }
+
+            override fun onVideoCodecError(eventTime: AnalyticsListener.EventTime, videoCodecError: Exception) {
+                android.util.Log.w("IPTV", "video codec error: $videoCodecError")
+            }
+
+            override fun onAudioCodecError(eventTime: AnalyticsListener.EventTime, audioCodecError: Exception) {
+                android.util.Log.w("IPTV", "audio codec error: $audioCodecError")
+            }
+
+            override fun onRenderedFirstFrame(eventTime: AnalyticsListener.EventTime, output: Any, renderTimeMs: Long) {
+                android.util.Log.i("IPTV", "first frame")
+            }
+
+            override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
+                android.util.Log.w("IPTV", "dropped $droppedFrames frames in $elapsedMs ms")
+            }
+        })
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) listener?.onEnded()
@@ -61,6 +115,26 @@ class Playback(context: Context) {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) = notifyState()
+
+            // диагностика: что за дорожки в потоке (кодек, размер, чересстрочность по SPS) — для разбора зависаний
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                try {
+                    for (g in tracks.groups) {
+                        if (g.type != C.TRACK_TYPE_VIDEO && g.type != C.TRACK_TYPE_AUDIO) continue
+                        for (i in 0 until g.length) {
+                            val f = g.getTrackFormat(i)
+                            var extra = ""
+                            if (g.type == C.TRACK_TYPE_VIDEO && f.initializationData.isNotEmpty()) {
+                                val sps = f.initializationData[0]
+                                if (sps.size > 5) extra = " interlaced=" + !androidx.media3.container.NalUnitUtil.parseSpsNalUnit(sps, 4, sps.size).frameMbsOnlyFlag
+                            }
+                            android.util.Log.i("IPTV", "track ${if (g.type == C.TRACK_TYPE_VIDEO) "video" else "audio"} ${f.sampleMimeType} ${f.codecs ?: ""} " +
+                                "${if (f.width > 0) f.width.toString() + "x" + f.height else ""} ${f.channelCount.takeIf { it > 0 }?.let { "ch=$it" } ?: ""}$extra " +
+                                "supported=${g.isTrackSupported(i)} selected=${g.isTrackSelected(i)}")
+                        }
+                    }
+                } catch (e: Exception) { android.util.Log.w("IPTV", "tracks log: $e") }
+            }
 
             override fun onPlayerError(error: PlaybackException) {
                 listener?.onError(error)
@@ -83,6 +157,12 @@ class Playback(context: Context) {
      * @param forceHls считать поток HLS (ссылка без расширения, на которой автоопределение не справилось)
      */
     fun play(ch: Channel, url: String, positionMs: Long = C.TIME_UNSET, forceHls: Boolean = false) {
+        // поправка, найденная раньше для этого канала (см. [checkStall])
+        fixKey = ch.key
+        fixStep = top.rootu.perfecttv.core.Prefs.playFix(ch.key)
+        applyFix()
+        stallCount = -1L
+        stallTicks = 0
         userAgent = ch.userAgent.ifEmpty { Net.USER_AGENT }
         val h = HashMap<String, String>()
         if (ch.referrer.isNotEmpty()) h["Referer"] = ch.referrer
@@ -103,13 +183,74 @@ class Playback(context: Context) {
         // скорости к краю эфира — иначе время на шкале расходится с передачей
         if (positionMs != C.TIME_UNSET) live.setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f)
         b.setLiveConfiguration(live.build())
-        if (positionMs != C.TIME_UNSET) player.setMediaItem(b.build(), positionMs) else player.setMediaItem(b.build())
+        val item = b.build()
+        if (item.localConfiguration?.mimeType == MimeTypes.APPLICATION_M3U8) {
+            val src = hlsFactory.createMediaSource(item)
+            if (positionMs != C.TIME_UNSET) player.setMediaSource(src, positionMs) else player.setMediaSource(src)
+        } else if (positionMs != C.TIME_UNSET) player.setMediaItem(item, positionMs) else player.setMediaItem(item)
         player.prepare()
         player.playWhenReady = true
     }
 
     fun stop() {
         player.stop()
+        stallCount = -1L
+        stallTicks = 0
+    }
+
+    // ---------------------------------------------------------- сторож зависания видео
+
+    private var fixKey = ""
+    /** Текущая поправка канала: 0 — нет, 1 — программный видеодекодер, 2 — и звук отключён */
+    var fixStep = 0
+        private set
+    private var stallCount = -1L
+    private var stallTicks = 0
+    private var stalls = 0
+
+    private fun applyFix() {
+        softwareVideo = fixStep >= 1
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, fixStep >= 2).build()
+    }
+
+    /** Убрать поправку канала и запустить заново — меню канала («Сбросить поправку потока») */
+    fun resetFix(ch: Channel, url: String) {
+        top.rootu.perfecttv.core.Prefs.setPlayFix(ch.key, 0)
+        play(ch, url)
+    }
+
+    /**
+     * Раз в секунду. Видео «зависло на первом кадре»: плеер играет (READY, не пауза), а счётчик показанных кадров
+     * не растёт [STALL_SECONDS] секунд. Тогда по очереди: программный видеодекодер (у аппаратного бывают
+     * проблемы с чересстрочным H.264 и необычными потоками), затем отключение звука (у зависшего звукового
+     * декодера, например MP2, стоят и часы воспроизведения). Поправка запоминается за каналом. Зависание
+     * без буферизации — то, что сторож считает неисправностью; загрузка («буферизация») — не он.
+     */
+    fun checkStall(live: () -> Unit = {}) {
+        if (!player.isPlaying || player.currentTracks.groups.none { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }) {
+            stallCount = -1L
+            stallTicks = 0
+            return
+        }
+        val counters = player.videoDecoderCounters ?: return
+        counters.ensureUpdated()
+        val n = counters.renderedOutputBufferCount.toLong()
+        if (stallCount < 0 || n != stallCount) {
+            stallCount = n
+            stallTicks = 0
+            return
+        }
+        if (++stallTicks < STALL_SECONDS || fixKey.isEmpty() || fixStep >= 2) return
+        stallTicks = 0
+        stallCount = -1L
+        fixStep++
+        android.util.Log.w("IPTV", "video stalled on ${fixKey}: fix $fixStep")
+        top.rootu.perfecttv.core.Prefs.setPlayFix(fixKey, fixStep)
+        applyFix()
+        // новый запуск декодера с поправкой: тот же поток с начала подготовки
+        player.prepare()
+        listener?.onFix(fixStep)
     }
 
     // ---------------------------------------------------------- звук и субтитры
@@ -220,6 +361,8 @@ class Playback(context: Context) {
     }
 
     companion object {
+        /** Сколько секунд видео не двигается при включённом воспроизведении, чтобы счесть его зависшим */
+        const val STALL_SECONDS = 8
         fun mimeOf(url: String): String? {
             val path = url.substringBefore('?').substringBefore('#').lowercase()
             return when {

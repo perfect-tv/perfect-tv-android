@@ -117,6 +117,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             }
 
             override fun onEnded() = onStreamEnded()
+            override fun onFix(step: Int) {
+                toast.show(str(if (step == 1) R.string.fix_software_decoder else R.string.fix_audio_off))
+            }
             override fun onError(e: PlaybackException) = onStreamError(e)
             override fun onVideoSize(width: Int, height: Int) {
                 state.height = height
@@ -143,6 +146,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         override fun run() {
             checkArchiveLive()
             watchArchive()
+            playback.checkStall()
             if (info.visible) updateInfo()
             if (ticks % 30 == 0) reminders.check()
             if (ticks > 0 && ticks % AUTO_REFRESH == 0) autoRefresh()
@@ -1466,6 +1470,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 val now = audio.firstOrNull { it.selected }?.label ?: ""
                 viewing.add(MenuLayer.Item(str(R.string.audio_and_subtitles), now, sub = { tracksPage(ch) }))
             }
+            if (playback.fixStep > 0) viewing.add(MenuLayer.Item(str(R.string.fix_reset)) { playback.resetFix(ch, lastUrl) })
             viewing.add(MenuLayer.Item(str(R.string.picture_format), aspectName(), keep = true) { Prefs.aspect = (Prefs.aspect + 1) % 3; applyAspect() })
         }
         viewing.add(MenuLayer.Item(str(R.string.sleep_timer), sleepValue(), keep = true) { cycleSleep() })

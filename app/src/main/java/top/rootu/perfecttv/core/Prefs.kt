@@ -109,6 +109,15 @@ object Prefs {
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
+    /**
+     * Поправка воспроизведения канала, найденная сторожем зависания видео ([top.rootu.perfecttv.player.Playback]):
+     * 0 — нет, 1 — программный видеодекодер, 2 — и звук отключён.
+     */
+    fun playFix(channelKey: String): Int = int("play_fix_$channelKey", 0)
+    fun setPlayFix(channelKey: String, step: Int) {
+        sp.edit().apply { if (step <= 0) remove("play_fix_$channelKey") else putInt("play_fix_$channelKey", step) }.apply()
+    }
+
     /** Приоритет логотипов: 0 — из плейлиста, 1 — из программы (XMLTV); не загрузился — берётся другой источник */
     var logoPriority: Int
         get() = int("logo_priority", 0).coerceIn(0, 1)
