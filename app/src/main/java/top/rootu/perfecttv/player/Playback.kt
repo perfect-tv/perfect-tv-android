@@ -39,7 +39,7 @@ class Playback(context: Context) {
         fun onEnded() {}
         fun onError(e: PlaybackException) {}
         fun onVideoSize(width: Int, height: Int) {}
-        /** Сторож зависания включил поправку: 1 — программный видеодекодер, 2 — звук отключён */
+        /** Сторож зависания включил поправку: 1 — программный видеодекодер */
         fun onFix(step: Int) {}
     }
 
@@ -201,7 +201,7 @@ class Playback(context: Context) {
     // ---------------------------------------------------------- сторож зависания видео
 
     private var fixKey = ""
-    /** Текущая поправка канала: 0 — нет, 1 — программный видеодекодер, 2 — и звук отключён */
+    /** Текущая поправка канала: 0 — нет, 1 — программный видеодекодер */
     var fixStep = 0
         private set
     private var stallCount = -1L
@@ -210,8 +210,6 @@ class Playback(context: Context) {
 
     private fun applyFix() {
         softwareVideo = fixStep >= 1
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, fixStep >= 2).build()
     }
 
     /** Убрать поправку канала и запустить заново — меню канала («Сбросить поправку потока») */
@@ -222,10 +220,9 @@ class Playback(context: Context) {
 
     /**
      * Раз в секунду. Видео «зависло на первом кадре»: плеер играет (READY, не пауза), а счётчик показанных кадров
-     * не растёт [STALL_SECONDS] секунд. Тогда по очереди: программный видеодекодер (у аппаратного бывают
-     * проблемы с чересстрочным H.264 и необычными потоками), затем отключение звука (у зависшего звукового
-     * декодера, например MP2, стоят и часы воспроизведения). Поправка запоминается за каналом. Зависание
-     * без буферизации — то, что сторож считает неисправностью; загрузка («буферизация») — не он.
+     * не растёт [STALL_SECONDS] секунд. Тогда включается программный видеодекодер (у аппаратного бывают
+     * проблемы с чересстрочным H.264 и необычными потоками); поправка запоминается за каналом. Звук не
+     * трогаем. Зависание без буферизации — то, что сторож считает неисправностью; загрузка («буферизация») — не он.
      */
     fun checkStall(live: () -> Unit = {}) {
         if (!player.isPlaying || player.currentTracks.groups.none { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }) {
@@ -241,7 +238,7 @@ class Playback(context: Context) {
             stallTicks = 0
             return
         }
-        if (++stallTicks < STALL_SECONDS || fixKey.isEmpty() || fixStep >= 2) return
+        if (++stallTicks < STALL_SECONDS || fixKey.isEmpty() || fixStep >= 1) return
         stallTicks = 0
         stallCount = -1L
         fixStep++

@@ -111,7 +111,7 @@ object Prefs {
 
     /**
      * Поправка воспроизведения канала, найденная сторожем зависания видео ([top.rootu.perfecttv.player.Playback]):
-     * 0 — нет, 1 — программный видеодекодер, 2 — и звук отключён.
+     * 0 — нет, 1 — программный видеодекодер.
      */
     fun playFix(channelKey: String): Int = int("play_fix_$channelKey", 0)
     fun setPlayFix(channelKey: String, step: Int) {

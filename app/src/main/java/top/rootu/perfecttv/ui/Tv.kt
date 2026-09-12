@@ -118,7 +118,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
             override fun onEnded() = onStreamEnded()
             override fun onFix(step: Int) {
-                toast.show(str(if (step == 1) R.string.fix_software_decoder else R.string.fix_audio_off))
+                toast.show(str(R.string.fix_software_decoder))
             }
             override fun onError(e: PlaybackException) = onStreamError(e)
             override fun onVideoSize(width: Int, height: Int) {

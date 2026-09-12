@@ -394,6 +394,5 @@
     <string name="logo_from_programme">Программа</string>
     <string name="logo_priority_sub">не загрузился — берётся другой источник; неудачные адреса запоминаются</string>
     <string name="fix_software_decoder">Видео зависло — включён программный декодер</string>
-    <string name="fix_audio_off">Видео зависло — звук отключён для этого канала</string>
     <string name="fix_reset">Сбросить поправку потока</string>
 </resources>

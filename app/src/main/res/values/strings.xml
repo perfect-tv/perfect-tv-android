@@ -394,6 +394,5 @@
     <string name="logo_from_programme">Programme (EPG)</string>
     <string name="logo_priority_sub">if one fails, the other source is used; failed addresses are remembered</string>
     <string name="fix_software_decoder">Video froze — software decoder enabled</string>
-    <string name="fix_audio_off">Video froze — audio turned off for this channel</string>
     <string name="fix_reset">Reset stream workaround</string>
 </resources>
