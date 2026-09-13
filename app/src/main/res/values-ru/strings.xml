@@ -406,10 +406,24 @@
     <string name="help_teletext">Телетекст</string>
     <string name="help_ttx_open">Открыть телетекст (есть и в меню канала)</string>
     <string name="help_ttx_digits">Номер страницы: три цифры</string>
-    <string name="help_ttx_pages">Следующая / предыдущая страница; PG± — на десять</string>
-    <string name="help_ttx_sub">Подстраницы</string>
     <string name="help_ttx_colors">Ссылки из нижней строки страницы</string>
-    <string name="help_ttx_ok">Показать скрытый текст</string>
     <string name="help_ttx_back">Стереть набранный номер, затем закрыть</string>
     <string name="help_ttx_colors_keys">Красная, зелёная, жёлтая, синяя</string>
+    <string name="ttx_keypad">Клавиатура</string>
+    <string name="ttx_background">Фон</string>
+    <string name="ttx_bg_black">Чёрный</string>
+    <string name="ttx_bg_video">Поверх видео</string>
+    <string name="ttx_reveal">Скрытый текст</string>
+    <string name="ttx_subpages">Подстраницы</string>
+    <string name="ttx_subpages_auto">Листаются</string>
+    <string name="ttx_subpages_stop">Стоп</string>
+    <string name="ttx_exit">Закрыть телетекст</string>
+    <string name="ttx_shown">Показана</string>
+    <string name="ttx_hidden">Скрыта</string>
+    <string name="ttx_page_n">Страница %1$s</string>
+    <string name="help_ttx_pad">Клавиатура: стрелки по кнопкам, OK — нажать; ← из левого столбца — на страницу (↑/↓ — страницы, ←/→ — подстраницы, OK — обратно к клавиатуре)</string>
+    <string name="help_ttx_menu">Меню: клавиатура, фон поверх видео, скрытый текст, стоп подстраниц, закрыть</string>
+    <string name="ttx_sec_view">Вид</string>
+    <string name="ttx_sec_pages">Страницы</string>
+    <string name="help_ttx_pg">Страницы через десять</string>
 </resources>

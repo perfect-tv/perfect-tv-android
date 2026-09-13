@@ -150,4 +150,41 @@ class TtxTest {
         val g = Ttx.layout(p, Ttx.headerRow(0x100, p.rows[0]))
         assertEquals("P100", g.rowText(0).substring(1, 5))
     }
+
+    // ------------------------------------------------------------ уровень 1.5 и двойная ширина
+
+    @Test fun diacriticsCompose() {
+        assertEquals('ё'.code, Ttx.accented(0x65, 0x24, 8))   // «е» + диерезис
+        assertEquals('Ё'.code, Ttx.accented(0x45, 0x24, 8))
+        assertEquals('é'.code, Ttx.accented('e'.code, 0, 2))
+        assertEquals('x'.code, Ttx.accented('x'.code, 0, 2))  // нет такой буквы — без значка
+        assertEquals('©'.code, Ttx.g2(0x53))
+        assertEquals(' '.code, Ttx.g2(0x20))
+    }
+
+    @Test fun enhancementReplacesChar() {
+        // «е» в кириллице с диерезисом поверх обычного знака: слово (адрес 40+строка, режим 4, столбец), затем знак
+        val rowWord = (40 + 3) or (0x04 shl 6) or (2 shl 11)    // строка 3, столбец 2
+        val charWord = 2 or (0x18 shl 6) or (0x65 shl 11)        // столбец 2: режим 0x18 = «¨», база 0x65
+        val p = TtxPage(0x100, 0, 0, Ttx.CYRILLIC_RU, Array(25) { r -> if (r == 3) ByteArray(40) { 0x20 } else null }, null, intArrayOf(rowWord, charWord, (40 or (0x1F shl 6))))
+        val g = Ttx.layout(p)
+        assertEquals('ё'.code, g.ch[3 * Ttx.COLS + 2])
+    }
+
+    @Test fun doubleWidthSkipsRightCell() {
+        val g = Ttx.layout(page(4 to listOf(0x0E) + s("AB") + s("C")))
+        val r = 4 * Ttx.COLS
+        assertTrue(g.has(r + 1, Ttx.A_DW))
+        assertTrue(g.has(r + 2, Ttx.A_DW_RIGHT))
+        assertTrue(g.has(r + 3, Ttx.A_DW))     // следующий знак — снова пара
+    }
+
+    @Test fun tvcPageHasYoFromEnhancement() {
+        val (dec, _) = decode("ТВ_Центр_Мурманск.ttx")
+        val pg = dec.subpages(0x142).firstOrNull() ?: return
+        assertTrue("нет X/26 у страницы 142", pg.enh != null)
+        val t = text(pg)
+        println(t)
+        assertTrue(t, t.contains("Актёрские"))
+    }
 }

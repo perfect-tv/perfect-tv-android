@@ -10,9 +10,10 @@ import top.rootu.perfecttv.teletext.TTX_COLORS
 import top.rootu.perfecttv.teletext.Ttx
 
 /**
- * Страница телетекста 40×25 на Canvas: область 4:3 по центру экрана, ячейка рисуется целиком
- * (фон, символ или блок мозаики 2×3). Двойная высота — символ вдвое выше через две ячейки,
- * мигание — по фазе [flashOn], скрытый текст — пока не включено [reveal].
+ * Страница телетекста 40×25 на Canvas: область 4:3, ячейка рисуется целиком (фон, знак или блок
+ * мозаики 2×3). Двойная высота и ширина — знак растянут на две ячейки, мигание — по фазе [flashOn],
+ * скрытый текст — пока не включено [reveal]. В режиме [mix] фон страницы прозрачный: чёрный — лёгкая
+ * вуаль, остальные цвета — почти непрозрачные, знаки с тенью, видео видно сквозь страницу.
  */
 class TeletextView(context: Context) : View(context) {
 
@@ -25,8 +26,18 @@ class TeletextView(context: Context) : View(context) {
     /** Подпись по центру (ожидание страницы), пусто — нет */
     var message = ""
         set(v) { field = v; invalidate() }
+    /** Прозрачный фон поверх видео */
+    var mix = false
+        set(v) { field = v; setBackgroundColor(if (v) Color.TRANSPARENT else Color.BLACK); invalidate() }
+    /** Страница прижата влево (справа клавиатура), иначе по центру */
+    var left = false
+        set(v) { field = v; invalidate() }
+    /** Рамка вокруг страницы: в фокусе управления (стрелки листают страницы) */
+    var focused = false
+        set(v) { field = v; invalidate() }
 
     private val fill = Paint()
+    private val frame = Paint().apply { style = Paint.Style.STROKE; color = Color.WHITE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val tmp = FloatArray(1)
 
@@ -35,10 +46,12 @@ class TeletextView(context: Context) : View(context) {
     override fun onDraw(c: Canvas) {
         val h = height.toFloat()
         val w = minOf(width.toFloat(), h * 4f / 3f)
-        val x0 = (width - w) / 2f
+        val x0 = if (left) 0f else (width - w) / 2f
         val cw = w / Ttx.COLS
         val ch = h / Ttx.ROWS
         text.textSize = ch * 0.82f
+        // тень знаков поверх видео
+        if (mix) text.setShadowLayer(ch * 0.08f, 0f, 0f, Color.BLACK) else text.clearShadowLayer()
         // растянуть знак по ширине ячейки: у моноширинного шрифта он уже, чем у телетекста
         val adv = text.measureText("0").coerceAtLeast(1f)
         val sx = (cw * 0.98f / adv).coerceIn(0.6f, 2f)
@@ -47,33 +60,42 @@ class TeletextView(context: Context) : View(context) {
             for (r in 0 until Ttx.ROWS) for (col in 0 until Ttx.COLS) {
                 val i = r * Ttx.COLS + col
                 val a = g.attr[i]
-                val left = x0 + col * cw
+                val l = x0 + col * cw
                 val top = r * ch
                 val bg = (a shr 3) and 7
-                if (bg != 0) { fill.color = TTX_COLORS[bg]; c.drawRect(left, top, left + cw, top + ch, fill) }
-                val hidden = (a and Ttx.A_CONCEAL != 0 && !reveal) || (a and Ttx.A_FLASH != 0 && !flashOn)
+                if (mix) {
+                    fill.color = if (bg == 0) 0x66000000 else (TTX_COLORS[bg] and 0xFFFFFF) or (0xE0 shl 24)
+                    c.drawRect(l, top, l + cw, top + ch, fill)
+                } else if (bg != 0) { fill.color = TTX_COLORS[bg]; c.drawRect(l, top, l + cw, top + ch, fill) }
+                val hidden = (a and Ttx.A_CONCEAL != 0 && !reveal) || (a and Ttx.A_FLASH != 0 && !flashOn) || a and Ttx.A_DW_RIGHT != 0
                 val code = g.ch[i]
                 if (hidden || code == 0x20) continue
                 val fg = TTX_COLORS[a and 7]
                 val bottom = a and Ttx.A_DH_BOTTOM != 0
-                val double = a and Ttx.A_DH != 0 || bottom
+                val tall = a and Ttx.A_DH != 0 || bottom
+                val wide = a and Ttx.A_DW != 0
                 c.save()
-                c.clipRect(left, top, left + cw, top + ch)
+                c.clipRect(l, top, l + cw * (if (wide) 2 else 1), top + ch)
                 // двойная высота: знак верхней ячейки растянут вдвое от её верха, в этой ячейке видна нужная половина
                 val dTop = if (bottom) top - ch else top
-                if (double) c.scale(1f, 2f, 0f, dTop)
+                if (tall || wide) c.scale(if (wide) 2f else 1f, if (tall) 2f else 1f, l, dTop)
                 fill.color = fg
-                if (a and Ttx.A_MOSAIC != 0) mosaic(c, code, left, dTop, cw, ch, a and Ttx.A_SEPARATED != 0)
-                else glyph(c, code, left, dTop, cw, ch, sx, fg)
+                if (a and Ttx.A_MOSAIC != 0) mosaic(c, code, l, dTop, cw, ch, a and Ttx.A_SEPARATED != 0)
+                else glyph(c, code, l, dTop, cw, ch, sx, fg)
                 c.restore()
             }
+        }
+        if (focused) {
+            frame.strokeWidth = maxOf(2f, ch * 0.08f)
+            frame.alpha = 150
+            c.drawRect(x0, 0f, x0 + w, h, frame)
         }
         if (message.isNotEmpty()) {
             text.textScaleX = 1f
             text.color = Color.WHITE
             text.textSize = ch * 1.1f
             val mw = text.measureText(message)
-            c.drawText(message, (width - mw) / 2f, h / 2f, text)
+            c.drawText(message, x0 + (w - mw) / 2f, h / 2f, text)
         }
     }
 

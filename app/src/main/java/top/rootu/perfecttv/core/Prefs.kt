@@ -133,6 +133,16 @@ object Prefs {
         get() = int("guide_header", 0).coerceIn(0, 2)
         set(v) = sp.edit().putInt("guide_header", v).apply()
 
+    /** Экранная клавиатура рядом со страницей телетекста */
+    var ttxKeypad: Boolean
+        get() = bool("ttx_keypad", true)
+        set(v) = sp.edit().putBoolean("ttx_keypad", v).apply()
+
+    /** Телетекст поверх видео (прозрачный фон) вместо чёрного экрана */
+    var ttxMix: Boolean
+        get() = bool("ttx_mix", false)
+        set(v) = sp.edit().putBoolean("ttx_mix", v).apply()
+
     /** Вид «Список»: при переходе в программу каналы сжимаются до логотипов, справа выезжает панель передачи */
     var guideDesc: Boolean
         get() = bool("guide_desc", false)

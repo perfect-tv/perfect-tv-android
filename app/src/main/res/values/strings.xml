@@ -406,10 +406,24 @@
     <string name="help_teletext">Teletext</string>
     <string name="help_ttx_open">Open teletext (also in the channel menu)</string>
     <string name="help_ttx_digits">Page number: three digits</string>
-    <string name="help_ttx_pages">Next / previous page; PG± — ten pages</string>
-    <string name="help_ttx_sub">Subpages</string>
     <string name="help_ttx_colors">Page links from the bottom line of the page</string>
-    <string name="help_ttx_ok">Show hidden text</string>
     <string name="help_ttx_back">Clear the typed number, then close</string>
     <string name="help_ttx_colors_keys">Red, Green, Yellow, Blue</string>
+    <string name="ttx_keypad">Keypad</string>
+    <string name="ttx_background">Background</string>
+    <string name="ttx_bg_black">Black</string>
+    <string name="ttx_bg_video">Over the video</string>
+    <string name="ttx_reveal">Hidden text</string>
+    <string name="ttx_subpages">Subpages</string>
+    <string name="ttx_subpages_auto">Auto</string>
+    <string name="ttx_subpages_stop">Stopped</string>
+    <string name="ttx_exit">Close teletext</string>
+    <string name="ttx_shown">Shown</string>
+    <string name="ttx_hidden">Hidden</string>
+    <string name="ttx_page_n">Page %1$s</string>
+    <string name="help_ttx_pad">Keypad: arrows over the keys, OK presses; ← from the left column — to the page (↑/↓ page, ←/→ subpages, OK — back to the keypad)</string>
+    <string name="help_ttx_menu">Menu: keypad, background over the video, hidden text, stop subpages, close</string>
+    <string name="ttx_sec_view">View</string>
+    <string name="ttx_sec_pages">Pages</string>
+    <string name="help_ttx_pg">Ten pages forward / back</string>
 </resources>

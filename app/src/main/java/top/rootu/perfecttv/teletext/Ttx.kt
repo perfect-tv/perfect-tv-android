@@ -18,7 +18,7 @@ val TTX_COLORS = intArrayOf(
  * Принятая страница. [number] — номер в BCD (0x100…0x8FF), [subcode] — подстраница,
  * [rows] — строки 0…24 по 40 байт «как пришли» (7 бит, без бита чётности), [charset] — код набора
  * G0 (7 бит, см. [Ttx.glyph]), [links] — ссылки Fastext (красная, зелёная, жёлтая, голубая, белая,
- * индекс), 0 — нет.
+ * индекс), 0 — нет, [enh] — слова пакетов X/26 (расширения уровня 1.5, по 18 бит), по порядку.
  */
 class TtxPage(
     val number: Int,
@@ -26,7 +26,8 @@ class TtxPage(
     val flags: Int,
     val charset: Int,
     val rows: Array<ByteArray?>,
-    val links: IntArray?
+    val links: IntArray?,
+    val enh: IntArray? = null
 ) {
     val isSubtitle get() = flags and F_SUBTITLE != 0
     val isNewsflash get() = flags and F_NEWSFLASH != 0
@@ -66,6 +67,9 @@ class TtxDecoder {
         val rows = arrayOfNulls<ByteArray>(25)
         var charset = -1
         var links: IntArray? = null
+        // пакеты X/26 по номеру обозначения (0…15)
+        val enh = arrayOfNulls<IntArray>(16)
+        var enhOld: IntArray? = null
     }
 
     private val building = arrayOfNulls<Builder>(8)
@@ -149,6 +153,7 @@ class TtxDecoder {
         when (row) {
             0 -> header(mag, d, timeUs, sink)
             in 1..24 -> building[mag]?.let { bl -> bl.rows[row] = ByteArray(40) { (d[it].toInt() and 0x7F).toByte() } }
+            26 -> building[mag]?.let { bl -> enhancement(bl, d) }
             27 -> building[mag]?.let { bl -> if (Ttx.ham84(d[0]) == 0) fastext(bl, d) }
             28 -> building[mag]?.let { bl -> designation(d)?.let { cs -> if (Ttx.ham84(d[0]).let { it == 0 || it == 4 } && bl.charset < 0) bl.charset = cs } }
             29 -> if (Ttx.ham84(d[0]).let { it == 0 || it == 4 }) designation(d)?.let { magCharset[mag] = it }
@@ -177,7 +182,7 @@ class TtxDecoder {
         val sub = s1 or ((s2 and 7) shl 4) or (s3 shl 8) or ((s4 and 3) shl 12)
         val b = Builder(mag, number, sub, flags, (c11 shr 1) and 7)
         // без бита стирания страница дополняет прежнюю
-        if (flags and TtxPage.F_ERASE == 0) store[(number shl 16) or sub]?.let { old -> for (r in 1..24) b.rows[r] = old.rows[r]; b.links = old.links; b.charset = old.charset }
+        if (flags and TtxPage.F_ERASE == 0) store[(number shl 16) or sub]?.let { old -> for (r in 1..24) b.rows[r] = old.rows[r]; b.links = old.links; b.charset = old.charset; b.enhOld = old.enh }
         b.rows[0] = ByteArray(40) { (d[it].toInt() and 0x7F).toByte() }
         building[mag] = b
     }
@@ -191,10 +196,19 @@ class TtxDecoder {
             cyrillicDefault -> Ttx.CYRILLIC_RU
             else -> b.subset
         }
-        val page = TtxPage(b.number, b.subcode, b.flags, cs, b.rows, b.links)
+        val packets = b.enh.filterNotNull()
+        val enh = if (packets.isNotEmpty()) packets.flatMap { it.asList() }.toIntArray() else b.enhOld
+        val page = TtxPage(b.number, b.subcode, b.flags, cs, b.rows, b.links, enh)
         store[(b.number shl 16) or b.subcode] = page
         version++
         sink?.onPage(page, timeUs)
+    }
+
+    // X/26: 13 слов по 18 бит (адрес 6 бит, режим 5, данные 7) после номера обозначения
+    private fun enhancement(b: Builder, d: ByteArray) {
+        val des = Ttx.ham84(d[0])
+        if (des !in 0..15) return
+        b.enh[des] = IntArray(13) { Ttx.ham2418(d, 1 + it * 3) ?: 0x1F shl 6 or 0x3F }
     }
 
     // Fastext: шесть ссылок по шесть полубайт (единицы, десятки, S1…S4 с битами магазина)
@@ -285,6 +299,23 @@ object Ttx {
         return if (k >= 0) opt[k].code else c
     }
 
+    // G2 (латиница, дополнительные знаки) 0x20…0x7F
+    private const val G2 = " ¡¢£\$¥#§¤‘“«←↑→↓" + "°±²³×µ¶·÷’”»¼½¾¿" + " `´ˆ˜¯˘˙¨ ˚¸_˝˛ˇ" + "―¹®©™♪₠‰α   ⅛⅜⅝⅞" +
+        "ΩÆĐªĦ ĲĿŁØŒºÞŦŊŉ" + "ĸæđðħıĳŀłøœßþŧŋ■"
+    private val COMBINING = intArrayOf(0, 0x300, 0x301, 0x302, 0x303, 0x304, 0x306, 0x307, 0x308, 0, 0x30A, 0x327, 0, 0x30B, 0x328, 0x30C)
+
+    /** Знак G2 по коду 0x20…0x7F */
+    fun g2(c: Int): Int = G2.getOrNull(c - 0x20)?.code ?: 0x20
+
+    /** Знак набора G0 с диакритикой ([mark] 0…15, как в режимах 0x10…0x1F пакета X/26): «е» + «¨» = «ё» */
+    fun accented(c: Int, charset: Int, mark: Int): Int {
+        val base = glyph(c, charset)
+        val comb = COMBINING.getOrElse(mark) { 0 }
+        if (comb == 0) return base
+        val n = java.text.Normalizer.normalize(String(Character.toChars(base)) + String(Character.toChars(comb)), java.text.Normalizer.Form.NFC)
+        return if (n.codePointCount(0, n.length) == 1) n.codePointAt(0) else base
+    }
+
     // ---------------------------------------------------------------- раскладка в сетку 40×25
 
     const val COLS = 40
@@ -300,6 +331,10 @@ object Ttx {
     const val A_CONCEAL = 1 shl 11
     /** Внутри «окна» (между кодами начала и конца окна) — для субтитров */
     const val A_BOX = 1 shl 12
+    /** Двойная ширина: знак вдвое шире, занимает эту и правую ячейку */
+    const val A_DW = 1 shl 13
+    /** Правая половина знака двойной ширины (своего знака нет) */
+    const val A_DW_RIGHT = 1 shl 14
 
     /**
      * Сетка: [ch] — код символа (Юникод; для мозаики — исходный 0x20…0x7F), [attr] — цвет символа
@@ -341,7 +376,8 @@ object Ttx {
             if (data == null) continue
             var fg = 7; var bg = 0; var mosaic = false; var sep = false
             var hold = false; var held = 0x20; var heldSep = false
-            var dh = false; var flash = false; var conceal = false; var box = false
+            var dh = false; var dw = false; var flash = false; var conceal = false; var box = false
+            var rightHalf = false  // эта ячейка — правая половина знака двойной ширины
             var prev = 0
             var anyDh = false
             for (c in 0 until COLS) {
@@ -357,7 +393,7 @@ object Ttx {
                     // «Set-At»: действуют уже на самой управляющей ячейке
                     when (code) {
                         0x09 -> flash = false
-                        0x0C -> dh = false
+                        0x0C -> { dh = false; dw = false }
                         0x18 -> conceal = true
                         0x19 -> sep = false
                         0x1A -> sep = true
@@ -368,8 +404,12 @@ object Ttx {
                     // ячейка управляющего кода — пробел или удержанная мозаика
                     if (hold && mosaic) { shown = held; shownMosaic = true; shownSep = heldSep } else { shown = 0x20; shownSep = sep }
                 }
+                // двойная ширина: знак занимает две ячейки, знак правой не показывается
+                val wide = dw && !rightHalf && code >= 0x20 && c < COLS - 1
                 val a = (fg and 7) or ((bg and 7) shl 3) or (if (shownMosaic) A_MOSAIC else 0) or (if (shownMosaic && shownSep) A_SEPARATED else 0) or
-                    (if (dh) A_DH else 0) or (if (flash) A_FLASH else 0) or (if (conceal) A_CONCEAL else 0) or (if (box) A_BOX else 0)
+                    (if (dh) A_DH else 0) or (if (flash) A_FLASH else 0) or (if (conceal) A_CONCEAL else 0) or (if (box) A_BOX else 0) or
+                    (if (wide) A_DW else 0) or (if (rightHalf) A_DW_RIGHT else 0)
+                rightHalf = wide
                 val i = r * COLS + c
                 g.ch[i] = shown; g.attr[i] = a
                 if (dh) anyDh = true
@@ -382,7 +422,9 @@ object Ttx {
                         0x08 -> flash = true
                         0x0A -> if (prev == 0x0A) box = false
                         0x0B -> if (prev == 0x0B) box = true
-                        0x0D, 0x0F -> dh = true
+                        0x0D -> { dh = true; dw = false }
+                        0x0E -> { dw = true; dh = false }
+                        0x0F -> { dh = true; dw = true }
                         0x1F -> { hold = false }
                     }
                 }
@@ -390,7 +432,41 @@ object Ttx {
             }
             if (anyDh && r < ROWS - 1) skipRow = r + 1
         }
+        page.enh?.let { enhance(page, g) }
         return g
+    }
+
+    /**
+     * Расширения уровня 1.5 (пакеты X/26): слова «адрес, режим, данные». Группа строки (адрес 40…63)
+     * задаёт позицию (режим 4: строка = адрес − 40, 40 — строка 24, столбец — в данных); группа
+     * столбца (0…39) — знак в этом столбце текущей строки: режим 9 — знак G0, 15 — знак G2,
+     * 16…31 — знак G0 с диакритикой (режим − 16). Цвета, мозаика G3, объекты и DRCS пропускаются.
+     */
+    private fun enhance(page: TtxPage, g: Grid) {
+        val t = page.enh ?: return
+        var row = 0
+        for (w in t) {
+            val addr = w and 0x3F
+            val mode = (w shr 6) and 0x1F
+            val data = (w shr 11) and 0x7F
+            if (addr >= 40) {
+                when (mode) {
+                    0x04 -> row = if (addr == 40) 24 else addr - 40
+                    0x1F -> return  // конец
+                }
+            } else if (row in 1..24 && data >= 0x20) {
+                val ch = when {
+                    mode == 0x09 -> glyph(data, page.charset)
+                    mode == 0x0F -> g2(data)
+                    mode >= 0x10 -> accented(data, page.charset, mode - 0x10)
+                    else -> continue
+                }
+                val i = row * COLS + addr
+                if (g.attr[i] and A_MOSAIC == 0) g.ch[i] = ch
+            }
+        }
+        // нижние половины двойной высоты повторяют верхние
+        for (i in COLS until COLS * ROWS) if (g.attr[i] and A_DH_BOTTOM != 0) g.ch[i] = g.ch[i - COLS]
     }
 
     /** Строка 0 для показа: «P100» слева, остальное — из заголовка страницы (дата, время) */

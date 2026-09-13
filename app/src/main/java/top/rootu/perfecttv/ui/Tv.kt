@@ -1309,7 +1309,28 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val nums = dec.numbers()
         val start = if (nums.isEmpty() || 0x100 in nums) 0x100 else nums.first()
         var layer: TeletextLayer? = null
-        layer = TeletextLayer(activity, dec, start) { remove(layer!!) }
+        layer = TeletextLayer(activity, dec, start, onMenu = { openTeletextMenu(layer!!) }, onClose = { closeMenu(); remove(layer!!) })
+        push(layer)
+    }
+
+    // меню телетекста (удерж. OK, MENU): вид и выход
+    private fun openTeletextMenu(t: TeletextLayer) {
+        closeMenu()
+        val page = {
+            MenuLayer.Page(str(R.string.teletext), str(R.string.ttx_page_n, "%03X".format(t.page)), sections = listOf(
+                MenuLayer.Section(str(R.string.ttx_sec_view), listOf(
+                    MenuLayer.Item(str(R.string.ttx_keypad), str(if (t.padVisible) R.string.ttx_shown else R.string.ttx_hidden), keep = true) { t.toggleKeypad() },
+                    MenuLayer.Item(str(R.string.ttx_background), str(if (t.mix) R.string.ttx_bg_video else R.string.ttx_bg_black), keep = true) { t.toggleMix() },
+                    MenuLayer.Item(str(R.string.ttx_reveal), onOff(t.reveal), keep = true) { t.toggleReveal() }
+                )),
+                MenuLayer.Section(str(R.string.ttx_sec_pages), listOf(
+                    MenuLayer.Item(str(R.string.ttx_subpages), str(if (t.hold) R.string.ttx_subpages_stop else R.string.ttx_subpages_auto), keep = true) { t.toggleHold() },
+                    MenuLayer.Item(str(R.string.ttx_exit)) { t.close() }
+                ))
+            ))
+        }
+        val layer = MenuLayer(activity, page, ::closeMenu)
+        menu = layer
         push(layer)
     }
 
