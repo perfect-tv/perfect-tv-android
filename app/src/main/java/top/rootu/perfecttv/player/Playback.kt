@@ -209,7 +209,8 @@ class Playback(context: Context) {
     private var stalls = 0
 
     private fun applyFix() {
-        softwareVideo = fixStep >= 1
+        // «Программный» — всегда; «Авто» — если для канала найдена поправка; «Аппаратный» — никогда
+        softwareVideo = when (top.rootu.perfecttv.core.Prefs.videoDecoder) { 2 -> true; 1 -> false; else -> fixStep >= 1 }
     }
 
     /** Убрать поправку канала и запустить заново — меню канала («Сбросить поправку потока») */
@@ -225,6 +226,12 @@ class Playback(context: Context) {
      * трогаем. Зависание без буферизации — то, что сторож считает неисправностью; загрузка («буферизация») — не он.
      */
     fun checkStall(live: () -> Unit = {}) {
+        // сторож — только в режиме «Авто»: «Аппаратный» и «Программный» выбраны явно
+        if (top.rootu.perfecttv.core.Prefs.videoDecoder != 0) {
+            stallCount = -1L
+            stallTicks = 0
+            return
+        }
         if (!player.isPlaying || player.currentTracks.groups.none { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }) {
             stallCount = -1L
             stallTicks = 0

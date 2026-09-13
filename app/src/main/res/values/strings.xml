@@ -395,4 +395,9 @@
     <string name="logo_priority_sub">if one fails, the other source is used; failed addresses are remembered</string>
     <string name="fix_software_decoder">Video froze — software decoder enabled</string>
     <string name="fix_reset">Reset stream workaround</string>
+    <string name="video_decoder">Video decoder</string>
+    <string name="decoder_auto">Auto</string>
+    <string name="decoder_hw">Hardware</string>
+    <string name="decoder_sw">Software</string>
+    <string name="video_decoder_sub">auto — hardware, and if the video freezes, software for that channel; applies from the next channel</string>
 </resources>

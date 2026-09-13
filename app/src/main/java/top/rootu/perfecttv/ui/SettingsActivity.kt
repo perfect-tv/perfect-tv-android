@@ -265,6 +265,8 @@ class SettingsActivity : Activity() {
         choice(col, str(R.string.up_key_in_the_player), listOf(str(R.string.recent_channels), str(R.string.programme_and_archive)), if (Prefs.upArchive) 1 else 0) {
             Prefs.upArchive = it == 1; showMain()
         }
+        choice(col, str(R.string.video_decoder), listOf(str(R.string.decoder_auto), str(R.string.decoder_hw), str(R.string.decoder_sw)), Prefs.videoDecoder,
+            str(R.string.video_decoder_sub)) { Prefs.videoDecoder = it; showMain() }
         number(col, str(R.string.remind_about_a_programme), listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore,
             label = { if (it == 0) str(R.string.when_it_starts) else str(R.string.x_min_before, it) }) { Prefs.remindBefore = it; showMain() }
         toggle(col, str(R.string.start_with_the_last_channel), Prefs.autoplayLast, str(R.string.off_the_guide_opens_on_start)) { Prefs.autoplayLast = it; showMain() }

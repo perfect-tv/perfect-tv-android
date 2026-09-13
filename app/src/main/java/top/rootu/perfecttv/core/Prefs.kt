@@ -109,6 +109,11 @@ object Prefs {
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
+    /** Видеодекодер: 0 — авто (аппаратный; зависло видео — для канала программный), 1 — аппаратный, 2 — программный */
+    var videoDecoder: Int
+        get() = int("video_decoder", 0).coerceIn(0, 2)
+        set(v) = sp.edit().putInt("video_decoder", v).apply()
+
     /**
      * Поправка воспроизведения канала, найденная сторожем зависания видео ([top.rootu.perfecttv.player.Playback]):
      * 0 — нет, 1 — программный видеодекодер.

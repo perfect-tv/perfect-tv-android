@@ -395,4 +395,9 @@
     <string name="logo_priority_sub">не загрузился — берётся другой источник; неудачные адреса запоминаются</string>
     <string name="fix_software_decoder">Видео зависло — включён программный декодер</string>
     <string name="fix_reset">Сбросить поправку потока</string>
+    <string name="video_decoder">Видеодекодер</string>
+    <string name="decoder_auto">Авто</string>
+    <string name="decoder_hw">Аппаратный</string>
+    <string name="decoder_sw">Программный</string>
+    <string name="video_decoder_sub">авто — аппаратный, а если видео зависло, для этого канала программный; со следующего канала</string>
 </resources>
