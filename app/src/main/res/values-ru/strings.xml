@@ -400,4 +400,16 @@
     <string name="decoder_hw">Аппаратный</string>
     <string name="decoder_sw">Программный</string>
     <string name="video_decoder_sub">авто — аппаратный, а если видео зависло, для этого канала программный; со следующего канала</string>
+    <string name="teletext">Телетекст</string>
+    <string name="teletext_waiting">Ожидание страницы %1$s…</string>
+    <string name="no_teletext">На этом канале нет телетекста</string>
+    <string name="help_teletext">Телетекст</string>
+    <string name="help_ttx_open">Открыть телетекст (есть и в меню канала)</string>
+    <string name="help_ttx_digits">Номер страницы: три цифры</string>
+    <string name="help_ttx_pages">Следующая / предыдущая страница; PG± — на десять</string>
+    <string name="help_ttx_sub">Подстраницы</string>
+    <string name="help_ttx_colors">Ссылки из нижней строки страницы</string>
+    <string name="help_ttx_ok">Показать скрытый текст</string>
+    <string name="help_ttx_back">Стереть набранный номер, затем закрыть</string>
+    <string name="help_ttx_colors_keys">Красная, зелёная, жёлтая, синяя</string>
 </resources>

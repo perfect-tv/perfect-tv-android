@@ -203,6 +203,11 @@ class Keys(
             KeyEvent.KEYCODE_MENU -> "menu"
             KeyEvent.KEYCODE_LAST_CHANNEL -> "history"
             KeyEvent.KEYCODE_SEARCH -> "search"
+            KeyEvent.KEYCODE_TV_TELETEXT -> "teletext"
+            KeyEvent.KEYCODE_PROG_RED -> "red"
+            KeyEvent.KEYCODE_PROG_GREEN -> "green"
+            KeyEvent.KEYCODE_PROG_YELLOW -> "yellow"
+            KeyEvent.KEYCODE_PROG_BLUE -> "blue"
             else -> null
         }
     }

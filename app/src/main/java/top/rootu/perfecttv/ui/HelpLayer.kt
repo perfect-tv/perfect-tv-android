@@ -85,6 +85,15 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
                 str(R.string.hold_ok) to str(R.string.help_search_hold),
                 str(R.string.help_search_mic) to str(R.string.help_search_voice)
             ),
+            str(R.string.help_teletext) to listOf(
+                "TEXT" to str(R.string.help_ttx_open),
+                "0–9" to str(R.string.help_ttx_digits),
+                "↑ / ↓" to str(R.string.help_ttx_pages),
+                "← / →" to str(R.string.help_ttx_sub),
+                str(R.string.help_ttx_colors_keys) to str(R.string.help_ttx_colors),
+                "OK" to str(R.string.help_ttx_ok),
+                str(R.string.back) to str(R.string.help_ttx_back)
+            ),
             str(R.string.programme_card) to listOf(
                 "← / →" to str(R.string.buttons),
                 "↑ / ↓" to str(R.string.scroll_description),

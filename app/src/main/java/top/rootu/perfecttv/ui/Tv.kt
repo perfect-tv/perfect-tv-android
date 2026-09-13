@@ -794,6 +794,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             "menu" -> return state.channel?.let { openMenu(it) } ?: Unit
             "history" -> return openHistory()
             "search" -> return openSearch()
+            "teletext" -> return openTeletext()
+            "red", "green", "yellow", "blue" -> return  // цветные кнопки — в телетексте
         }
         main.postDelayed({ showInfo() }, 50)
     }
@@ -1301,6 +1303,16 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         Thread { top.rootu.perfecttv.data.Home.update(ctx, favs, popular, lastRow) }.start()
     }
 
+    fun openTeletext() {
+        val dec = playback.teletext
+        if (!dec.declared && dec.numbers().isEmpty()) return toast.show(str(R.string.no_teletext))
+        val nums = dec.numbers()
+        val start = if (nums.isEmpty() || 0x100 in nums) 0x100 else nums.first()
+        var layer: TeletextLayer? = null
+        layer = TeletextLayer(activity, dec, start) { remove(layer!!) }
+        push(layer)
+    }
+
     fun openHelp() {
         var layer: HelpLayer? = null
         layer = HelpLayer(activity) { remove(layer!!) }
@@ -1471,6 +1483,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 val now = audio.firstOrNull { it.selected }?.label ?: ""
                 viewing.add(MenuLayer.Item(str(R.string.audio_and_subtitles), now, sub = { tracksPage(ch) }))
             }
+            if (playback.teletext.declared || playback.teletext.numbers().isNotEmpty()) viewing.add(MenuLayer.Item(str(R.string.teletext)) { openTeletext() })
             if (playback.fixStep > 0) viewing.add(MenuLayer.Item(str(R.string.fix_reset)) { playback.resetFix(ch, lastUrl) })
             viewing.add(MenuLayer.Item(str(R.string.picture_format), aspectName(), keep = true) { Prefs.aspect = (Prefs.aspect + 1) % 3; applyAspect() })
         }

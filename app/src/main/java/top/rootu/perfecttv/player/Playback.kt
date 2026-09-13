@@ -18,7 +18,6 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
-import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
@@ -72,6 +71,10 @@ class Playback(context: Context) {
 
     private val main = Handler(Looper.getMainLooper())
 
+    /** Страницы телетекста текущего канала (дорожка читается экстрактором HLS, см. [TeletextHlsExtractorFactory]) */
+    val teletext = top.rootu.perfecttv.teletext.TtxDecoder()
+    private var teletextKey = ""
+
     /**
      * HLS-источник с разбором MPEG-TS, который считает ключевыми и non-IDR I-кадры с recovery point.
      * Вещательные кодеры (у них же чересстрочное H.264 и несколько звуковых дорожек) часто не ставят IDR вовсе:
@@ -79,7 +82,7 @@ class Playback(context: Context) {
      * на первом кадре. Для обычных потоков (с IDR) разницы нет.
      */
     private val hlsFactory = HlsMediaSource.Factory(DataSource.Factory { dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource() })
-        .setExtractorFactory(DefaultHlsExtractorFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES, false))
+        .setExtractorFactory(TeletextHlsExtractorFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES, teletext))
 
     init {
         // диагностика: какие декодеры взяты и что не так — для разбора «зависает на первом кадре» (тег IPTV в logcat)
@@ -133,7 +136,7 @@ class Playback(context: Context) {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 try {
                     for (g in tracks.groups) {
-                        if (g.type != C.TRACK_TYPE_VIDEO && g.type != C.TRACK_TYPE_AUDIO) continue
+                        if (g.type != C.TRACK_TYPE_VIDEO && g.type != C.TRACK_TYPE_AUDIO && g.type != C.TRACK_TYPE_TEXT) continue
                         for (i in 0 until g.length) {
                             val f = g.getTrackFormat(i)
                             var extra = ""
@@ -141,7 +144,7 @@ class Playback(context: Context) {
                                 val sps = f.initializationData[0]
                                 if (sps.size > 5) extra = " interlaced=" + !androidx.media3.container.NalUnitUtil.parseSpsNalUnit(sps, 4, sps.size).frameMbsOnlyFlag
                             }
-                            android.util.Log.i("IPTV", "track ${if (g.type == C.TRACK_TYPE_VIDEO) "video" else "audio"} ${f.sampleMimeType} ${f.codecs ?: ""} " +
+                            android.util.Log.i("IPTV", "track ${when (g.type) { C.TRACK_TYPE_VIDEO -> "video"; C.TRACK_TYPE_TEXT -> "text"; else -> "audio" }} ${f.sampleMimeType} ${f.codecs ?: ""} " +
                                 "${if (f.width > 0) f.width.toString() + "x" + f.height else ""} ${f.channelCount.takeIf { it > 0 }?.let { "ch=$it" } ?: ""}$extra " +
                                 "supported=${g.isTrackSupported(i)} selected=${g.isTrackSelected(i)}")
                         }
@@ -171,6 +174,7 @@ class Playback(context: Context) {
      */
     fun play(ch: Channel, url: String, positionMs: Long = C.TIME_UNSET, forceHls: Boolean = false) {
         // поправка, найденная раньше для этого канала (см. [checkStall])
+        if (ch.key != teletextKey) { teletextKey = ch.key; teletext.reset() }
         fixKey = ch.key
         fixStep = top.rootu.perfecttv.core.Prefs.playFix(ch.key)
         applyFix()
