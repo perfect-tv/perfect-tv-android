@@ -996,6 +996,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             ahead = if (same) bufferAhead() else 0,
             seek = sk,
             height = if (same) state.height else 0,
+            decoder = if (same) playback.videoSoftware?.let { if (it) "SW" else "HW" } else null,
             paused = same && playback.paused,
             error = same && state.error
         ))

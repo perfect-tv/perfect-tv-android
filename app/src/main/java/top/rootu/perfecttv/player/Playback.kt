@@ -86,6 +86,19 @@ class Playback(context: Context) {
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
                 android.util.Log.i("IPTV", "video decoder $decoderName (${initializationDurationMs} ms)")
+                // программный или аппаратный — по описанию декодера в списке системы (бейдж в инфопанели)
+                // у старых OMX-декодеров системного набора признак «программный» может быть не выставлен — смотрим и по имени
+                val byName = decoderName.startsWith("OMX.google.") || decoderName.startsWith("c2.android.") ||
+                    decoderName.startsWith("c2.google.") || decoderName.startsWith("OMX.ffmpeg.") || decoderName.endsWith(".sw.dec")
+                videoSoftware = byName || try {
+                    val mime = player.videoFormat?.sampleMimeType
+                    androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mime ?: MimeTypes.VIDEO_H264, false, false)
+                        .firstOrNull { it.name == decoderName }?.softwareOnly == true
+                } catch (e: Exception) { false }
+            }
+
+            override fun onVideoDecoderReleased(eventTime: AnalyticsListener.EventTime, decoderName: String) {
+                videoSoftware = null
             }
 
             override fun onAudioDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
@@ -199,6 +212,10 @@ class Playback(context: Context) {
     }
 
     // ---------------------------------------------------------- сторож зависания видео
+
+    /** Текущий видеодекодер: true — программный, false — аппаратный, null — ещё не запущен */
+    @Volatile var videoSoftware: Boolean? = null
+        private set
 
     private var fixKey = ""
     /** Текущая поправка канала: 0 — нет, 1 — программный видеодекодер */

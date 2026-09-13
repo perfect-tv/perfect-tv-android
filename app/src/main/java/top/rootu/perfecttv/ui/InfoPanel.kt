@@ -40,7 +40,9 @@ class InfoPanel(val view: View) {
         val seek: Long?,
         val height: Int,
         val paused: Boolean,
-        val error: Boolean
+        val error: Boolean,
+        /** Видеодекодер: «HW» (аппаратный), «SW» (программный) или null */
+        val decoder: String? = null
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -219,6 +221,7 @@ class InfoPanel(val view: View) {
             badge(str(R.string.archive_2) + (if (lag > 0) " · −" + Fmt.duration(lag) else ""), U.ARCHIVE, U.ON_ARCHIVE)
         } else badge(str(R.string.live), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
+        m.decoder?.let { badge(it, U.FILL_ACTIVE) }
         if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
     }
