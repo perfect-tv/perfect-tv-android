@@ -42,7 +42,9 @@ class InfoPanel(val view: View) {
         val paused: Boolean,
         val error: Boolean,
         /** Видеодекодер: «HW» (аппаратный), «SW» (программный) или null */
-        val decoder: String? = null
+        val decoder: String? = null,
+        /** В потоке идут страницы телетекста */
+        val teletext: Boolean = false
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -222,6 +224,7 @@ class InfoPanel(val view: View) {
         } else badge(str(R.string.live), U.LIVE)
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
         m.decoder?.let { badge(it, U.FILL_ACTIVE) }
+        if (m.teletext) badge("TTX", U.FILL_ACTIVE)
         if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
         return sb
     }

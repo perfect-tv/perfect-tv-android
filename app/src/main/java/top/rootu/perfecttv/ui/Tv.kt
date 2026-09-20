@@ -999,6 +999,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             seek = sk,
             height = if (same) state.height else 0,
             decoder = if (same) playback.videoSoftware?.let { if (it) "SW" else "HW" } else null,
+            teletext = same && playback.teletext.numbers().isNotEmpty(),
             paused = same && playback.paused,
             error = same && state.error
         ))
