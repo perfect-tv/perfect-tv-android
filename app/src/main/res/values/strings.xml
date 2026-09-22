@@ -421,9 +421,9 @@
     <string name="ttx_shown">Shown</string>
     <string name="ttx_hidden">Hidden</string>
     <string name="ttx_page_n">Page %1$s</string>
-    <string name="help_ttx_pad">Keypad: arrows over the keys, OK presses; ← from the left column — to the page (↑/↓ page, ←/→ subpages, OK — back to the keypad)</string>
+    <string name="help_ttx_pad">Keypad like the «Google» PIN: ↑/↓ — row (wraps), ← / OK / → — left, middle, right key of the row (the circle above the keypad shows them); without the keypad ↑/↓ — pages, ←/→ — subpages</string>
     <string name="help_ttx_menu">Menu: keypad, background over the video, hidden text, stop subpages, close</string>
     <string name="ttx_sec_view">View</string>
     <string name="ttx_sec_pages">Pages</string>
-    <string name="help_ttx_pg">Ten pages forward / back</string>
+    <string name="help_ttx_pg">Next / previous page</string>
 </resources>

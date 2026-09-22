@@ -32,12 +32,8 @@ class TeletextView(context: Context) : View(context) {
     /** Страница прижата влево (справа клавиатура), иначе по центру */
     var left = false
         set(v) { field = v; invalidate() }
-    /** Рамка вокруг страницы: в фокусе управления (стрелки листают страницы) */
-    var focused = false
-        set(v) { field = v; invalidate() }
 
     private val fill = Paint()
-    private val frame = Paint().apply { style = Paint.Style.STROKE; color = Color.WHITE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val tmp = FloatArray(1)
 
@@ -84,11 +80,6 @@ class TeletextView(context: Context) : View(context) {
                 else glyph(c, code, l, dTop, cw, ch, sx, fg)
                 c.restore()
             }
-        }
-        if (focused) {
-            frame.strokeWidth = maxOf(2f, ch * 0.08f)
-            frame.alpha = 150
-            c.drawRect(x0, 0f, x0 + w, h, frame)
         }
         if (message.isNotEmpty()) {
             text.textScaleX = 1f

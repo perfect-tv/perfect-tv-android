@@ -21,11 +21,12 @@ import top.rootu.perfecttv.teletext.TtxPage
 
 /**
  * Телетекст на весь экран: страницы из [TtxDecoder] (их копит плеер, пока идёт канал); справа —
- * экранная клавиатура (цифры, цветные кнопки, стереть, индекс, стоп подстраниц, фон).
+ * экранная клавиатура (цифры, цветные кнопки, стереть, индекс, подстраницы) как PIN «Google».
  *
- * Фокус управления — в одной из двух зон. Клавиатура: стрелки по кнопкам, OK — нажать, ← из левого
- * столбца — на страницу. Страница (вокруг неё рамка): ↑/↓ — страница, ←/→ — подстраницы, OK — к клавиатуре.
- * Цифры и цветные кнопки пульта работают всегда; PG± — на десять страниц; удерж. OK или MENU —
+ * Клавиатура: ↑/↓ — ряд (по кругу), ← / OK / → — левая, средняя, правая кнопка ряда; над клавиатурой
+ * круг d-pad показывает кнопки текущего ряда. Клавиатура скрыта: ↑/↓ — страница, ←/→ — подстраницы,
+ * OK — скрытый текст. Цифры и цветные кнопки пульта работают всегда; PG± — страница вперёд/назад;
+ * удерж. OK или MENU —
  * меню телетекста ([onMenu]); «Назад» стирает набранное, потом закрывает. Страницы, которых ещё не
  * было в эфире, ждём: в потоке они идут по кругу, обычно это секунды.
  */
@@ -51,13 +52,12 @@ class TeletextLayer(
     private var phase = true
     private var lastSwitch = 0L
 
-    // клавиатура: 6 рядов по 3 кнопки
+    // клавиатура: 6 рядов по 3 кнопки, выбран ряд [row]
     private val keypad: View = LayoutInflater.from(context).inflate(R.layout.teletext_keypad, root, false)
     private val padViews = ArrayList<TextView>()
     private val padKeys = ArrayList<String>()
-    private var padIndex = 4  // «5»
-    /** 0 — клавиатура, 1 — страница */
-    private var zone = 0
+    private var row = 1  // «4 5 6»
+    private val wheel: TeletextWheel = keypad.findViewById(R.id.ttx_wheel)
 
     var padVisible = Prefs.ttxKeypad
         private set
@@ -84,13 +84,13 @@ class TeletextLayer(
         root.addView(keypad, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = U.pxi(1.2f) })
         val rows = (keypad as LinearLayout)
         for (r in 0 until rows.childCount) {
-            val line = rows.getChildAt(r) as LinearLayout
+            val line = rows.getChildAt(r) as? LinearLayout ?: continue
             for (c in 0 until line.childCount) {
                 val v = line.getChildAt(c) as TextView
                 val i = padViews.size
                 padViews.add(v)
                 padKeys.add(v.tag as String)
-                v.setOnClickListener { padIndex = i; zone = 0; press(padKeys[i]); render() }
+                v.setOnClickListener { row = i / 3; press(padKeys[i]); render() }
             }
         }
         // цветные кнопки — цветом, в фокусе — с белой рамкой
@@ -118,14 +118,17 @@ class TeletextLayer(
     private fun applyPad() {
         keypad.visibility = if (padVisible) View.VISIBLE else View.GONE
         tv.left = padVisible
-        if (!padVisible) zone = 1
         render()
     }
 
     private fun render() {
-        padViews.forEachIndexed { i, v -> v.isSelected = padVisible && zone == 0 && i == padIndex }
-        padViews[padKeys.indexOf("hold")].text = if (hold) "▶" else "‖"
-        tv.focused = padVisible && zone == 1
+        padViews.forEachIndexed { i, v -> v.isSelected = padVisible && i / 3 == row }
+        val colors = IntArray(3) { c ->
+            val i = row * 3 + c
+            val n = listOf("r", "g", "y", "b").indexOf(padKeys[i])
+            if (n >= 0) TTX_COLORS[n + 1] else 0
+        }
+        wheel.set(Array(3) { c -> padViews[row * 3 + c].text.toString() }, colors)
     }
 
     private fun refresh() {
@@ -175,15 +178,15 @@ class TeletextLayer(
             "b" -> link(3)
             "del" -> { typed = typed.dropLast(1); seen = -1; refresh() }
             "idx" -> go(0x100)
-            "hold" -> toggleHold()
-            "mix" -> toggleMix()
+            "prev" -> subpage(-1)
+            "next" -> subpage(1)
             else -> digit(k.toInt())
         }
     }
 
     // ------------------------------------------------------------ состояние для меню телетекста
 
-    fun toggleKeypad() { padVisible = !padVisible; Prefs.ttxKeypad = padVisible; if (padVisible) zone = 0; applyPad() }
+    fun toggleKeypad() { padVisible = !padVisible; Prefs.ttxKeypad = padVisible; applyPad() }
     fun toggleMix() { tv.mix = !tv.mix; Prefs.ttxMix = tv.mix }
     fun toggleReveal() { tv.reveal = !tv.reveal }
     fun toggleHold() { hold = !hold; lastSwitch = System.currentTimeMillis(); render() }
@@ -194,17 +197,15 @@ class TeletextLayer(
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") return digit(digit)
         when (name) {
-            "pgup" -> return go(step(page, 10))
-            "pgdown" -> return go(step(page, -10))
+            "pgup" -> return go(step(page, 1))
+            "pgdown" -> return go(step(page, -1))
         }
-        if (zone == 0 && padVisible) {
-            val r = padIndex / 3
-            val c = padIndex % 3
+        if (padVisible) {
             when (name) {
-                "left" -> if (c > 0) padIndex-- else zone = 1
-                "right" -> if (c < 2) padIndex++
-                "up" -> padIndex = ((r + 5) % 6) * 3 + c
-                "down" -> padIndex = ((r + 1) % 6) * 3 + c
+                "left" -> press(padKeys[row * 3])
+                "right" -> press(padKeys[row * 3 + 2])
+                "up" -> row = (row + 5) % 6
+                "down" -> row = (row + 1) % 6
             }
             render()
         } else when (name) {
@@ -236,9 +237,7 @@ class TeletextLayer(
     }
 
     override fun enter() {
-        if (zone == 0 && padVisible) press(padKeys[padIndex])
-        else if (padVisible) { zone = 0; render() }
-        else toggleReveal()
+        if (padVisible) press(padKeys[row * 3 + 1]) else toggleReveal()
         render()
     }
 

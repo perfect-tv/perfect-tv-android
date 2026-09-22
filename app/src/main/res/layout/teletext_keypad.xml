@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Клавиатура телетекста справа от страницы: цифры, цветные кнопки (tag r/g/y/b), стереть (del),
-  индекс (idx), стоп подстраниц (hold), фон (mix). Ряды — по порядку, tag — значение.
+  Клавиатура телетекста справа от страницы, как PIN «Google»: сверху круг d-pad с кнопками текущего
+  ряда, ниже ряды по три кнопки (↑/↓ — ряд, ←/OK/→ — кнопка ряда). Цветные кнопки — tag r/g/y/b,
+  стереть (del), индекс (idx), подстраницы назад/вперёд (prev/next). Ряды — по порядку, tag — значение.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -11,6 +12,12 @@
     android:background="@drawable/bg_popup"
     android:orientation="vertical"
     android:padding="6dp">
+
+    <top.rootu.perfecttv.ui.TeletextWheel
+        android:id="@+id/ttx_wheel"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_marginBottom="4dp" />
 
     <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
         <TextView style="@style/Text.PinKey" android:tag="1" android:text="1" />
@@ -38,8 +45,8 @@
         <TextView style="@style/Text.PinKey" android:tag="b" />
     </LinearLayout>
     <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+        <TextView style="@style/Text.PinKey" android:tag="prev" android:text="‹" />
         <TextView style="@style/Text.PinKey" android:tag="idx" android:text="100" android:textSize="13sp" />
-        <TextView style="@style/Text.PinKey" android:tag="hold" android:text="‖" />
-        <TextView style="@style/Text.PinKey" android:tag="mix" android:text="◐" />
+        <TextView style="@style/Text.PinKey" android:tag="next" android:text="›" />
     </LinearLayout>
 </LinearLayout>

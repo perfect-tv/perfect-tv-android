@@ -421,9 +421,9 @@
     <string name="ttx_shown">Показана</string>
     <string name="ttx_hidden">Скрыта</string>
     <string name="ttx_page_n">Страница %1$s</string>
-    <string name="help_ttx_pad">Клавиатура: стрелки по кнопкам, OK — нажать; ← из левого столбца — на страницу (↑/↓ — страницы, ←/→ — подстраницы, OK — обратно к клавиатуре)</string>
+    <string name="help_ttx_pad">Клавиатура как PIN «Google»: ↑/↓ — ряд (по кругу), ← / OK / → — левая, средняя, правая кнопка ряда (круг над клавиатурой показывает их); без клавиатуры ↑/↓ — страницы, ←/→ — подстраницы</string>
     <string name="help_ttx_menu">Меню: клавиатура, фон поверх видео, скрытый текст, стоп подстраниц, закрыть</string>
     <string name="ttx_sec_view">Вид</string>
     <string name="ttx_sec_pages">Страницы</string>
-    <string name="help_ttx_pg">Страницы через десять</string>
+    <string name="help_ttx_pg">Страница вперёд / назад</string>
 </resources>
