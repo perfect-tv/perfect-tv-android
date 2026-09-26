@@ -14,7 +14,10 @@ object Icons {
     private lateinit var fav: Drawable
     private lateinit var lock: Drawable
     private lateinit var play: Drawable
-    private val filters = HashMap<Int, PorterDuffColorFilter>()
+    // по своему экземпляру на пару «значок + цвет»: векторный Drawable при аппаратной отрисовке
+    // запоминает фильтр в самом объекте, и один общий экземпляр красил бы все значки кадра
+    // в цвет последнего (в фокусе — чёрный, и значок пропадал на выделении)
+    private val tinted = HashMap<Long, Drawable>()
 
     enum class Kind { ARCHIVE, REMIND, FAV, LOCK, PLAY }
 
@@ -36,9 +39,12 @@ object Icons {
 
     /** Квадратный значок со стороной [size] слева-сверху в (x, y) */
     fun draw(c: Canvas, k: Kind, x: Float, y: Float, size: Float, color: Int) {
-        val d = drawable(k)
+        val d = tinted.getOrPut(k.ordinal.toLong() shl 32 or (color.toLong() and 0xFFFFFFFFL)) {
+            (drawable(k).constantState?.newDrawable()?.mutate() ?: drawable(k)).apply {
+                colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
+            }
+        }
         d.setBounds(x.toInt(), y.toInt(), (x + size).toInt(), (y + size).toInt())
-        d.colorFilter = filters.getOrPut(color) { PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN) }
         d.draw(c)
     }
 }
