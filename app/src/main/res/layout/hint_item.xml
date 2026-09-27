@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Подсказка клавиши: клавиша в рамке и действие -->
+<!-- Подсказка клавиши: клавиша в рамке и действие. Размеры те же, что в строках подсказок на Canvas
+     (GuideLayer, SearchLayer): рамка 1,7 em = 17 dp по высоте внутри линии, поля 0,5 em, зазор 0,6 em, между парами 1,8 em -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
@@ -16,10 +17,9 @@
         android:background="@drawable/bg_hint_key"
         android:gravity="center"
         android:minWidth="20dp"
+        android:minHeight="18dp"
         android:paddingStart="5dp"
-        android:paddingTop="1dp"
         android:paddingEnd="5dp"
-        android:paddingBottom="1dp"
         android:textColor="@color/text_80"
         android:textSize="11sp" />
 

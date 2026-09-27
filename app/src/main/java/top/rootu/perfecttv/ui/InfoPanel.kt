@@ -209,14 +209,14 @@ class InfoPanel(val view: View) {
 
     private fun badgesOf(m: Model): CharSequence {
         val sb = SpannableStringBuilder()
-        fun badge(text: String, bg: Int, fg: Int = U.WHITE) {
+        fun badge(text: String, bg: Int, fg: Int = U.WHITE, icon: Int = BadgeSpan.NONE) {
             if (sb.isNotEmpty()) sb.append(" ")
             val s = sb.length
-            sb.append(text)
-            sb.setSpan(BadgeSpan(bg, fg), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.append(if (text.isEmpty()) " " else text)
+            sb.setSpan(BadgeSpan(bg, fg, icon), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         if (m.error) badge(str(R.string.error), U.LIVE)
-        if (m.paused) badge("❚❚", U.FILL_ACTIVE)
+        if (m.paused) badge("", U.FILL_ACTIVE, icon = BadgeSpan.PAUSE)
         if (m.archive) {
             // отставание от эфира — в бейдже: «Архив · −21:40»
             val lag = Clock.now() - m.position
@@ -225,20 +225,43 @@ class InfoPanel(val view: View) {
         if (m.height > 0) badge(if (m.height >= 2000) "4K" else if (m.height >= 1000) "FHD" else if (m.height >= 700) "HD" else "SD", U.FILL_ACTIVE)
         m.decoder?.let { badge(it, U.FILL_ACTIVE) }
         if (m.teletext) badge("TTX", U.FILL_ACTIVE)
-        if (m.channel.hasArchive) badge("⟲ " + str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE)
+        if (m.channel.hasArchive) badge(str(R.string.x_d, m.channel.archiveDays), U.FILL_ACTIVE, icon = BadgeSpan.HISTORY)
         return sb
     }
 
-    /** Бейдж: скруглённая плашка с полями вокруг текста (по высоте — на всю строку, она задана в разметке) */
-    private class BadgeSpan(private val bg: Int, private val fg: Int) : ReplacementSpan() {
+    /**
+     * Бейдж: скруглённая плашка с полями вокруг текста (по высоте — на всю строку, она задана в разметке).
+     * [icon] — значок слева от текста (или вместо него, [PAUSE]); рисуется по высоте цифр текста, а не
+     * знаком шрифта, у которого свой размер и вертикальное положение.
+     */
+    private class BadgeSpan(private val bg: Int, private val fg: Int, private val icon: Int = NONE) : ReplacementSpan() {
         private val padH = U.px(0.6f)
         private val gap = U.px(0.3f)
+        private val rect = android.graphics.Rect()
 
-        override fun getSize(paint: android.graphics.Paint, text: CharSequence, start: Int, end: Int, fm: android.graphics.Paint.FontMetricsInt?) =
-            Math.round(paint.measureText(text, start, end) + 2 * padH + gap)
+        private fun capHeight(paint: android.graphics.Paint): Float {
+            paint.getTextBounds("0", 0, 1, rect)
+            return rect.height().toFloat()
+        }
+
+        private fun iconWidth(cap: Float) = when (icon) {
+            PAUSE -> cap * 0.8f
+            HISTORY -> cap * 1.2f
+            else -> 0f
+        }
+
+        override fun getSize(paint: android.graphics.Paint, text: CharSequence, start: Int, end: Int, fm: android.graphics.Paint.FontMetricsInt?): Int {
+            val cap = capHeight(paint)
+            val tw = if (icon == PAUSE) 0f else paint.measureText(text, start, end)
+            val iw = iconWidth(cap) + if (icon == HISTORY) cap * 0.4f else 0f
+            return Math.round(tw + iw + 2 * padH + gap)
+        }
 
         override fun draw(c: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: android.graphics.Paint) {
-            val w = paint.measureText(text, start, end) + 2 * padH
+            val cap = capHeight(paint)
+            val iw = iconWidth(cap)
+            val tw = if (icon == PAUSE) 0f else paint.measureText(text, start, end)
+            val w = tw + iw + (if (icon == HISTORY) cap * 0.4f else 0f) + 2 * padH
             // плашка — по росту текста с полями сверху и снизу, а не по строке
             val mid = y + (paint.ascent() + paint.descent()) / 2
             val half = paint.textSize * 0.82f
@@ -246,8 +269,30 @@ class InfoPanel(val view: View) {
             paint.color = bg
             c.drawRoundRect(x, mid - half, x + w, mid + half, U.px(0.4f), U.px(0.4f), paint)
             paint.color = fg
-            c.drawText(text, start, end, x + padH, y.toFloat(), paint)
+            val capMid = y - cap / 2
+            var tx = x + padH
+            when (icon) {
+                PAUSE -> {
+                    val bar = cap * 0.3f
+                    val r = bar / 3
+                    c.drawRoundRect(tx, capMid - cap / 2, tx + bar, capMid + cap / 2, r, r, paint)
+                    c.drawRoundRect(tx + iw - bar, capMid - cap / 2, tx + iw, capMid + cap / 2, r, r, paint)
+                }
+                HISTORY -> {
+                    // значок занимает ~3/4 поля 24×24, поэтому поле — на треть больше высоты цифр
+                    val size = cap * 1.33f
+                    Icons.draw(c, Icons.Kind.ARCHIVE, tx + iw / 2 - size / 2, capMid - size / 2, size, fg)
+                    tx += iw + cap * 0.4f
+                }
+            }
+            if (icon != PAUSE) c.drawText(text, start, end, tx, y.toFloat(), paint)
             paint.color = color
+        }
+
+        companion object {
+            const val NONE = 0
+            const val PAUSE = 1
+            const val HISTORY = 2
         }
     }
 
