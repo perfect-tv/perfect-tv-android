@@ -524,6 +524,9 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val pCat = U.paint(1.4f, bold = true)
         private val pCatArrow = U.paint(1.4f, U.wa(0.5f))
         private val pCount = U.paint(1.1f, U.wa(0.5f))
+        // счётчик в заголовке категории — тот же размер, что у названия
+        private val pHeadCount = U.paint(1.4f, U.wa(0.5f))
+        private val capRect = android.graphics.Rect()
         private val pTick = U.paint(1.1f, U.wa(0.7f))
         private val pNowChip = U.paint(1.1f, bold = true)
         private val pNum = U.paint(1.15f, U.wa(0.5f))
@@ -893,7 +896,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val logoW = 9f * em
             Logos.draw(c, context, ch, padX, t, padX + logoW, t + 6.2f * em) { invalidate() }
             val x = padX + logoW + 1.2f * em
-            val clockW = pClock.measureText("00:00") + em
+            val clockW = pClock.measureText("00:00") + em + closeW()
             val w = width - padX - x - clockW
             // в списке программ — передача в фокусе списка, в сетке — под фокусом сетки, иначе — идущая
             val listP = if ((zone == Zone.PROGRAMS || zone == Zone.DATES) && !grid) plRows.getOrNull(plIndex) else null
@@ -924,20 +927,45 @@ class GuideLayer(private val tv: Tv) : Layer {
             val logoW = 6.8f * em
             Logos.draw(c, context, ch, padX, t + 0.2f * em, padX + logoW, t + 0.2f * em + 4.4f * em) { invalidate() }
             val x = padX + logoW + 1.2f * em
-            val clockW = pClock.measureText("00:00") + em
+            val clockW = pClock.measureText("00:00") + em + closeW()
             val w = width - padX - x - clockW
             U.drawText(c, ch.title(), x, t + 1.5f * em, w, pTitle)
             val sub = ch.group + if (ch.hasArchive) " · " + str(R.string.archive_x_d, ch.archiveDays) else ""
             U.drawText(c, sub, x, t + 3.5f * em, w, pChannel)
         }
 
+        /** Диаметр кнопки ✕ на сенсорных: чуть выше цифр часов; ✕ стоит у правого края, часы левее */
+        private fun closeD(): Float {
+            pClock.getTextBounds("0", 0, 1, capRect)
+            return capRect.height() * 1.2f
+        }
+
+        private fun closeW() = if (U.touch) closeD() + 0.8f * em else 0f
+
         private fun drawClock(c: Canvas, now: Long) {
             val t = padTop
             val clock = Fmt.hhmm(now)
-            // на сенсорных (не ТВ) — ✕ закрыть, часы левее
-            val closeW = if (U.touch) 2.6f * em else 0f
-            if (U.touch) c.drawText("✕", width - padX - pClock.measureText("✕"), t + 1.7f * em, pClock)
-            c.drawText(clock, width - padX - closeW - pClock.measureText(clock), t + 1.7f * em, pClock)
+            val base = t + 1.7f * em
+            if (U.touch) {
+                // белая круглая кнопка с чёрным крестиком по центру цифр часов
+                val d = closeD()
+                pClock.getTextBounds("0", 0, 1, capRect)
+                val cy = base - capRect.height() / 2f
+                val cx = width - padX - d / 2
+                U.fill.style = Paint.Style.FILL
+                U.fill.color = U.WHITE
+                c.drawCircle(cx, cy, d / 2, U.fill)
+                val h = d * 0.18f
+                U.fill.style = Paint.Style.STROKE
+                U.fill.strokeWidth = 0.17f * em
+                U.fill.strokeCap = Paint.Cap.ROUND
+                U.fill.color = U.BLACK
+                c.drawLine(cx - h, cy - h, cx + h, cy + h, U.fill)
+                c.drawLine(cx - h, cy + h, cx + h, cy - h, U.fill)
+                U.fill.style = Paint.Style.FILL
+                U.fill.strokeCap = Paint.Cap.BUTT
+            }
+            c.drawText(clock, width - padX - closeW() - pClock.measureText(clock), base, pClock)
             if (tv.repo.epgLoading()) {
                 val s = str(R.string.programme_is_loading)
                 c.drawText(s, width - padX - pCount.measureText(s), t + 3.4f * em, pCount)
@@ -956,11 +984,12 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (groups.size > 1 && !catsFixed) c.drawText("‹", l, cy - (pCatArrow.descent() + pCatArrow.ascent()) / 2, pCatArrow)
             val title = g?.title?.ifEmpty { "—" } ?: "—"
             val count = g?.let { counts.getOrPut(it.key + it.channels.size) { it.channels.size.toString() } } ?: ""
-            val cw = pCount.measureText(count)
+            val cw = pHeadCount.measureText(count)
             val tw = minOf(pCat.measureText(title), r - l - arrowW - cw - em)
             val tx = l + arrowW
             U.drawText(c, title, tx, cy, tw, pCat)
-            c.drawText(count, tx + tw + 0.6f * em, cy - (pCount.descent() + pCount.ascent()) / 2, pCount)
+            // одна базовая линия с названием: оба кегля равны
+            c.drawText(count, tx + tw + 0.6f * em, cy - (pCat.descent() + pCat.ascent()) / 2, pHeadCount)
             if (!grid) return
             val gl = padX + chW + gap
             val gr = width - padX
@@ -1289,7 +1318,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         /** Тап: ‹ › — категория, ✕ — закрыть, канал — смотреть, передача — карточка */
         private fun tap(x: Float, y: Float) {
             val headY = padTop + topBlockNow
-            if (U.touch && x > width - padX - 2.5f * em && y < padTop + 2.5f * em) return tv.closeGuide()
+            if (U.touch && x > width - padX - closeD() - 1.2f * em && y < padTop + 3f * em) return tv.closeGuide()
             if (zone == Zone.PLAYLISTS) {
                 // тап по плейлисту — открыть; мимо колонки — вернуться к категориям
                 if (x < padX + catW && y >= bodyTop) {
