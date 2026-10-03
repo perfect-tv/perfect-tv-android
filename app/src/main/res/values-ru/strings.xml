@@ -42,7 +42,7 @@
     <string name="to_archive_reminders_tabs_up_down">К кнопкам «Программа» / «Напоминания» вверху: ←/→ — переключить, ↓ — обратно в список</string>
     <string name="past_from_archive_current_live">Прошедшая — из архива, текущая — эфир, будущая — карточка</string>
     <string name="hold_ok">удерж. OK</string>
-    <string name="programme_card_watch_from_start">Карточка передачи («Смотреть сначала», «Напомнить»)</string>
+    <string name="programme_card_watch_from_start">Карточка передачи («Смотреть с начала», «Напомнить»)</string>
     <string name="programme_card">Карточка передачи</string>
     <string name="buttons">Кнопки</string>
     <string name="scroll_description">Прокрутка описания</string>
@@ -221,7 +221,7 @@
     <string name="the_playlist_was_deleted">Плейлист удалён</string>
     <string name="the_channel_is_no_longer_in_the">Канала больше нет в плейлисте</string>
     <string name="archive_x_d">Архив %1$s дн.</string>
-    <string name="watch_from_start">Смотреть сначала</string>
+    <string name="watch_from_start">Смотреть с начала</string>
     <string name="watch_live">Смотреть эфир</string>
     <string name="remind_2">Напомнить</string>
     <string name="on_air_now">Сейчас в эфире</string>
@@ -291,7 +291,7 @@
     <string name="hint_seek">Перемотка</string>
     <string name="hint_programme">Программа</string>
     <string name="hint_recent">Недавние</string>
-    <string name="tile_restart">Сначала</string>
+    <string name="tile_restart">С начала</string>
     <string name="tile_live">В эфир</string>
     <string name="tile_fav_add">В избранное</string>
     <string name="tile_fav_remove">Из избранного</string>
