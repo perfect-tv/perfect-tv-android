@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.media3.exoplayer.dash)
     implementation(libs.media3.exoplayer.rtsp)
     implementation(libs.media3.datasource.okhttp)
+    implementation(libs.media3.effect)
     implementation(libs.media3.ui)
     implementation(libs.okhttp)
     implementation(libs.coil)

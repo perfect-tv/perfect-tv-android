@@ -109,6 +109,11 @@ object Prefs {
         get() = sp.getLong("home_watch_next_id", 0L)
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
+    /** Деинтерлейсинг чересстрочных потоков (шейдер поверх видео) */
+    var deinterlace: Boolean
+        get() = bool("deinterlace", false)
+        set(v) = sp.edit().putBoolean("deinterlace", v).apply()
+
     /** Видеодекодер: 0 — авто (аппаратный; зависло видео — для канала программный), 1 — аппаратный, 2 — программный */
     var videoDecoder: Int
         get() = int("video_decoder", 0).coerceIn(0, 2)

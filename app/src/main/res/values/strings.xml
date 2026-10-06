@@ -400,6 +400,8 @@
     <string name="decoder_hw">Hardware</string>
     <string name="decoder_sw">Software</string>
     <string name="video_decoder_sub">auto — hardware, and if the video freezes, software for that channel; applies from the next channel</string>
+    <string name="deinterlace">Deinterlacing</string>
+    <string name="deinterlace_sub">for interlaced channels (1080i): removes combing on motion, lower vertical sharpness on motion; uses extra GPU; from the next channel</string>
     <string name="teletext">Teletext</string>
     <string name="teletext_waiting">Waiting for page %1$s…</string>
     <string name="no_teletext">No teletext on this channel</string>

@@ -157,7 +157,10 @@ class Playback(context: Context) {
             // диагностика: что за дорожки в потоке (кодек, размер, чересстрочность по SPS) — для разбора зависаний
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 try {
+                    var interlaced = false
+                    var hasVideo = false
                     for (g in tracks.groups) {
+                        if (g.type == C.TRACK_TYPE_VIDEO && g.isSelected && g.length > 0) { hasVideo = true; interlaced = isInterlaced(g.getTrackFormat(0)) }
                         if (g.type != C.TRACK_TYPE_VIDEO && g.type != C.TRACK_TYPE_AUDIO && g.type != C.TRACK_TYPE_TEXT) continue
                         for (i in 0 until g.length) {
                             val f = g.getTrackFormat(i)
@@ -171,6 +174,8 @@ class Playback(context: Context) {
                                 "supported=${g.isTrackSupported(i)} selected=${g.isTrackSelected(i)}")
                         }
                     }
+                    // события треков без выбранного видео (смена источника) состояние не меняют: иначе эффект мигал бы
+                    if (hasVideo) setDeinterlace(interlaced)
                 } catch (e: Exception) { android.util.Log.w("IPTV", "tracks log: $e") }
             }
 
@@ -182,6 +187,24 @@ class Playback(context: Context) {
                 if (videoSize.height > 0) listener?.onVideoSize(videoSize.width, videoSize.height)
             }
         })
+    }
+
+    /** Чересстрочный ли поток: кадр не «только кадры» (frame_mbs_only_flag = 0) в SPS H.264 */
+    private fun isInterlaced(f: androidx.media3.common.Format): Boolean {
+        if (f.sampleMimeType != MimeTypes.VIDEO_H264 || f.initializationData.isEmpty()) return false
+        val sps = f.initializationData[0]
+        return try { sps.size > 5 && !androidx.media3.container.NalUnitUtil.parseSpsNalUnit(sps, 4, sps.size).frameMbsOnlyFlag } catch (e: Exception) { false }
+    }
+
+    private var deinterlaced = false
+
+    /** Деинтерлейсинг: по настройке и только для чересстрочного потока; эффект меняется, только когда состояние сменилось */
+    fun setDeinterlace(interlaced: Boolean) {
+        val want = interlaced && top.rootu.perfecttv.core.Prefs.deinterlace
+        if (want == deinterlaced) return
+        deinterlaced = want
+        android.util.Log.i("IPTV", "deinterlace ${if (want) "on" else "off"}")
+        player.setVideoEffects(if (want) listOf(DeinterlaceEffect()) else emptyList())
     }
 
     private fun notifyState() {
