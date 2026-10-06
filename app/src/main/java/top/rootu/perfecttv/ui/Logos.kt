@@ -144,6 +144,7 @@ object Logos {
     }
 
     private const val CACHE_BYTES = 64L * 1024 * 1024
+    private const val MAX_WAITERS = 16
 
     /** Битмап логотипа или null (ещё грузится / нет). [ready] — вызвать, когда загрузится */
     fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? = bitmapUrl(context, urlFor(ch), 256, 160, ready)
@@ -152,7 +153,9 @@ object Logos {
     fun bitmapUrl(context: Context, url: String, w: Int, h: Int, ready: () -> Unit): Bitmap? {
         if (url.isEmpty() || isFailed(url)) return null
         bitmaps.get(url)?.let { return it }
-        waiters.getOrPut(url) { ArrayList() }.add(ready)
+        // каждый кадр, пока логотип грузится, приносит новый ready: без предела список растёт, а потом все
+        // вызовы приходят разом (перерисовка подвисает); хватает нескольких — перерисовка общая
+        waiters.getOrPut(url) { ArrayList() }.let { if (it.size < MAX_WAITERS) it.add(ready) }
         if (pending.add(url)) {
             loader.enqueue(ImageRequest.Builder(context).data(url).size(w, h)
                 .allowHardware(false)

@@ -40,7 +40,7 @@ class Repo(context: Context) {
         Bus.on { e ->
             if (e is DataEvent.EpgProgress) {
                 if (e.done) loadingSources.remove(e.sourceId) else loadingSources.add(e.sourceId)
-                invalidateEpg(e.sourceId)
+                invalidateEpg(e.sourceId, e.done)
             }
         }
     }
@@ -241,10 +241,23 @@ class Repo(context: Context) {
         return icon
     }
 
-    private fun invalidateEpg(sourceId: Long) {
-        mapFor.clear()
-        iconCache.clear()
-        cache.entries.removeAll { it.value.sourceId == sourceId || it.value.sourceId < 0 }
+    /**
+     * Сброс кэшей программы. Загрузка закончена ([done]) — всё, что связано с источником. Пока она идёт
+     * (события приходят на каждую пачку), сбрасываются только пустые записи: передачи, которых ещё не было,
+     * появятся по мере загрузки, а готовые списки остаются. Иначе каждое переключение канала и каждая
+     * отрисовка строки заново читали бы БД в главном потоке, пока в неё пишет загрузчик, — интерфейс
+     * подвисал бы до конца загрузки.
+     */
+    private fun invalidateEpg(sourceId: Long, done: Boolean) {
+        if (done) {
+            mapFor.clear()
+            iconCache.clear()
+            cache.entries.removeAll { it.value.sourceId == sourceId || it.value.sourceId < 0 }
+        } else {
+            mapFor.entries.removeAll { it.value.isEmpty() }
+            iconCache.values.removeAll { it.isEmpty() }
+            cache.entries.removeAll { it.value.list.isEmpty() && (it.value.sourceId == sourceId || it.value.sourceId < 0) }
+        }
     }
 
     /**
