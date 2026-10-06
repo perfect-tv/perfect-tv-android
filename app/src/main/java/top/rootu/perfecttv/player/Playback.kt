@@ -57,12 +57,33 @@ class Playback(context: Context) {
         if (softwareVideo && MimeTypes.isVideo(mime)) list.sortedBy { if (it.softwareOnly) 0 else 1 } else list
     }
 
+    /**
+     * Флаги разбора MPEG-TS для битых и вещательных IPTV-потоков (общие для HLS и прямого TS):
+     * non-IDR ключевые кадры (см. [hlsFactory]), поиск границ кадров по access unit (а не по началу PES:
+     * иначе при кадрах, пересекающих PES, картинка рвётся или поток встаёт), DTS-звук HDMV, игнор splice info.
+     */
+    private val tsFlags = DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+        DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
+        DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS or
+        DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM
+
+    // сбой загрузки сегмента или куска — не меньше 5 повторов, прежде чем считать это ошибкой потока
+    private val loadPolicy = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy() {
+        override fun getMinimumLoadableRetryCount(dataType: Int): Int = 5
+    }
+
+    // не-HLS ссылки (прямой TS по HTTP, MP4…): те же флаги TS и поиск меток времени подальше от начала
+    // (в потоках, где PCR редкий, стандартных 600 пакетов не хватает)
+    private val extractors = androidx.media3.extractor.DefaultExtractorsFactory()
+        .setTsExtractorFlags(tsFlags)
+        .setTsExtractorTimestampSearchBytes(5000 * androidx.media3.extractor.ts.TsExtractor.TS_PACKET_SIZE)
+
     val player: ExoPlayer = ExoPlayer.Builder(context, DefaultRenderersFactory(context)
         .setEnableDecoderFallback(true)
         .setMediaCodecSelector(codecSelector))
-        .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory {
+        .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory {
             dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource()
-        })
+        }.setLoadErrorHandlingPolicy(loadPolicy))
         .setLoadControl(DefaultLoadControl.Builder()
             // быстрый старт после переключения канала; дальше буфер растёт как обычно
             .setBufferDurationsMs(15_000, 50_000, 1_000, 2_000)
@@ -82,7 +103,8 @@ class Playback(context: Context) {
      * на первом кадре. Для обычных потоков (с IDR) разницы нет.
      */
     private val hlsFactory = HlsMediaSource.Factory(DataSource.Factory { dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource() })
-        .setExtractorFactory(TeletextHlsExtractorFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES, teletext))
+        .setExtractorFactory(TeletextHlsExtractorFactory(tsFlags, teletext))
+        .setLoadErrorHandlingPolicy(loadPolicy)
 
     init {
         // диагностика: какие декодеры взяты и что не так — для разбора «зависает на первом кадре» (тег IPTV в logcat)
