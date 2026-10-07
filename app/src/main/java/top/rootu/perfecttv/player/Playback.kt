@@ -79,6 +79,8 @@ class Playback(context: Context) {
         .setTsExtractorTimestampSearchBytes(5000 * androidx.media3.extractor.ts.TsExtractor.TS_PACKET_SIZE)
 
     val player: ExoPlayer = ExoPlayer.Builder(context, DefaultRenderersFactory(context)
+        // FFmpeg-декодер звука из AAR — после системных (MP2, AC-3, DTS без своего кодека на приставке)
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         .setEnableDecoderFallback(true)
         .setMediaCodecSelector(codecSelector))
         .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory {
