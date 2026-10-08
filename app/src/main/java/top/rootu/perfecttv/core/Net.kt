@@ -7,17 +7,33 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.IOException
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 
-/** Общий OkHttp: таймауты, кэш, редиректы; поправка часов по Date */
+/**
+ * Общий OkHttp: таймауты, кэш, редиректы; поправка часов по Date. HTTPS — с любыми сертификатами
+ * (просроченные, самоподписанные, чужое имя узла): у провайдеров IPTV это обычное дело.
+ */
 object Net {
     const val USER_AGENT = "PerfectTV/1.0 (Linux; Android) ExoPlayer"
 
     lateinit var client: OkHttpClient
         private set
 
+    private val trustAll = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+    }
+
     fun init(context: Context) {
+        val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustAll), SecureRandom()) }
         client = OkHttpClient.Builder()
+            .sslSocketFactory(ssl.socketFactory, trustAll)
+            .hostnameVerifier { _, _ -> true }
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)

@@ -47,6 +47,8 @@ object Logos {
         // прежний общий кэш Coil (до своего кэша логотипов) — убрать
         java.io.File(app.cacheDir, "image_cache").deleteRecursively()
         loader = ImageLoader.Builder(app)
+            // тот же клиент, что у плейлистов и потоков (HTTPS с любыми сертификатами), но без его HTTP-кэша
+            .okHttpClient(top.rootu.perfecttv.core.Net.client.newBuilder().cache(null).build())
             .crossfade(false)
             .allowRgb565(true)
             .respectCacheHeaders(false)
