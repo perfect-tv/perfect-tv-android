@@ -400,6 +400,8 @@
     <string name="decoder_hw">Аппаратный</string>
     <string name="decoder_sw">Программный</string>
     <string name="video_decoder_sub">авто — аппаратный, а если видео зависло, для этого канала программный; со следующего канала</string>
+    <string name="any_cert">Принимать любые сертификаты</string>
+    <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>
     <string name="deinterlace_sub">для чересстрочных каналов (1080i): убирает «гребёнку» на движении, вертикальная чёткость на движении ниже; нагружает видеопроцессор; со следующего канала</string>
     <string name="teletext">Телетекст</string>

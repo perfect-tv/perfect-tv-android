@@ -15,7 +15,8 @@ import javax.net.ssl.X509TrustManager
 
 /**
  * Общий OkHttp: таймауты, кэш, редиректы; поправка часов по Date. HTTPS — с любыми сертификатами
- * (просроченные, самоподписанные, чужое имя узла): у провайдеров IPTV это обычное дело.
+ * (просроченные, самоподписанные, чужое имя узла) при включённой настройке [Prefs.anyCert] (по умолчанию да):
+ * у провайдеров IPTV это обычное дело.
  */
 object Net {
     const val USER_AGENT = "PerfectTV/1.0 (Linux; Android) ExoPlayer"
@@ -23,17 +24,23 @@ object Net {
     lateinit var client: OkHttpClient
         private set
 
+    private val system: X509TrustManager = javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm())
+        .apply { init(null as java.security.KeyStore?) }.trustManagers.filterIsInstance<X509TrustManager>().first()
+
+    /** Системная проверка, а при включённой настройке «Принимать любые сертификаты» — без неё (читается на каждом соединении) */
     private val trustAll = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = system.checkClientTrusted(chain, authType)
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+            if (!Prefs.anyCert) system.checkServerTrusted(chain, authType)
+        }
+        override fun getAcceptedIssuers(): Array<X509Certificate> = system.acceptedIssuers
     }
 
     fun init(context: Context) {
         val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustAll), SecureRandom()) }
         client = OkHttpClient.Builder()
             .sslSocketFactory(ssl.socketFactory, trustAll)
-            .hostnameVerifier { _, _ -> true }
+            .hostnameVerifier { host, session -> Prefs.anyCert || okhttp3.internal.tls.OkHostnameVerifier.verify(host, session) }
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)

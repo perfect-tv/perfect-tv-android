@@ -110,6 +110,11 @@ object Prefs {
         set(v) = sp.edit().putLong("home_watch_next_id", v).apply()
 
     /** Деинтерлейсинг чересстрочных потоков (шейдер поверх видео) */
+    /** HTTPS без проверки сертификата и имени узла */
+    var anyCert: Boolean
+        get() = bool("any_cert", true)
+        set(v) = sp.edit().putBoolean("any_cert", v).apply()
+
     var deinterlace: Boolean
         get() = bool("deinterlace", false)
         set(v) = sp.edit().putBoolean("deinterlace", v).apply()
