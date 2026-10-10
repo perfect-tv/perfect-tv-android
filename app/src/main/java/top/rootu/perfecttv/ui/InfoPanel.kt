@@ -89,6 +89,12 @@ class InfoPanel(val view: View) {
         banner.layoutParams.width = Math.round(cw * 0.25f)
         banner.layoutParams.height = Math.round(cw * 0.25f * 9 / 16)
         upnext.layoutParams.width = Math.round(cw * 0.27f)
+        // описание не выше картинки: строк столько, сколько помещается рядом с одной строкой тегов
+        // (число зависит от размера интерфейса, высота панели не прыгает от длины текста)
+        moreTags.isSingleLine = true
+        moreTags.ellipsize = android.text.TextUtils.TruncateAt.END
+        val gap = Math.round(6 * dm.density)
+        moreText.maxLines = maxOf(2, ((banner.layoutParams.height - moreTags.lineHeight - gap) / moreText.lineHeight))
         if (U.touch) {
             // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
             val touch = view.findViewById<LinearLayout>(R.id.info_touch)

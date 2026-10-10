@@ -213,11 +213,12 @@ object Logos {
      * грузится — пустая подложка, чтобы монограмма не мелькала.
      * @param plate тёмная подложка (строка в фокусе с белым фоном: белые логотипы иначе не видно)
      * @param badge рисовать бейдж (если включён в настройках)
+     * @param corner радиус подложки; по умолчанию — малый. Подложка внутри скруглённой строки — радиус строки минус отступ
      */
-    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, plate: Boolean = false, badge: Boolean = true, invalidate: () -> Unit) {
+    fun draw(c: Canvas, context: Context, ch: Channel, l: Float, t: Float, r: Float, b: Float, plate: Boolean = false, badge: Boolean = true, corner: Float = -1f, invalidate: () -> Unit) {
         val bm = bitmap(context, ch, invalidate)
         val h = b - t
-        val radius = minOf(U.px(U.RADIUS_S), h * 0.2f)
+        val radius = if (corner >= 0f) corner else minOf(U.px(U.RADIUS_S), h * 0.2f)
         U.roundRect(c, l, t, r, b, radius, if (plate) PLATE else U.FILL_SOFT)
         val showBadge = badge && Prefs.numberMode == Prefs.NUMBER_BADGE && ch.num > 0
         if (bm == null) {
@@ -272,10 +273,13 @@ object Logos {
     private fun drawBadge(c: Canvas, num: Int, l: Float, t: Float, h: Float, radius: Float) {
         val text = num.toString()
         badgePaint.textSize = maxOf(U.px(0.9f), h * 0.26f)
-        val bh = badgePaint.textSize * 1.35f
-        val bw = maxOf(bh * 1.15f, badgePaint.measureText(text) + badgePaint.textSize * 0.8f)
-        U.roundRect(c, l, t, l + bw, t + bh, radius, badgeBg)
-        c.drawText(text, l + (bw - badgePaint.measureText(text)) / 2, t + bh / 2 - (badgePaint.descent() + badgePaint.ascent()) / 2, badgePaint)
+        val bh = badgePaint.textSize * 1.5f
+        val bw = maxOf(bh * 1.2f, badgePaint.measureText(text) + badgePaint.textSize * 1.2f)
+        // бейдж отступает от угла подложки, радиус — вложенный: внешний минус отступ (но не острее четверти высоты)
+        val inset = minOf(radius * 0.5f, h * 0.06f).coerceAtLeast(U.px(0.15f))
+        val r = maxOf(radius - inset, bh * 0.25f)
+        U.roundRect(c, l + inset, t + inset, l + inset + bw, t + inset + bh, minOf(r, bh / 2), badgeBg)
+        c.drawText(text, l + inset + (bw - badgePaint.measureText(text)) / 2, t + inset + bh / 2 - (badgePaint.descent() + badgePaint.ascent()) / 2, badgePaint)
     }
 
     /** Логотип для ImageView: перерисовывается, когда битмап загрузится */

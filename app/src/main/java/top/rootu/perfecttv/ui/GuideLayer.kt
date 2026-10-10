@@ -1029,13 +1029,13 @@ class GuideLayer(private val tv: Tv) : Layer {
             val r = padX + chW
             val chFocus = focus && zone == Zone.CHANNELS
             val bg = if (chFocus) U.WHITE else if (focus) U.FILL_ACTIVE else U.FILL
-            U.roundRect(c, l, y, r, y + rowH, U.px(U.RADIUS_S), bg)
+            U.roundRect(c, l, y, r, y + rowH, U.px(U.RADIUS), bg)
             // фокус ушёл в программу или на даты — канал остаётся обведённым: сюда он вернётся
-            if (focus && !chFocus && !grid && (zone == Zone.PROGRAMS || zone == Zone.DATES)) outline(c, l, y, r, y + rowH)
+            if (focus && !chFocus && !grid && (zone == Zone.PROGRAMS || zone == Zone.DATES)) outline(c, l, y, r, y + rowH, U.px(U.RADIUS))
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
             var x = l + 0.35f * em
-            Logos.draw(c, context, ch, x, y + 0.25f * em, x + 4.3f * em, y + rowH - 0.25f * em, plate = chFocus) { invalidate() }
+            Logos.draw(c, context, ch, x, y + 0.25f * em, x + 4.3f * em, y + rowH - 0.25f * em, plate = chFocus, corner = U.px(U.RADIUS) - 0.25f * em) { invalidate() }
             // колонка логотипов (выехало описание): только логотип
             if (!grid && r - l < 10f * em) return
             x += 4.3f * em + 0.7f * em
@@ -1095,12 +1095,12 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
         }
 
-        private fun outline(c: Canvas, l: Float, t: Float, r: Float, b: Float) {
+        private fun outline(c: Canvas, l: Float, t: Float, r: Float, b: Float, rad: Float = U.px(U.RADIUS_S)) {
             val sw = 0.15f * em
             U.fill.style = Paint.Style.STROKE
             U.fill.strokeWidth = sw
             U.fill.color = U.wa(0.8f)
-            c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, U.px(U.RADIUS_S), U.px(U.RADIUS_S), U.fill)
+            c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, rad, rad, U.fill)
             U.fill.style = Paint.Style.FILL
         }
 
@@ -1243,6 +1243,12 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val dstR = android.graphics.RectF()
         private val bmPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
 
+        /** Строк описания, что помещаются под картинкой, временем и названием (две строки) и над подсказкой OK */
+        private fun panelDescLines(top: Float, bottom: Float, ih: Float): Int {
+            val used = ih + 1.2f * em + 1.9f * em + pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em + 2.4f * em
+            return maxOf(1, ((bottom - top - used) / (pPanelDesc.fontSpacing * 1.12f)).toInt())
+        }
+
         private fun layoutOf(s: String, p: TextPaint, w: Int, lines: Int) =
             StaticLayout.Builder.obtain(s, 0, s.length, p, w).setMaxLines(lines)
                 .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(0f, 1.12f).build()
@@ -1277,14 +1283,15 @@ class GuideLayer(private val tv: Tv) : Layer {
             val key = ch.key + ":" + p.start + ":" + w
             if (key != panelKey) {
                 panelKey = key
-                panelTitle = layoutOf(p.title, pPanelTitle, w, 3)
-                panelDesc = if (p.desc.isEmpty()) null else layoutOf(p.desc, pPanelDesc, w, maxOf(2, ((bottom - top - ih - 9f * em) / (pPanelDesc.textSize * 1.4f)).toInt()))
+                panelTitle = layoutOf(p.title, pPanelTitle, w, 2)
+                panelDesc = if (p.desc.isEmpty()) null else layoutOf(p.desc, pPanelDesc, w, panelDescLines(top, bottom, ih))
             }
             var y = top + ih + 1.2f * em
             pPanelSub.color = U.wa(0.7f)
             U.drawText(c, Fmt.dayTimeRange(p.start, p.stop), l, y + 0.6f * em, pw, pPanelSub)
             y += 1.9f * em
-            panelTitle?.let { c.save(); c.translate(l, y); it.draw(c); c.restore(); y += it.height + 0.7f * em }
+            // название всегда занимает место двух строк: описание не прыгает от длины названия
+            panelTitle?.let { c.save(); c.translate(l, y); it.draw(c); c.restore(); y += pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em }
             panelDesc?.let { c.save(); c.translate(l, y); it.draw(c); c.restore() }
             // клавиша OK в рамке и действие — как в окне «Программа»
             val live = p.start <= now && now < p.stop
