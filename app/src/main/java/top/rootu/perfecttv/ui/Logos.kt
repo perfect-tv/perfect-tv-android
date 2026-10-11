@@ -20,7 +20,13 @@ import top.rootu.perfecttv.data.Channel
  */
 object Logos {
     private lateinit var loader: ImageLoader
-    private val bitmaps = LruCache<String, Bitmap>(400)
+    // по байтам, а не по числу: логотипы с прозрачностью — ARGB, 400 штук на слабой приставке — десятки МБ;
+    // не больше 1/16 кучи приложения (но не меньше 6 МБ и не больше 24)
+    private val bitmaps = object : LruCache<String, Bitmap>(
+        (Runtime.getRuntime().maxMemory() / 16).coerceIn(6L shl 20, 24L shl 20).toInt()
+    ) {
+        override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
+    }
     // адреса, которые не загрузились, и до какого времени (unix-секунды) их не пробуем: чтобы не стучаться
     // в недоступный источник на каждой отрисовке. Ошибка сервера и битая картинка — на 12 часов (и между
     // запусками), нет сети или таймаут — на 3 минуты (связь вернётся). Очистка кэша логотипов сбрасывает всё.
@@ -52,6 +58,8 @@ object Logos {
             .crossfade(false)
             .allowRgb565(true)
             .respectCacheHeaders(false)
+            // свой LRU битмапов для Canvas уже есть; общий кэш Coil (четверть кучи) дублировал бы его
+            .memoryCache(null)
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(java.io.File(app.cacheDir, "picons"))
