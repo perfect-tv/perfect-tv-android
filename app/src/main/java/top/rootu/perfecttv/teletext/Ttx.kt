@@ -115,6 +115,11 @@ class TtxDecoder {
     }
 
     /** Страница [number] (BCD) — подстраницы по возрастанию кода */
+    /** Есть ли хоть одна принятая страница (дёшево, в отличие от [numbers]) */
+    fun hasPages(): Boolean = store.isNotEmpty()
+
+    private val MAX_PAGES = 3000
+
     fun subpages(number: Int): List<TtxPage> =
         store.entries.filter { it.key ushr 16 == number }.sortedBy { it.key }.map { it.value }
 
@@ -138,7 +143,10 @@ class TtxDecoder {
             val u = i + 2
             i = u + ul
             if (i > end) break
-            if ((uid == 0x02 || uid == 0x03) && ul == 44 && (buf[u + 1].toInt() and 0xFF) == 0xE4) unit(buf, u + 2, timeUs, sink)
+            if ((uid == 0x02 || uid == 0x03) && ul == 44 && (buf[u + 1].toInt() and 0xFF) == 0xE4) {
+                // битый пакет не должен ронять загрузку сегмента (разбор идёт в потоке загрузки плеера)
+                try { unit(buf, u + 2, timeUs, sink) } catch (e: RuntimeException) { android.util.Log.w("IPTV", "teletext packet: $e") }
+            }
         }
     }
 
@@ -199,6 +207,8 @@ class TtxDecoder {
         val packets = b.enh.filterNotNull()
         val enh = if (packets.isNotEmpty()) packets.flatMap { it.asList() }.toIntArray() else b.enhOld
         val page = TtxPage(b.number, b.subcode, b.flags, cs, b.rows, b.links, enh)
+        // предел: кодировщик с «бегущим» кодом подстраницы иначе копил бы страницы до нехватки памяти
+        if (store.size >= MAX_PAGES) store.clear()
         store[(b.number shl 16) or b.subcode] = page
         version++
         sink?.onPage(page, timeUs)

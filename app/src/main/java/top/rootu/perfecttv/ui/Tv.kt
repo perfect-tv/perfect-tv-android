@@ -999,7 +999,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             seek = sk,
             height = if (same) state.height else 0,
             decoder = if (same) playback.videoSoftware?.let { if (it) "SW" else "HW" } else null,
-            teletext = same && playback.teletext.numbers().isNotEmpty(),
+            teletext = same && playback.teletext.hasPages(),
             paused = same && playback.paused,
             error = same && state.error
         ))
@@ -1505,7 +1505,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 val now = audio.firstOrNull { it.selected }?.label ?: ""
                 viewing.add(MenuLayer.Item(str(R.string.audio_and_subtitles), now, sub = { tracksPage(ch) }))
             }
-            if (playback.teletext.declared || playback.teletext.numbers().isNotEmpty()) viewing.add(MenuLayer.Item(str(R.string.teletext)) { openTeletext() })
+            if (playback.teletext.declared || playback.teletext.hasPages()) viewing.add(MenuLayer.Item(str(R.string.teletext)) { openTeletext() })
             if (playback.fixStep > 0) viewing.add(MenuLayer.Item(str(R.string.fix_reset)) { playback.resetFix(ch, lastUrl) })
             viewing.add(MenuLayer.Item(str(R.string.picture_format), aspectName(), keep = true) { Prefs.aspect = (Prefs.aspect + 1) % 3; applyAspect() })
         }
