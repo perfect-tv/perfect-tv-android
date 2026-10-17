@@ -233,7 +233,15 @@ class GuideLayer(private val tv: Tv) : Layer {
 
     /** Список категорий изменился (скрытие, избранное) — оставить фокус на том же канале */
     fun reload() {
+        val inPls = zone == Zone.PLAYLISTS
         open(focused, group?.key)
+        if (inPls) keepPlaylists()
+    }
+
+    /** open() ставит зону каналов и убирает колонки; в колонке плейлистов остаёмся в ней, колонка на месте */
+    private fun keepPlaylists() {
+        zone = Zone.PLAYLISTS
+        gv.showPlaylists()
     }
 
     /**
@@ -337,9 +345,10 @@ class GuideLayer(private val tv: Tv) : Layer {
         gv.invalidate()
     }
 
-    /** ↑/↓ — плейлист, OK — открыть его, → — обратно к категориям */
+    /** ↑/↓ — плейлист (категории и каналы справа меняются сразу), OK или → — к категориям, «Назад» — отмена */
     private fun playlistsKey(name: String) {
         val n = pls.size
+        val was = plsIndex
         when (name) {
             "up" -> plsIndex = (plsIndex - 1 + n) % n
             "down" -> plsIndex = (plsIndex + 1) % n
@@ -347,12 +356,22 @@ class GuideLayer(private val tv: Tv) : Layer {
             "pgdown" -> plsIndex = minOf(n - 1, plsIndex + gv.catRows() - 1)
             "right" -> zone = Zone.CATS
         }
+        if (plsIndex != was) previewSelected()
         gv.invalidate()
     }
 
-    private fun choosePlaylist() {
+    /** Показать справа плейлист в фокусе колонки */
+    private fun previewSelected() {
         val p = pls.getOrNull(plsIndex) ?: return
-        if (p.id == tv.playlist?.id) { zone = Zone.CATS; gv.invalidate() } else tv.switchPlaylist(p)
+        tv.previewPlaylist(p)
+        open(null, null)
+        keepPlaylists()
+    }
+
+    private fun choosePlaylist() {
+        previewSelected()
+        zone = Zone.CATS
+        gv.invalidate()
     }
 
     private fun openCats() {
@@ -473,6 +492,8 @@ class GuideLayer(private val tv: Tv) : Layer {
     override fun back() {
         if (tv.numberPending()) return tv.cancelNumber()
         if (zone == Zone.PLAYLISTS) {
+            // отмена: прежний плейлист, категория и канал — как были
+            if (tv.revertPlaylistPreview()) open(tv.state.channel, tv.state.groupKey)
             zone = Zone.CATS
             gv.invalidate()
             return
@@ -554,6 +575,9 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var rv = 1f              // программа канала: 0 — скрыта, 1 — выехала (виды 2 и 3)
         private val catW get() = 19f * em
         private val catRowH get() = 3.2f * em
+
+        /** Колонки категорий и плейлистов выдвинуты сразу, без анимации */
+        fun showPlaylists() { shift = 1f; shift2 = 1f }
 
         fun resetShift() {
             // сразу в состояние вида, без выезда: категории стоят на экране, программа скрыта — по виду
@@ -830,7 +854,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var hintList: List<Pair<String, String>> = emptyList()
 
         private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
-            Zone.PLAYLISTS -> listOf("↑ ↓" to str(R.string.hint_playlist), "OK" to str(R.string.hint_select), "→" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
+            Zone.PLAYLISTS -> listOf("↑ ↓" to str(R.string.hint_playlist), "→" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
             Zone.CATS -> listOf("↑ ↓" to str(R.string.category), "→" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
             Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_to_channels), "→" to str(R.string.hint_dates), "↑ ↓" to str(R.string.hint_programme_pick))
             Zone.DATES -> listOf("↑ ↓" to str(R.string.hint_date), "←" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))

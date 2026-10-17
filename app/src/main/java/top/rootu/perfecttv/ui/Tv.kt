@@ -487,6 +487,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         }
         main.removeCallbacks(switchRun)
         pending = null
+        // канал выбран в просматриваемом плейлисте — он становится открытым
+        if (previewOrigin != null) { previewOrigin = null; playlist?.let { Prefs.lastPlaylist = it.id } }
         // PIN «действует», пока смотрим закрытые каналы подряд; открытый канал — сброс. Канал,
         // который заблокировали прямо во время просмотра, PIN не открывал — флаг не ставится.
         if (ch !== state.channel) {
@@ -1055,6 +1057,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     fun closeGuide(silent: Boolean = false) {
         if (!layers.contains(guide)) return
         if (!silent && !hasVideo()) return exitRequest()
+        revertPlaylistPreview()
         layers.toList().reversed().forEach { if (it !== guide) remove(it) }
         remove(guide)
     }
@@ -1692,6 +1695,35 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
+    }
+
+    /** Плейлист, который был открыт до просмотра другого в колонке плейлистов гида (null — просмотра нет) */
+    private var previewOrigin: Playlist? = null
+
+    /**
+     * Просмотр плейлиста из колонки плейлистов гида: каналы и категории справа меняются сразу, а
+     * видео, слои и история остаются. Закреплается, когда включают канал ([playChannel]); иначе при
+     * закрытии гида или «Назад» в колонке возвращается прежний ([revertPlaylistPreview]).
+     */
+    fun previewPlaylist(p: Playlist) {
+        if (p.id == playlist?.id) return
+        if (previewOrigin == null) previewOrigin = playlist
+        playlist = p
+        val cat = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
+        catalog = cat
+        if (cat.channels.isEmpty() || repo.isStale(p)) repo.refresh(p, false) { err -> onRefreshed(p, err) }
+        else repo.refreshEpg(p, false)
+    }
+
+    /** Вернуть плейлист, открытый до просмотра (каталог перечитывается; гид обновляет вызывающий) */
+    fun revertPlaylistPreview(): Boolean {
+        val o = previewOrigin ?: return false
+        previewOrigin = null
+        val p = repo.playlist(o.id) ?: o
+        playlist = p
+        catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
+        state.channel?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
+        return true
     }
 
     fun switchPlaylist(p: Playlist) {
