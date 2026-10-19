@@ -103,7 +103,27 @@ class TtxDecoder {
         return p.number == subtitleNumber
     }
 
+    // страницы субтитров с временем кадра (мкс): плеер буферизует поток на десятки секунд вперёд, и «последняя
+    // принятая» страница опережает картинку; экран телетекста берёт ту, что относится к текущему кадру
+    private val subHistory = ArrayDeque<Pair<Long, TtxPage>>()
+
+    @Synchronized fun recordSubtitle(timeUs: Long, p: TtxPage) {
+        subHistory.addLast(timeUs to p)
+        while (subHistory.size > 200) subHistory.removeFirst()
+    }
+
+    /** Есть ли записанные страницы субтитров */
+    @Synchronized fun hasSubtitleHistory() = subHistory.isNotEmpty()
+
+    /** Страница субтитров, показанная на кадре [posUs] (последняя не позже него); null — кадр раньше записей */
+    @Synchronized fun subtitleAt(posUs: Long): TtxPage? {
+        var r: TtxPage? = null
+        for ((t, p) in subHistory) { if (t <= posUs) r = p else break }
+        return r
+    }
+
     @Synchronized fun reset() {
+        subHistory.clear()
         declared = false
         subtitleNumber = 0
         subtitleEmpty = true

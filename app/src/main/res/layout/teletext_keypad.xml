@@ -49,4 +49,17 @@
         <TextView style="@style/Text.PinKey" android:tag="idx" android:text="100" android:textSize="13sp" />
         <TextView style="@style/Text.PinKey" android:tag="next" android:text="›" />
     </LinearLayout>
+
+    <!-- диапазоны принятых страниц (заполняет код): текущий выделен; ширина — как у трёх кнопок -->
+    <TextView
+        android:id="@+id/ttx_ranges"
+        style="@style/Text"
+        android:layout_width="177dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="3"
+        android:textColor="@color/text_65"
+        android:textSize="11.5sp" />
 </LinearLayout>

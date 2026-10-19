@@ -145,13 +145,13 @@ object Prefs {
 
     /** Экранная клавиатура рядом со страницей телетекста */
     var ttxKeypad: Boolean
-        get() = bool("ttx_keypad", true)
-        set(v) = sp.edit().putBoolean("ttx_keypad", v).apply()
+        get() = bool("ttx_keypad2", false)
+        set(v) = sp.edit().putBoolean("ttx_keypad2", v).apply()
 
     /** Телетекст поверх видео (прозрачный фон) вместо чёрного экрана */
     var ttxMix: Boolean
-        get() = bool("ttx_mix", false)
-        set(v) = sp.edit().putBoolean("ttx_mix", v).apply()
+        get() = bool("ttx_mix2", true)
+        set(v) = sp.edit().putBoolean("ttx_mix2", v).apply()
 
     /** Вид «Список»: при переходе в программу каналы сжимаются до логотипов, справа выезжает панель передачи */
     var guideDesc: Boolean

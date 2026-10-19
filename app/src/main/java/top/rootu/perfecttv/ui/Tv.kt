@@ -1313,7 +1313,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val nums = dec.numbers()
         val start = if (nums.isEmpty() || 0x100 in nums) 0x100 else nums.first()
         var layer: TeletextLayer? = null
-        layer = TeletextLayer(activity, dec, start, onMenu = { openTeletextMenu(layer!!) }, onClose = { closeMenu(); remove(layer!!) })
+        layer = TeletextLayer(activity, dec, start, position = { playback.periodPositionMs * 1000 }, onMenu = { openTeletextMenu(layer!!) }, onClose = { closeMenu(); remove(layer!!) })
         push(layer)
     }
 

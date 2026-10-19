@@ -23,17 +23,20 @@ import top.rootu.perfecttv.teletext.TtxPage
  * Телетекст на весь экран: страницы из [TtxDecoder] (их копит плеер, пока идёт канал); справа —
  * экранная клавиатура (цифры, цветные кнопки, стереть, индекс, подстраницы) как PIN «Google».
  *
- * Клавиатура: ↑/↓ — ряд (по кругу), ← / OK / → — левая, средняя, правая кнопка ряда; над клавиатурой
- * круг d-pad показывает кнопки текущего ряда. Клавиатура скрыта: ↑/↓ — страница, ←/→ — подстраницы,
- * OK — скрытый текст. Цифры и цветные кнопки пульта работают всегда; PG± — страница вперёд/назад;
- * удерж. OK или MENU —
- * меню телетекста ([onMenu]); «Назад» стирает набранное, потом закрывает. Страницы, которых ещё не
+ * Клавиатура (по OK, «Назад» скрывает): ↑/↓ — ряд (по кругу), ← / OK / → — левая, средняя, правая кнопка
+ * ряда; над клавиатурой круг d-pad показывает кнопки текущего ряда, под ней — диапазоны принятых страниц.
+ * Без клавиатуры: ←/→ — предыдущая / следующая из принятых страниц (как каналы), ↑/↓ — подстраницы.
+ * Цифры и цветные кнопки пульта работают всегда; PG± — подстраницы; удерж. OK или MENU —
+ * меню телетекста ([onMenu]); «Назад» стирает набранное, потом скрывает клавиатуру, потом закрывает.
+ * Страница субтитров показывается по времени кадра ([TtxDecoder.subtitleAt]), а не по последней принятой. Страницы, которых ещё не
  * было в эфире, ждём: в потоке они идут по кругу, обычно это секунды.
  */
 class TeletextLayer(
     private val context: Context,
     private val decoder: TtxDecoder,
     startPage: Int,
+    /** Позиция воспроизведения от начала периода, мкс (-1 — неизвестна): по ней выбирается страница субтитров */
+    private val position: () -> Long,
     private val onMenu: () -> Unit,
     private val onClose: () -> Unit
 ) : Layer {
@@ -58,6 +61,7 @@ class TeletextLayer(
     private val padKeys = ArrayList<String>()
     private var row = 1  // «4 5 6»
     private val wheel: TeletextWheel = keypad.findViewById(R.id.ttx_wheel)
+    private val rangesView: TextView = keypad.findViewById(R.id.ttx_ranges)
 
     var padVisible = Prefs.ttxKeypad
         private set
@@ -67,15 +71,18 @@ class TeletextLayer(
     var hold = false
         private set
 
+    private var beat = 0
     private val tick = object : Runnable {
         override fun run() {
-            phase = !phase
+            // шаг 250 мс (страница субтитров следует за кадром), мигание — по-прежнему раз в 500
+            if (beat++ % 2 == 0) { phase = !phase }
             tv.flashOn = phase
+            if (syncing()) { seen = -1 }
             // подстраницы листаются сами, как на телевизоре
             val n = decoder.subpages(page).size
             if (n > 1 && !hold && System.currentTimeMillis() - lastSwitch > SUBPAGE_MS) { sub = (sub + 1) % n; lastSwitch = System.currentTimeMillis(); seen = -1 }
             if (decoder.version != seen) refresh()
-            handler.postDelayed(this, 500)
+            handler.postDelayed(this, 250)
         }
     }
 
@@ -88,6 +95,8 @@ class TeletextLayer(
             for (c in 0 until line.childCount) {
                 val v = line.getChildAt(c) as TextView
                 val i = padViews.size
+                v.isFocusable = false  // кнопки — только по тапу, фокус Android не нужен (иначе «1» оставалась белой)
+                v.isFocusableInTouchMode = false
                 padViews.add(v)
                 padKeys.add(v.tag as String)
                 v.setOnClickListener { row = i / 3; press(padKeys[i]); render() }
@@ -99,7 +108,7 @@ class TeletextLayer(
         applyPad()
         lastSwitch = System.currentTimeMillis()
         refresh()
-        handler.postDelayed(tick, 500)
+        handler.postDelayed(tick, 250)
     }
 
     private fun colorKey(color: Int): StateListDrawable {
@@ -129,10 +138,40 @@ class TeletextLayer(
             if (n >= 0) TTX_COLORS[n + 1] else 0
         }
         wheel.set(Array(3) { c -> padViews[row * 3 + c].text.toString() }, colors)
+        if (padVisible) showRanges()
     }
+
+    private fun showRanges() {
+        val r = ranges(decoder.numbers())
+        val sb = android.text.SpannableStringBuilder()
+        if (r.isEmpty()) sb.append(str(R.string.ttx_no_pages))
+        for ((i, e) in r.withIndex()) {
+            if (i > 0) sb.append("  ")
+            val s0 = sb.length
+            sb.append(if (e.first == e.last) "%03X".format(e.first) else "%03X–%03X".format(e.first, e.last))
+            if (page in e.first..e.last) {
+                sb.setSpan(android.text.style.ForegroundColorSpan(0xFFFFFFFF.toInt()), s0, sb.length, 0)
+                sb.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), s0, sb.length, 0)
+            }
+        }
+        if (rangesView.text.toString() != sb.toString() || page != shownRangePage) rangesView.text = sb
+        shownRangePage = page
+    }
+    private var shownRangePage = -1
+
+    /** Страница субтитров идёт по времени кадра: пока на ней — обновляем по часам, а не по приёму */
+    private fun syncing() = page == decoder.subtitleNumber && decoder.hasSubtitleHistory() && position() >= 0
 
     private fun refresh() {
         seen = decoder.version
+        if (padVisible) showRanges()
+        if (syncing()) {
+            // субтитры: страница, что была на экране в момент текущего кадра (нет такой — пустая)
+            val p = decoder.subtitleAt(position()) ?: blank()
+            tv.message = ""
+            tv.grid = Ttx.layout(p, Ttx.headerRow(page, p.rows[0], typed))
+            return
+        }
         val subs = decoder.subpages(page)
         if (subs.isEmpty()) {
             // страницы ещё нет: пустой экран с заголовком и ожиданием
@@ -178,14 +217,15 @@ class TeletextLayer(
             "b" -> link(3)
             "del" -> { typed = typed.dropLast(1); seen = -1; refresh() }
             "idx" -> go(0x100)
-            "prev" -> subpage(-1)
-            "next" -> subpage(1)
+            "prev" -> go(known(-1))
+            "next" -> go(known(1))
             else -> digit(k.toInt())
         }
     }
 
     // ------------------------------------------------------------ состояние для меню телетекста
 
+    /** Из меню: клавиатура показана — и при следующем открытии телетекста */
     fun toggleKeypad() { padVisible = !padVisible; Prefs.ttxKeypad = padVisible; applyPad() }
     fun toggleMix() { tv.mix = !tv.mix; Prefs.ttxMix = tv.mix }
     fun toggleReveal() { tv.reveal = !tv.reveal }
@@ -197,8 +237,8 @@ class TeletextLayer(
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") return digit(digit)
         when (name) {
-            "pgup" -> return go(step(page, 1))
-            "pgdown" -> return go(step(page, -1))
+            "pgup" -> return subpage(1)
+            "pgdown" -> return subpage(-1)
         }
         if (padVisible) {
             when (name) {
@@ -209,11 +249,18 @@ class TeletextLayer(
             }
             render()
         } else when (name) {
-            "up" -> go(step(page, 1))
-            "down" -> go(step(page, -1))
-            "left" -> subpage(-1)
-            "right" -> subpage(1)
+            "left" -> go(known(-1))
+            "right" -> go(known(1))
+            "up" -> subpage(-1)
+            "down" -> subpage(1)
         }
+    }
+
+    /** Соседняя принятая страница ([d] = ±1) по кругу; ничего ещё не принято — следующий номер подряд */
+    private fun known(d: Int): Int {
+        val nums = decoder.numbers()
+        if (nums.isEmpty()) return step(page, d)
+        return if (d > 0) nums.firstOrNull { it > page } ?: nums.first() else nums.lastOrNull { it < page } ?: nums.last()
     }
 
     private fun subpage(d: Int) {
@@ -237,14 +284,18 @@ class TeletextLayer(
     }
 
     override fun enter() {
-        if (padVisible) press(padKeys[row * 3 + 1]) else toggleReveal()
+        if (padVisible) press(padKeys[row * 3 + 1]) else { padVisible = true; applyPad(); return }
         render()
     }
 
     override fun long() = onMenu()
 
     override fun back() {
-        if (typed.isNotEmpty()) { typed = ""; seen = -1; refresh() } else onClose()
+        when {
+            typed.isNotEmpty() -> { typed = ""; seen = -1; refresh() }
+            padVisible -> { padVisible = false; applyPad() }  // только скрыть; настройка меню не меняется
+            else -> onClose()
+        }
     }
 
     override fun destroy() {
@@ -253,6 +304,20 @@ class TeletextLayer(
 
     companion object {
         private const val SUBPAGE_MS = 6000L
+
+        /** Номера страниц (BCD, по возрастанию) → диапазоны подряд идущих: 100,101,102,200 → 100–102, 200 */
+        fun ranges(nums: List<Int>): List<IntRange> {
+            val out = ArrayList<IntRange>()
+            var from = -1
+            var prev = -1
+            for (n in nums) {
+                if (from >= 0 && n == next(prev)) { prev = n; continue }
+                if (from >= 0) out.add(from..prev)
+                from = n; prev = n
+            }
+            if (from >= 0) out.add(from..prev)
+            return out
+        }
 
         /** Следующая страница на [d] шагов; номера в BCD, шестнадцатеричные «цифры» пропускаются, по кругу 100…899 */
         fun step(from: Int, d: Int): Int {
@@ -265,7 +330,7 @@ class TeletextLayer(
             return n
         }
 
-        private fun next(n: Int): Int {
+        internal fun next(n: Int): Int {
             var v = n + 1
             if (v and 0xF > 9) v = (v and 0xFF0) + 0x10
             if (v and 0xF0 > 0x90) v = (v and 0xF00) + 0x100

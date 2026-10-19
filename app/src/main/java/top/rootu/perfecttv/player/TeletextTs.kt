@@ -239,6 +239,7 @@ private class TeletextReader(
     private fun subtitle(page: TtxPage, t: Long) {
         val o = out ?: return
         if (t == C.TIME_UNSET || !decoder.acceptSubtitle(page)) return
+        decoder.recordSubtitle(t, page)
         var lines = Ttx.subtitleLines(Ttx.layout(page))
         // заглушка «ПРОГРАММА ТРАНСЛИРУЕТСЯ БЕЗ СУБТИТРОВ»: каналы шлют её, пока субтитров нет — не показывать
         if (lines.any { l -> l.joinToString("") { it.text }.contains("БЕЗ СУБТИТРОВ") }) lines = emptyList()

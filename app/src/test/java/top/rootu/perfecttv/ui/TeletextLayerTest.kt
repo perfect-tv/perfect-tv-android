@@ -21,4 +21,10 @@ class TeletextLayerTest {
         assertEquals(0x205, TeletextLayer.step(0x195, 10))
         assertEquals(0x195, TeletextLayer.step(0x205, -10))
     }
+
+    @Test fun rangesJoinConsecutivePages() {
+        val r = TeletextLayer.ranges(listOf(0x100, 0x101, 0x109, 0x110, 0x200, 0x888))
+        assertEquals(listOf(0x100..0x101, 0x109..0x110, 0x200..0x200, 0x888..0x888), r)
+        assertEquals(emptyList<IntRange>(), TeletextLayer.ranges(emptyList()))
+    }
 }
