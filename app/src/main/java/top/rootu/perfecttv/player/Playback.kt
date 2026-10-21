@@ -330,6 +330,13 @@ class Playback(context: Context) {
     /** Дорожка потока: [label] — название или язык, [selected] — играет сейчас */
     class Track(val group: androidx.media3.common.TrackGroup, val index: Int, val label: String, val language: String, val selected: Boolean)
 
+    /** Сколько дорожек типа [type], которые плеер умеет играть (без подписей — дёшево, для инфопанели) */
+    fun trackCount(type: Int): Int {
+        var n = 0
+        for (g in player.currentTracks.groups) if (g.type == type) for (i in 0 until g.length) if (g.isTrackSupported(i)) n++
+        return n
+    }
+
     /** Дорожки типа [type] (C.TRACK_TYPE_AUDIO / C.TRACK_TYPE_TEXT), которые плеер умеет играть */
     fun tracks(type: Int): List<Track> {
         val out = ArrayList<Track>()

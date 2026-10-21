@@ -1002,6 +1002,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             height = if (same) state.height else 0,
             decoder = if (same) playback.videoSoftware?.let { if (it) "SW" else "HW" } else null,
             teletext = same && playback.teletext.hasPages(),
+            audios = if (same) playback.trackCount(androidx.media3.common.C.TRACK_TYPE_AUDIO) else 0,
+            subtitles = if (same) playback.trackCount(androidx.media3.common.C.TRACK_TYPE_TEXT) else 0,
             paused = same && playback.paused,
             error = same && state.error
         ))

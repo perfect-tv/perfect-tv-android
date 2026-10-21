@@ -422,6 +422,7 @@
     <string name="ttx_subpages_auto">Auto</string>
     <string name="ttx_subpages_stop">Stopped</string>
     <string name="ttx_no_pages">No pages received yet</string>
+    <string name="audio_n">Audio ×%1$d</string>
     <string name="ttx_exit">Close teletext</string>
     <string name="ttx_shown">Shown</string>
     <string name="ttx_hidden">Hidden</string>
