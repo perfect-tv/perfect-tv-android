@@ -258,9 +258,10 @@ private class TeletextReader(
             for (r in runs) {
                 val s = sb.length
                 sb.append(r.text)
-                sb.setSpan(ForegroundColorSpan(TTX_COLORS[r.fg and 7]), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // цвет текста и фона — из потока (белый — речь, жёлтый — песня…), если в настройках не задан свой
+                if (SubtitleStyle.textColor() == 0) sb.setSpan(ForegroundColorSpan(TTX_COLORS[r.fg and 7]), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 // чёрный фон телетекста — полупрозрачная плашка, остальные цвета как есть
-                sb.setSpan(BackgroundColorSpan(if (r.bg == 0) 0xCC000000.toInt() else TTX_COLORS[r.bg and 7]), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                if (SubtitleStyle.background() == null) sb.setSpan(BackgroundColorSpan(if (r.bg == 0) 0xCC000000.toInt() else TTX_COLORS[r.bg and 7]), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
         return Cue.Builder().setText(sb).build()

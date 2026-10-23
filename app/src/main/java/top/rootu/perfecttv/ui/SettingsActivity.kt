@@ -16,6 +16,7 @@ import android.widget.TextView
 import top.rootu.perfecttv.App
 import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
+import top.rootu.perfecttv.player.SubtitleStyle
 import top.rootu.perfecttv.data.Bus
 import top.rootu.perfecttv.data.DataEvent
 import top.rootu.perfecttv.data.Loaders
@@ -267,6 +268,13 @@ class SettingsActivity : Activity() {
         }
         choice(col, str(R.string.video_decoder), listOf(str(R.string.decoder_auto), str(R.string.decoder_hw), str(R.string.decoder_sw)), Prefs.videoDecoder,
             str(R.string.video_decoder_sub)) { Prefs.videoDecoder = it; showMain() }
+        number(col, str(R.string.subs_size), SubtitleStyle.SIZES, Prefs.subSize, label = { "$it%" }) { Prefs.subSize = it; showMain() }
+        choice(col, str(R.string.subs_color), listOf(str(R.string.subs_as_stream), str(R.string.subs_white), str(R.string.subs_yellow), str(R.string.subs_green), str(R.string.subs_cyan)),
+            Prefs.subColor, str(R.string.subs_color_sub)) { Prefs.subColor = it; showMain() }
+        choice(col, str(R.string.subs_bg), listOf(str(R.string.subs_as_stream), str(R.string.subs_bg_none), str(R.string.subs_bg_semi), str(R.string.subs_bg_black)),
+            Prefs.subBg) { Prefs.subBg = it; showMain() }
+        choice(col, str(R.string.subs_edge), listOf(str(R.string.subs_edge_none), str(R.string.subs_edge_outline), str(R.string.subs_edge_shadow)), Prefs.subEdge) { Prefs.subEdge = it; showMain() }
+        number(col, str(R.string.subs_bottom), SubtitleStyle.BOTTOMS, Prefs.subBottom, label = { "$it%" }) { Prefs.subBottom = it; showMain() }
         toggle(col, str(R.string.any_cert), Prefs.anyCert, str(R.string.any_cert_sub)) { Prefs.anyCert = it; showMain() }
         toggle(col, str(R.string.deinterlace), Prefs.deinterlace, str(R.string.deinterlace_sub)) { Prefs.deinterlace = it; showMain() }
         number(col, str(R.string.remind_about_a_programme), listOf(0, 1, 2, 3, 4, 5, 10), Prefs.remindBefore,

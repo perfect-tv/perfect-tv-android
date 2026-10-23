@@ -41,6 +41,7 @@ class TvActivity : Activity() {
         val pb = Playback(this)
         playback = pb
         findViewById<PlayerView>(R.id.player).player = pb.player
+        applySubtitleStyle()
         tv = Tv(this, root, pb)
         reminderFromIntent(intent)
         externalFromIntent(intent)
@@ -84,8 +85,14 @@ class TvActivity : Activity() {
         i.removeExtra(Alarms.EXTRA_REMINDER)
     }
 
+    /** Оформление субтитров из настроек (при запуске и при возврате из настроек) */
+    private fun applySubtitleStyle() {
+        findViewById<PlayerView>(R.id.player).subtitleView?.let { top.rootu.perfecttv.player.SubtitleStyle.apply(it) }
+    }
+
     override fun onResume() {
         super.onResume()
+        applySubtitleStyle()
         App.foreground = true
         pendingReminder?.let { id ->
             pendingReminder = null

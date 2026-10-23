@@ -115,6 +115,23 @@ object Prefs {
         get() = bool("any_cert", true)
         set(v) = sp.edit().putBoolean("any_cert", v).apply()
 
+    /** Оформление субтитров (индексы списков в `SubtitleStyle`): размер %, цвет, фон, обводка, отступ снизу % */
+    var subSize: Int
+        get() = sp.getInt("sub_size", 100)
+        set(v) = sp.edit().putInt("sub_size", v).apply()
+    var subColor: Int
+        get() = sp.getInt("sub_color", 0)
+        set(v) = sp.edit().putInt("sub_color", v).apply()
+    var subBg: Int
+        get() = sp.getInt("sub_bg", 0)
+        set(v) = sp.edit().putInt("sub_bg", v).apply()
+    var subEdge: Int
+        get() = sp.getInt("sub_edge", 0)
+        set(v) = sp.edit().putInt("sub_edge", v).apply()
+    var subBottom: Int
+        get() = sp.getInt("sub_bottom", 8)
+        set(v) = sp.edit().putInt("sub_bottom", v).apply()
+
     var deinterlace: Boolean
         get() = bool("deinterlace", false)
         set(v) = sp.edit().putBoolean("deinterlace", v).apply()
