@@ -417,6 +417,12 @@
     <string name="subs_edge_outline">Outline</string>
     <string name="subs_edge_shadow">Shadow</string>
     <string name="subs_bottom">Subtitle bottom margin</string>
+    <string name="voice_button">Voice input button</string>
+    <string name="voice_left">Left of the search field</string>
+    <string name="voice_keyboard">On the keyboard</string>
+    <string name="voice_hidden">Hidden</string>
+    <string name="voice_button_sub">in the search; the language follows the on-screen keyboard layout; the search key on the remote still works unless hidden</string>
+    <string name="hint_voice">Voice input</string>
     <string name="any_cert">Accept any certificates</string>
     <string name="any_cert_sub">for playlists, guide, logos and streams over HTTPS: expired, self-signed or mismatched certificates are accepted; no protection against interception</string>
     <string name="deinterlace">Deinterlacing</string>

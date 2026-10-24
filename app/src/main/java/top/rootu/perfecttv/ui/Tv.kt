@@ -1071,8 +1071,6 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         var layer: SearchLayer? = null
         val leave = { layers.toList().reversed().forEach { if (it !== guide) remove(it) } }
         val speech = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, top.rootu.perfecttv.core.Lang.locale.toLanguageTag())
         val canSpeak = speech.resolveActivity(activity.packageManager) != null
         layer = SearchLayer(activity, repo,
             channels = { cat.group(Catalog.ALL_KEY)?.channels ?: emptyList() },
@@ -1087,8 +1085,13 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 }
             },
             onLong = { ch -> openSchedule(ch, 0) },
-            onVoice = if (!canSpeak) null else { ->
-                try { activity.startActivityForResult(speech, REQ_VOICE) } catch (e: Exception) { toast.show(str(R.string.voice_unavailable)) }
+            onVoice = if (!canSpeak) null else { tag ->
+                // язык — явно и дважды (часть распознавателей читает только предпочтение), иначе берётся английский
+                val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, tag)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
+                try { activity.startActivityForResult(i, REQ_VOICE) } catch (e: Exception) { toast.show(str(R.string.voice_unavailable)) }
             },
             onBack = { remove(layer!!) })
         push(layer)

@@ -268,6 +268,8 @@ class SettingsActivity : Activity() {
         }
         choice(col, str(R.string.video_decoder), listOf(str(R.string.decoder_auto), str(R.string.decoder_hw), str(R.string.decoder_sw)), Prefs.videoDecoder,
             str(R.string.video_decoder_sub)) { Prefs.videoDecoder = it; showMain() }
+        choice(col, str(R.string.voice_button), listOf(str(R.string.voice_left), str(R.string.voice_keyboard), str(R.string.voice_hidden)), Prefs.voiceButton,
+            str(R.string.voice_button_sub)) { Prefs.voiceButton = it; showMain() }
         number(col, str(R.string.subs_size), SubtitleStyle.SIZES, Prefs.subSize, label = { "$it%" }) { Prefs.subSize = it; showMain() }
         choice(col, str(R.string.subs_color), listOf(str(R.string.subs_as_stream), str(R.string.subs_white), str(R.string.subs_yellow), str(R.string.subs_green), str(R.string.subs_cyan)),
             Prefs.subColor, str(R.string.subs_color_sub)) { Prefs.subColor = it; showMain() }

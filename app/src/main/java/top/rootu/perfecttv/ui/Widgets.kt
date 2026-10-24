@@ -113,6 +113,9 @@ class FormView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
             else -> InputType.TYPE_CLASS_TEXT
         }
         if (pin) e.filters = arrayOf(InputFilter.LengthFilter(6))
+        // курсор — в конец текста (при правке длинного адреса он иначе стоял в начале строки и его не было видно)
+        e.setSelection(e.text.length)
+        e.setOnFocusChangeListener { v, focused -> if (focused) v.post { (v as EditText).setSelection(v.text.length) } }
         addView(f)
         return e
     }

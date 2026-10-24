@@ -417,6 +417,12 @@
     <string name="subs_edge_outline">Контур</string>
     <string name="subs_edge_shadow">Тень</string>
     <string name="subs_bottom">Отступ субтитров снизу</string>
+    <string name="voice_button">Кнопка голосового ввода</string>
+    <string name="voice_left">Слева от строки поиска</string>
+    <string name="voice_keyboard">На клавиатуре</string>
+    <string name="voice_hidden">Скрыта</string>
+    <string name="voice_button_sub">в поиске; язык — по раскладке экранной клавиатуры; кнопка поиска на пульте работает, пока кнопка не скрыта</string>
+    <string name="hint_voice">Голосовой ввод</string>
     <string name="any_cert">Принимать любые сертификаты</string>
     <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>

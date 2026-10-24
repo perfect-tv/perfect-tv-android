@@ -132,6 +132,11 @@ object Prefs {
         get() = sp.getInt("sub_bottom", 8)
         set(v) = sp.edit().putInt("sub_bottom", v).apply()
 
+    /** Кнопка голосового ввода в поиске: 0 — слева от строки ввода, 1 — на клавиатуре, 2 — скрыта */
+    var voiceButton: Int
+        get() = sp.getInt("voice_button", 0)
+        set(v) = sp.edit().putInt("voice_button", v).apply()
+
     var deinterlace: Boolean
         get() = bool("deinterlace", false)
         set(v) = sp.edit().putBoolean("deinterlace", v).apply()

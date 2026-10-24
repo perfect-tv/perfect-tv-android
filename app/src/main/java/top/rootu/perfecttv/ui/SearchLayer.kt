@@ -33,8 +33,8 @@ class SearchLayer(
     /** Передача: канал, начало, конец (что делать — решает Tv по времени и архиву) */
     private val onProgramme: (Channel, Long, Long) -> Unit,
     private val onLong: (Channel) -> Unit,
-    /** Голосовой ввод (null — распознавания на устройстве нет); результат — в [setQuery] */
-    private val onVoice: (() -> Unit)?,
+    /** Голосовой ввод (null — распознавания на устройстве нет): язык — тег по раскладке клавиатуры (ru-RU / en-US) */
+    private val onVoice: ((String) -> Unit)?,
     private val onBack: () -> Unit
 ) : Layer {
 
@@ -48,7 +48,7 @@ class SearchLayer(
 
     private class Sug(val text: String, val recent: Boolean)
 
-    private enum class Zone { KEYS, QUERIES, RESULTS }
+    private enum class Zone { KEYS, QUERIES, RESULTS, MIC }
 
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "search") }
@@ -93,7 +93,7 @@ class SearchLayer(
         if (l == SYM) out.add(listOf(Key("http://", "http://", 3), Key("https://", "https://", 3), Key(".m3u8", ".m3u8", 2), Key(".xml.gz", ".xml.gz", 3)))
         out.add("1234567890-".map { Key(it.toString(), it.toString()) })
         // микрофон — если на устройстве есть распознавание речи; пробел тогда на клавишу уже
-        val mic = onVoice != null
+        val mic = onVoice != null && Prefs.voiceButton == 1
         val tail = arrayListOf(Key(str(R.string.key_space), " ", if (mic) 4 else 5))
         if (mic) tail.add(Key("", "", 1, VOICE))
         tail.add(Key("", "", 2, DEL))
@@ -104,6 +104,15 @@ class SearchLayer(
         kr = kr.coerceIn(0, rows.size - 1)
         kc = kc.coerceIn(0, rows[kr].size - 1)
     }
+
+    /** Язык голосового ввода — по раскладке клавиатуры (английские буквы — английский, иначе русский / язык приложения) */
+    private fun voice() {
+        val tag = when (textLang) { EN -> "en-US"; else -> if (Lang.isEn) "en-US" else "ru-RU" }
+        onVoice?.invoke(tag)
+    }
+
+    /** Кнопка микрофона слева от строки ввода (настройка «Кнопка голосового ввода») */
+    private val micLeft get() = onVoice != null && Prefs.voiceButton == 0
 
     /** Клавиша ряда [r] над/под серединой текущей */
     private fun keyAt(r: Int, center: Float): Int {
@@ -119,7 +128,7 @@ class SearchLayer(
             TO_RU -> setLang(RU)
             TO_EN -> setLang(EN)
             TO_SYM -> setLang(SYM)
-            VOICE -> onVoice?.invoke()
+            VOICE -> voice()
         }
         list.invalidate()
     }
@@ -244,9 +253,13 @@ class SearchLayer(
                 when (name) {
                     "left" -> if (kc > 0) kc--
                     "right" -> if (kc < rows[kr].size - 1) kc++ else if (ri >= 0) zone = Zone.RESULTS
-                    "up" -> if (kr > 0) { kr--; kc = keyAt(kr, center) }
+                    "up" -> if (kr > 0) { kr--; kc = keyAt(kr, center) } else if (micLeft) zone = Zone.MIC
                     "down" -> if (kr < rows.size - 1) { kr++; kc = keyAt(kr, center) } else if (sugs.isNotEmpty()) { zone = Zone.QUERIES; si = 0 }
                 }
+            }
+            Zone.MIC -> when (name) {
+                "down" -> zone = Zone.KEYS
+                "right" -> zone = Zone.KEYS
             }
             Zone.QUERIES -> when (name) {
                 "up" -> if (si > 0) si-- else zone = Zone.KEYS
@@ -266,6 +279,7 @@ class SearchLayer(
 
     override fun enter() {
         when (zone) {
+            Zone.MIC -> voice()
             Zone.KEYS -> press(rows[kr][kc])
             Zone.QUERIES -> sugs.getOrNull(si)?.let {
                 query.setLength(0)
@@ -284,6 +298,7 @@ class SearchLayer(
     /** Удержание OK: на ⌫ — очистить поле, на недавнем запросе — забыть его, на находке — программа канала */
     override fun long() {
         when (zone) {
+            Zone.MIC -> voice()
             Zone.KEYS -> if (rows[kr][kc].action == DEL && query.isNotEmpty()) { query.setLength(0); changed() } else press(rows[kr][kc])
             Zone.QUERIES -> sugs.getOrNull(si)?.takeIf { it.recent }?.let { s ->
                 Prefs.searchRecent = Prefs.searchRecent.filter { it != s.text }
@@ -299,7 +314,7 @@ class SearchLayer(
 
     /** Кнопка поиска / микрофона на пульте в открытом поиске — голосовой ввод */
     override fun media(name: String) {
-        if (name == "search") onVoice?.invoke()
+        if (name == "search" && Prefs.voiceButton != 2) voice()
     }
 
     override fun destroy() {
@@ -356,9 +371,18 @@ class SearchLayer(
         }
 
         private fun drawField(c: Canvas) {
-            val l = padX
+            var l = padX
             val t = padY
-            U.roundRect(c, l, t, l + leftW, t + fieldH, U.px(U.RADIUS), U.wa(0.12f))
+            var fw = leftW
+            if (micLeft) {
+                // микрофон слева от строки, квадрат высотой в строку; в фокусе — белый
+                val f = zone == Zone.MIC
+                U.roundRect(c, l, t, l + fieldH, t + fieldH, U.px(U.RADIUS), if (f) U.WHITE else U.wa(0.12f))
+                drawMic(c, l + fieldH / 2, t + fieldH / 2, if (f) U.BLACK else U.WHITE)
+                l += fieldH + gap
+                fw -= fieldH + gap
+            }
+            U.roundRect(c, l, t, l + fw, t + fieldH, U.px(U.RADIUS), U.wa(0.12f))
             val cy = t + fieldH / 2
             // лупа
             stroke(U.wa(0.5f), 0.16f * em)
@@ -367,7 +391,7 @@ class SearchLayer(
             c.drawLine(ix + 0.3f * em, cy + 0.3f * em, ix + 0.8f * em, cy + 0.8f * em, U.fill)
             U.fill.style = Paint.Style.FILL
             val x = l + 3.6f * em
-            val w = leftW - 4.8f * em
+            val w = fw - 4.8f * em
             if (query.isEmpty()) {
                 U.drawText(c, str(R.string.search_placeholder), x, cy, w, pPlace)
                 U.fill.color = U.WHITE
@@ -573,6 +597,7 @@ class SearchLayer(
                 hintList = when (zone) {
                     Zone.KEYS -> listOf(ok to str(R.string.hint_type), "→" to str(R.string.hint_results), "↓" to str(R.string.queries),
                         str(R.string.key_hold_ok) to str(R.string.hint_clear_field))
+                    Zone.MIC -> listOf(ok to str(R.string.hint_voice), "↓" to str(R.string.hint_keyboard))
                     Zone.QUERIES -> listOf(ok to str(R.string.hint_use_query), str(R.string.key_hold_ok) to str(R.string.hint_forget_query), "↑" to str(R.string.hint_keyboard))
                     Zone.RESULTS -> listOf(ok to str(R.string.watch), str(R.string.key_hold_ok) to str(R.string.hint_programme), "←" to str(R.string.hint_keyboard))
                 }
