@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil)
     implementation(libs.tvprovider)
+    // QR-код для ввода с телефона (только кодирование)
+    implementation(libs.zxing.core)
     // программные аудиодекодеры FFmpeg (MP2, AC-3, E-AC-3, DTS…) для устройств, где их нет в системе; Media3 1.9.0
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 

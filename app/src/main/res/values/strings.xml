@@ -423,6 +423,13 @@
     <string name="voice_hidden">Hidden</string>
     <string name="voice_button_sub">in the search; the language follows the on-screen keyboard layout; the search key on the remote still works unless hidden</string>
     <string name="hint_voice">Voice input</string>
+    <string name="phone_input">From phone</string>
+    <string name="phone_title">Enter from your phone</string>
+    <string name="phone_hint">The phone and the TV must be on the same Wi-Fi network. Point the camera at the code or open the address in the phone browser, enter the data and press Send. The window works while it is open.</string>
+    <string name="phone_send">Send</string>
+    <string name="phone_done">Done — go back to the TV</string>
+    <string name="phone_received">Received from the phone</string>
+    <string name="phone_no_network">No network: the TV address was not found</string>
     <string name="any_cert">Accept any certificates</string>
     <string name="any_cert_sub">for playlists, guide, logos and streams over HTTPS: expired, self-signed or mismatched certificates are accepted; no protection against interception</string>
     <string name="deinterlace">Deinterlacing</string>

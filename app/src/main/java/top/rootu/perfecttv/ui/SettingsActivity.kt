@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import top.rootu.perfecttv.App
 import top.rootu.perfecttv.core.Clock
+import top.rootu.perfecttv.core.PhoneInput
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.player.SubtitleStyle
 import top.rootu.perfecttv.data.Bus
@@ -545,6 +546,13 @@ class SettingsActivity : Activity() {
             top.rootu.perfecttv.core.Tmdb.test { err -> status.text = if (err == null) str(R.string.works) else str(R.string.not_working_x, err) }
         }
         form.button(str(R.string.remove_key)) { Prefs.tmdbKey = ""; showMain() }
+        form.button(str(R.string.phone_input)) {
+            phoneInput(listOf(
+                PhoneInput.Field("key", str(R.string.key_or_token), key.text.toString()),
+                PhoneInput.Field("api", str(R.string.api_address), api.text.toString(), url = true),
+                PhoneInput.Field("img", str(R.string.images_address), img.text.toString(), url = true)),
+                mapOf("key" to key, "api" to api, "img" to img))
+        }
         status = form.note()
         key.requestFocus()
     }
@@ -572,6 +580,41 @@ class SettingsActivity : Activity() {
             showMain()
         }
         (old ?: new1)?.requestFocus()
+    }
+
+    // ------------------------------------------------------------------ ввод с телефона
+
+    /**
+     * Окно с QR-кодом: телефон открывает страницу с [fields] и присылает значения; они попадают в
+     * [targets] (поля формы по ключам), окно закрывается. Нет сети — сообщение.
+     */
+    private fun phoneInput(fields: List<PhoneInput.Field>, targets: Map<String, EditText>) {
+        var dialog: android.app.Dialog? = null
+        val pi = PhoneInput(str(R.string.phone_title), fields, str(R.string.phone_send), str(R.string.phone_done)) { values ->
+            for ((k, v) in values) targets[k]?.setText(v)
+            targets.values.firstOrNull()?.let { it.setSelection(it.text.length) }
+            dialog?.dismiss()
+            android.widget.Toast.makeText(this, str(R.string.phone_received), android.widget.Toast.LENGTH_SHORT).show()
+        }
+        val url = pi.start()
+        if (url == null) {
+            android.widget.Toast.makeText(this, str(R.string.phone_no_network), android.widget.Toast.LENGTH_LONG).show()
+            return pi.stop()
+        }
+        val v = layoutInflater.inflate(R.layout.phone_input, null)
+        v.findViewById<android.widget.ImageView>(R.id.phone_qr).setImageBitmap(PhoneInput.qr(url, 600))
+        v.findViewById<TextView>(R.id.phone_url).text = url
+        val close = v.findViewById<TextView>(R.id.phone_close)
+        val d = android.app.Dialog(this)
+        dialog = d
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        d.setContentView(v)
+        d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        d.setOnDismissListener { pi.stop() }
+        close.setOnClickListener { d.dismiss() }
+        close.isSelected = true
+        d.show()
+        close.requestFocus()
     }
 
     // ------------------------------------------------------------------ плейлист
@@ -604,6 +647,13 @@ class SettingsActivity : Activity() {
         form.button(str(R.string.choose_file_2)) {
             editRoot = frame.getChildAt(0)
             pickFile(url)
+        }
+        form.button(str(R.string.phone_input)) {
+            phoneInput(listOf(
+                PhoneInput.Field("name", str(R.string.name), name.text.toString()),
+                PhoneInput.Field("url", str(R.string.playlist_address), url.text.toString(), url = true),
+                PhoneInput.Field("epg", str(R.string.own_programme_sources_xmltv_comma), userEpg.text.toString(), url = true)),
+                mapOf("name" to name, "url" to url, "epg" to userEpg))
         }
         if (p != null) {
             form.button(str(R.string.up)) { repo.movePlaylist(p.id, -1); android.widget.Toast.makeText(this, str(R.string.playlist_moved_up), android.widget.Toast.LENGTH_SHORT).show() }

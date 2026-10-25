@@ -423,6 +423,13 @@
     <string name="voice_hidden">Скрыта</string>
     <string name="voice_button_sub">в поиске; язык — по раскладке экранной клавиатуры; кнопка поиска на пульте работает, пока кнопка не скрыта</string>
     <string name="hint_voice">Голосовой ввод</string>
+    <string name="phone_input">С телефона</string>
+    <string name="phone_title">Ввод с телефона</string>
+    <string name="phone_hint">Телефон и телевизор должны быть в одной сети Wi-Fi. Наведите камеру на код или откройте адрес в браузере телефона, введите данные и нажмите «Отправить». Окно действует, пока открыто.</string>
+    <string name="phone_send">Отправить</string>
+    <string name="phone_done">Готово — вернитесь к телевизору</string>
+    <string name="phone_received">Получено с телефона</string>
+    <string name="phone_no_network">Нет сети: адрес телевизора не найден</string>
     <string name="any_cert">Принимать любые сертификаты</string>
     <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>
