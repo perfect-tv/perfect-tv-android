@@ -23,7 +23,12 @@ class XmltvParser(
     private val onChannel: (EpgChannelRaw) -> Unit,
     private val beforeProgrammes: () -> Unit,
     private val wanted: (String) -> Boolean,
-    private val onProgramme: (EpgProgramme) -> Unit
+    private val onProgramme: (EpgProgramme) -> Unit,
+    /**
+     * Нужна ли передача (канал, начало, конец — unix-секунды): нет — она пропускается поиском «</programme>» без
+     * разбора содержимого. Спрашивается только у передач с атрибутом stop (без него конец определяется по следующей).
+     */
+    private val accept: (String, Long, Long) -> Boolean = { _, _, _ -> true }
 ) {
     var channels = 0
         private set
@@ -115,6 +120,11 @@ class XmltvParser(
                             } else {
                                 val start = attrOf(tag, nameEnd, tag.len, "start")
                                 val stop = attrOf(tag, nameEnd, tag.len, "stop")
+                                if (!stop.isNullOrEmpty() && !accept(lastId, parseTime(start), parseTime(stop))) {
+                                    skipped++
+                                    if (!tag.selfClosed()) s.skipPast(PROGRAMME_END)
+                                    continue
+                                }
                                 elem.clear()
                                 if (!tag.selfClosed()) s.copyUntil(PROGRAMME_END, elem)
                                 programme(lastId, start, stop, elem)

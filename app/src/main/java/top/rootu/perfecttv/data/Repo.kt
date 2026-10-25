@@ -18,7 +18,7 @@ import java.util.concurrent.Executors
 class Repo(context: Context) {
     val db = Db(context)
     val reminders = Reminders(db)
-    private val loaders = Loaders(db, context.contentResolver) { maxOf(Prefs.archiveDays, maxArchiveDays) }
+    private val loaders = Loaders(db, context.contentResolver)
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "loader").apply { priority = Thread.MIN_PRIORITY } }
     private val main = Handler(Looper.getMainLooper())
 
@@ -183,8 +183,13 @@ class Repo(context: Context) {
         val seen = HashSet<String>()
         for (p in playlists()) {
             if (url !in p.epgUrls()) continue
-            db.readableDatabase.rawQuery("SELECT key,tvg_id,tvg_name,name FROM channel WHERE playlist_id=?", arrayOf(p.id.toString())).use { c ->
-                while (c.moveToNext()) if (seen.add(c.getString(0))) out.add(Loaders.Wanted(c.getString(0), c.getString(1), c.getString(2), c.getString(3)))
+            db.readableDatabase.rawQuery("SELECT key,tvg_id,tvg_name,name,catchup_type,catchup_days FROM channel WHERE playlist_id=?", arrayOf(p.id.toString())).use { c ->
+                val def = Prefs.archiveDays
+                while (c.moveToNext()) if (seen.add(c.getString(0))) {
+                    // глубина архива канала: нет архива — 0, нет своей глубины — общая из настроек
+                    val days = if (c.isNull(4)) 0 else c.getInt(5).takeIf { it > 0 } ?: def
+                    out.add(Loaders.Wanted(c.getString(0), c.getString(1), c.getString(2), c.getString(3), days))
+                }
             }
         }
         return out

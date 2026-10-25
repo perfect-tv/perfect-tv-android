@@ -14,7 +14,7 @@ import java.io.InputStream
  * интерфейс видит их сразу (WAL), файл целиком в памяти не бывает.
  * Вызывать в фоновом потоке (см. [Repo]).
  */
-class Loaders(private val db: Db, private val resolver: android.content.ContentResolver, private val maxArchiveDays: () -> Int) {
+class Loaders(private val db: Db, private val resolver: android.content.ContentResolver) {
 
     class LoadError(val code: String, message: String) : IOException(message)
 
@@ -141,12 +141,16 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
 
     // ------------------------------------------------------------------ программа
 
-    /** Каналы, для которых нужна программа этого источника: ключ, tvg-id, tvg-name, имя */
-    class Wanted(val key: String, val tvgId: String, val tvgName: String, val name: String)
+    /** Каналы, для которых нужна программа этого источника: ключ, tvg-id, tvg-name, имя, глубина архива в днях (0 — архива нет) */
+    class Wanted(val key: String, val tvgId: String, val tvgName: String, val name: String, val archiveDays: Int = 0)
 
     /**
-     * Загрузить XMLTV источника. Передачи пишутся с load_id этой загрузки (INSERT OR REPLACE),
-     * старые строки удаляются только после успешного окончания: обрыв посередине ничего не теряет.
+     * Загрузить XMLTV источника. Хранится программа только каналов плейлистов, а из прошлого — не глубже архива
+     * канала (+ сутки). Передачи пишутся с load_id этой загрузки (INSERT OR REPLACE). Прошедшие дни (до начала
+     * сегодняшнего) уже сохранённого диапазона не разбираются и не перезаписываются: прошлое не меняется.
+     * После успешного окончания удаляются только заменённые передачи (сегодня и позже), ненужные каналы и
+     * устаревшее по глубине архива; прошлое, которого в новой выгрузке нет, остаётся — оно нужно архиву.
+     * Обрыв посередине ничего не теряет.
      */
     fun loadEpg(sourceId: Long, url: String, channels: List<Wanted>, force: Boolean, langs: List<String>) {
         Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
@@ -175,8 +179,25 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                 return
             }
             val now = Clock.now()
-            val minT = now - (maxArchiveDays() + 1) * 86400L
             val maxT = now + 8 * 86400L
+            // начало сегодняшнего дня по местному времени: всё, что закончилось раньше, — «прошлое», оно не меняется
+            val todayStart = java.util.Calendar.getInstance().apply {
+                timeInMillis = now * 1000
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis / 1000
+            // глубина архива по каналам источника (xml-id → дней), заполняется после сопоставления
+            val xmlDays = HashMap<String, Int>()
+            // уже сохранённое прошлое по каналам: от первой до последней передачи
+            class Span(val from: Long, val to: Long)
+            val have = HashMap<String, Span>()
+            w.rawQuery("SELECT xml_id, MIN(start), MAX(start) FROM programme WHERE source_id=? AND stop<=? GROUP BY xml_id",
+                arrayOf(sourceId.toString(), todayStart.toString())).use { while (it.moveToNext()) have[it.getString(0)] = Span(it.getLong(1), it.getLong(2)) }
+            val inRange = { ch: String, start: Long, stop: Long ->
+                // глубже архива канала (+ сутки) и дальше недели вперёд не нужно; прошлое внутри сохранённого — уже есть
+                val keepFrom = now - ((xmlDays[ch] ?: 0) + 1) * 86400L
+                val h = have[ch]
+                stop >= keepFrom && start <= maxT && !(stop <= todayStart && h != null && start >= h.from && start <= h.to)
+            }
             val counting = Streams.Counting(src.input)
             var skippedOf: () -> Int = { 0 }
             val matcher = EpgMatcher()
@@ -185,6 +206,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
             val prIns = w.compileStatement("INSERT OR REPLACE INTO programme(source_id,xml_id,start,stop,title,sub_title,descr,category,icon,load_id) VALUES(?,?,?,?,?,?,?,?,?,?)")
             var inBatch = 0
             var written = 0
+            var stored = 0   // всего передач источника в БД после загрузки (written — записано в этой)
             var lastEvent = 0L
             var dbNs = 0L      // время записи в БД (вставки и коммиты) — для разбивки в логе
             val commit = {
@@ -224,6 +246,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                         for (c in channels) {
                             val xml = matcher.match(c.tvgId, c.tvgName, c.name) ?: continue
                             wanted.add(xml)
+                            xmlDays.merge(xml, c.archiveDays, ::maxOf)
                             mapIns.bindLong(1, sourceId)
                             mapIns.bindString(2, c.key)
                             mapIns.bindString(3, xml)
@@ -234,7 +257,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                     },
                     wanted = { it in wanted },
                     onProgramme = { pr ->
-                        if (pr.stop >= minT && pr.start <= maxT) {
+                        if (inRange(pr.channel, pr.start, pr.stop)) {
                             prIns.clearBindings()
                             prIns.bindLong(1, sourceId)
                             prIns.bindString(2, pr.channel)
@@ -255,7 +278,8 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                                 commit()
                             }
                         }
-                    }
+                    },
+                    accept = inRange
                 )
                 skippedOf = { parser.skipped }
                 parser.parse(Streams.open(counting) { it.endsWith(".xml", true) || !it.contains('.') })
@@ -267,11 +291,27 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                 w.rawQuery("PRAGMA wal_autocheckpoint=1000", null).close()
             }
             w.tx {
-                execSQL("DELETE FROM programme WHERE source_id=? AND (load_id<>? OR stop<?)", arrayOf<Any>(sourceId, loadId, minT))
+                // каналы, которых нет в плейлистах (или пропали из сопоставления)
+                execSQL("DELETE FROM programme WHERE source_id=? AND xml_id NOT IN (SELECT xml_id FROM epg_map WHERE source_id=?)", arrayOf<Any>(sourceId, sourceId))
+                // заменённое: передачи прошлой загрузки с сегодняшнего дня, начиная с первой передачи новой выгрузки канала
+                // (нет новых передач канала на сегодня и дальше — все его будущие передачи устарели)
+                execSQL("DELETE FROM programme WHERE source_id=? AND load_id<>? AND stop>? AND start>=COALESCE((SELECT MIN(p2.start) FROM programme p2 " +
+                    "WHERE p2.source_id=programme.source_id AND p2.xml_id=programme.xml_id AND p2.load_id=? AND p2.stop>?), 0)",
+                    arrayOf<Any>(sourceId, loadId, todayStart, loadId, todayStart))
+                // глубже архива канала (+ сутки): по группам каналов с одинаковой глубиной
+                for ((days, ids) in xmlDays.entries.groupBy({ it.value }, { it.key })) {
+                    val keepFrom = now - (days + 1) * 86400L
+                    for (chunk in ids.chunked(400)) {
+                        execSQL("DELETE FROM programme WHERE source_id=? AND stop<? AND xml_id IN (" + chunk.joinToString(",") { "?" } + ")",
+                            (listOf<Any>(sourceId, keepFrom) + chunk).toTypedArray())
+                    }
+                }
+                val total = compileStatement("SELECT COUNT(*) FROM programme WHERE source_id=?").also { it.bindLong(1, sourceId) }.simpleQueryForLong()
+                total.let { stored = it.toInt() }
                 execSQL("UPDATE epg_source SET status=?, loaded_at=?, etag=?, last_modified=?, programmes_count=?, load_id=?, error='' WHERE id=?",
-                    arrayOf<Any>(STATUS_READY, Clock.now(), src.etag, src.lastModified, written, loadId, sourceId))
+                    arrayOf<Any>(STATUS_READY, Clock.now(), src.etag, src.lastModified, stored, loadId, sourceId))
             }
-            Log.i(TAG, "epg $url: передач $written за ${System.currentTimeMillis() - t0} мс " +
+            Log.i(TAG, "epg $url: передач записано $written (в БД $stored) за ${System.currentTimeMillis() - t0} мс " +
                 "(${counting.bytes / 1048576} МБ скачано, запись в БД ${dbNs / 1_000_000} мс, пропущено ${skippedOf()} передач)")
             Bus.post(DataEvent.EpgProgress(sourceId, url, written, 100, true))
         } catch (e: Exception) {

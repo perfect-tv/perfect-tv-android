@@ -52,6 +52,16 @@ class XmltvParserTest {
         assertEquals(XmltvParser.parseTime("20231114190000 +0000"), pr.first { it.channel == "ntv" }.start)
     }
 
+    @Test fun acceptSkipsProgrammesWithoutParsingThem() {
+        val pr = ArrayList<EpgProgramme>()
+        val asked = ArrayList<Triple<String, Long, Long>>()
+        val p = XmltvParser(listOf("ru"), {}, {}, { it == "1tv" }, { pr.add(it) }) { ch, start, stop -> asked.add(Triple(ch, start, stop)); start >= 1699990000L }
+        p.parse(Streams.open(ByteArrayInputStream(xml.toByteArray())))
+        // передачи с stop спрашиваются (две у 1tv), передача без stop — нет; отклонённая (22:00 +0300 = 1699988400) не выдаётся
+        assertEquals(2, asked.size)
+        assertEquals(listOf("Без конца", "Ночь & день"), pr.map { it.title })
+    }
+
     @Test fun gzip() {
         val bytes = ByteArrayOutputStream().also { GZIPOutputStream(it).use { g -> g.write(xml.toByteArray()) } }.toByteArray()
         val (_, _, pr) = run(bytes, setOf("1tv"))
