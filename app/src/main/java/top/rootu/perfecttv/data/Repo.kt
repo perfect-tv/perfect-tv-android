@@ -179,20 +179,23 @@ class Repo(context: Context) {
 
     /** Каналы всех плейлистов, в источниках которых есть [url] */
     private fun wantedFor(url: String): List<Loaders.Wanted> {
-        val out = ArrayList<Loaders.Wanted>()
-        val seen = HashSet<String>()
+        val out = LinkedHashMap<String, Loaders.Wanted>()
         for (p in playlists()) {
             if (url !in p.epgUrls()) continue
             db.readableDatabase.rawQuery("SELECT key,tvg_id,tvg_name,name,catchup_type,catchup_days FROM channel WHERE playlist_id=?", arrayOf(p.id.toString())).use { c ->
                 val def = Prefs.archiveDays
-                while (c.moveToNext()) if (seen.add(c.getString(0))) {
+                while (c.moveToNext()) {
                     // глубина архива канала: нет архива — 0, нет своей глубины — общая из настроек
                     val days = if (c.isNull(4)) 0 else c.getInt(5).takeIf { it > 0 } ?: def
-                    out.add(Loaders.Wanted(c.getString(0), c.getString(1), c.getString(2), c.getString(3), days))
+                    val key = c.getString(0)
+                    // один канал в нескольких плейлистах: программа общая, глубина — наибольшая
+                    val prev = out[key]
+                    if (prev == null) out[key] = Loaders.Wanted(key, c.getString(1), c.getString(2), c.getString(3), days)
+                    else if (days > prev.archiveDays) out[key] = Loaders.Wanted(key, prev.tvgId, prev.tvgName, prev.name, days)
                 }
             }
         }
-        return out
+        return out.values.toList()
     }
 
     private fun langs(): List<String> = listOf(Locale.getDefault().language.lowercase(), "ru", "en").distinct()
