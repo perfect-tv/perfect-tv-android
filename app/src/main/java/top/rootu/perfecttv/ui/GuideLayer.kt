@@ -1186,7 +1186,13 @@ class GuideLayer(private val tv: Tv) : Layer {
             val past = p.stop <= now
             val pf = zone == Zone.PROGRAMS && i == plIndex
             val ghost = zone == Zone.DATES && i == plIndex
-            val bg = when { pf -> U.WHITE; ghost -> U.FILL_ACTIVE; live -> U.FILL_PLAYING; else -> 0 }
+            // что играет в плеере у этого канала: эфир — идущая передача, архив — передача с кадром (метка «играет» на ней)
+            val watching = tv.state.channel?.key == ch.key
+            val arch = watching && tv.state.archive != null
+            val pos = if (arch) tv.position() else now
+            val playingArchive = arch && p.start <= pos && pos < p.stop
+            val playingLive = watching && !arch && live
+            val bg = when { pf -> U.WHITE; ghost -> U.FILL_ACTIVE; (live && !arch) || playingArchive -> U.FILL_PLAYING; else -> 0 }
             if (bg != 0) U.roundRect(c, l, y, r, y + h, U.px(U.RADIUS_S), bg)
             if (ghost) outline(c, l, y, r, y + h)
             val fg = if (pf) U.BLACK else if (past) U.wa(0.62f) else U.WHITE
@@ -1198,22 +1204,27 @@ class GuideLayer(private val tv: Tv) : Layer {
             val isz = 1.7f * em
             var ix = r - 0.8f * em
             if (live) {
-                pLive.color = ic
+                // играющий эфир — цветом «Эфир», остальные — как значки
+                val lc = if (playingLive) U.LIVE else ic
+                pLive.color = lc
                 val lw = pLive.measureText("LIVE")
                 val pad = 0.8f * em
                 ix -= lw + 2 * pad
                 U.fill.style = Paint.Style.STROKE
                 U.fill.strokeWidth = 0.12f * em
-                U.fill.color = ic
+                U.fill.color = lc
                 c.drawRoundRect(ix, cy - 0.85f * em, ix + lw + 2 * pad, cy + 0.85f * em, 0.3f * em, 0.3f * em, U.fill)
                 U.fill.style = Paint.Style.FILL
                 c.drawText("LIVE", ix + pad, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= 0.5f * em
             }
-            if (past && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.5f * em }
+            // играющий архив — значок цветом архива
+            if ((past || playingArchive) && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT) {
+                ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, if (playingArchive) U.ARCHIVE else ic); ix -= 0.5f * em
+            }
             if (p.start > now && tv.reminders.has(ch, p.start)) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ic); ix -= 0.5f * em }
             val tx = l + 5.4f * em
-            val pt = if (live) pProgTitleBold else pProgTitle
+            val pt = if (live || playingArchive) pProgTitleBold else pProgTitle
             pt.color = fg
             U.drawText(c, p.title, tx, cy, ix - tx - 0.3f * em, pt)
             if (live) {
@@ -1245,7 +1256,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (y + th < top || y > bottom) continue
                 val focus = zone == Zone.DATES && k == dateIndex
                 if (focus) U.roundRect(c, l, y, r, y + th, U.px(U.RADIUS_S), U.WHITE)
-                else if (k == cur) outline(c, l, y, r, y + th)
+                else if (k == cur) { U.roundRect(c, l, y, r, y + th, U.px(U.RADIUS_S), U.FILL_ACTIVE); outline(c, l, y, r, y + th) }
                 val p = if (focus || k == cur) pTabBold else pTab
                 p.color = if (focus) U.BLACK else if (k == cur) U.WHITE else U.wa(0.72f)
                 val (a, b) = plDayLabels[k]
