@@ -210,7 +210,31 @@ class GuideLayer(private val tv: Tv) : Layer {
         }
     }
 
-    private fun liveStart() = Clock.now() - Cells.SLOT
+    /**
+     * Время кадра играющего архива, если фокус на его канале (иначе null): у этого канала окно сетки привязано
+     * к нему, а не к эфиру — янтарная линия на месте красной, листание на другие каналы возвращает эфир.
+     */
+    private fun archiveAnchor(): Long? {
+        if (tv.state.archive == null) return null
+        val ch = tv.state.channel ?: return null
+        return if (focused?.key == ch.key) tv.position() else null
+    }
+
+    /** Начало окна сетки при фокусе на каналах: линия — через 30 минут от него (эфир или архив) */
+    private fun liveStart() = (archiveAnchor() ?: Clock.now()) - Cells.SLOT
+
+    /** OK в архиве: вид со списком программ — фокус на играющей передаче (в сетке остаются каналы, сетка на архиве) */
+    fun focusArchive() {
+        if (grid) return
+        ensureRows()
+        val pos = tv.position()
+        val i = plRows.indexOfFirst { it.start <= pos && pos < it.stop }
+        if (i < 0) return toPrograms()
+        plIndex = i
+        plJump = true
+        zone = Zone.PROGRAMS
+        gv.invalidate()
+    }
 
     /** Открыть на канале и категории (zone "grid" — сразу в сетку) */
     fun open(ch: Channel?, groupKey: String?, toGrid: Boolean = false) {
@@ -432,9 +456,11 @@ class GuideLayer(private val tv: Tv) : Layer {
     private fun pageSize() = maxOf(1, gv.visibleRows() - 1)
 
     private fun toGrid() {
+        // на канале с играющим архивом выделяется архивная передача, окно остаётся как было (линия архива)
+        val at = archiveAnchor()
         zone = Zone.GRID
         live = false
-        focusTime = Clock.now()
+        focusTime = at ?: Clock.now()
         gv.invalidate()
     }
 
@@ -640,6 +666,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             drawBackground(c)
             val now = Clock.now()
+            archNow = if (tv.state.archive != null && tv.state.channel?.key == focused?.key) tv.position() else -1L
             if (live) winStart = liveStart()
             if (now / 60 != nowMinute) {
                 nowMinute = now / 60
@@ -700,16 +727,25 @@ class GuideLayer(private val tv: Tv) : Layer {
                 drawRow(c, list[i], i == index, y, gridL, gridR, now)
             }
             if (grid) {
-                val x = gridL + (now - winStart).toFloat() / SPAN * (gridR - gridL)
+                // линия «сейчас» красная; на канале с играющим архивом (окно у него по времени архива) — янтарная
+                val anchor = if (zone == Zone.CHANNELS) archiveAnchor() else null
+                val lineT = anchor ?: now
+                if (anchor != null && anchor / 60 != archMinute) { archMinute = anchor / 60; archText = Fmt.hhmm(anchor) }
+                val text = if (anchor != null) archText else nowText
+                val x = gridL + (lineT - winStart).toFloat() / SPAN * (gridR - gridL)
                 if (x in gridL..gridR) {
-                    // красная линия «сейчас» и время над ней (подпись деления под плашкой не рисуется)
+                    // линия «сейчас» и время над ней (подпись деления под плашкой не рисуется)
                     val shown = minOf(rows, list.size - first)
+                    nowLine.color = if (anchor != null) U.ARCHIVE else U.LIVE
                     c.drawLine(x, bodyTop - 0.5f * em, x, bodyTop + shown * (rowH + gap) - gap, nowLine)
-                    val hw = nowChipHalf()
+                    val hw = pNowChip.measureText(text) / 2 + 0.45f * em
                     val cx = x.coerceIn(gridL + hw, gridR - hw)
                     val cy = bodyTop - 1.35f * em
-                    U.roundRect(c, cx - hw, cy - 0.85f * em, cx + hw, cy + 0.85f * em, 0.35f * em, U.LIVE)
-                    c.drawText(nowText, cx - pNowChip.measureText(nowText) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
+                    U.roundRect(c, cx - hw, cy - 0.85f * em, cx + hw, cy + 0.85f * em, 0.35f * em, if (anchor != null) U.ARCHIVE else U.LIVE)
+                    val tc = pNowChip.color
+                    if (anchor != null) pNowChip.color = U.ON_ARCHIVE
+                    c.drawText(text, cx - pNowChip.measureText(text) / 2, cy - (pNowChip.descent() + pNowChip.ascent()) / 2, pNowChip)
+                    pNowChip.color = tc
                 }
             } else if (rv > 0.01f) {
                 if (rv >= 0.99f) {
@@ -890,6 +926,10 @@ class GuideLayer(private val tv: Tv) : Layer {
         // подпись плашки «сейчас»: строка меняется раз в минуту, а не на каждом кадре
         private var nowText = ""
         private var nowMinute = -1L
+        private var archText = ""
+        private var archMinute = -1L
+        // позиция играющего архива у канала в фокусе (-1 — нет), считается раз за кадр: по ней строки программы
+        private var archNow = -1L
 
         private fun nowChipHalf() = pNowChip.measureText(nowText) / 2 + 0.45f * em
 
@@ -1138,7 +1178,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         private val listBottom get() = height - padBottom - hintsH
 
-        private fun progH(p: Programme, now: Long) = if (p.start <= now && now < p.stop) rowH + 0.9f * em else rowH
+        private fun progH(p: Programme, now: Long) = if ((p.start <= now && now < p.stop) || (archNow >= 0 && p.start <= archNow && archNow < p.stop)) rowH + 0.9f * em else rowH
 
         /** Список передач канала в фокусе: идущая — со шкалой, прошедшая — со значком архива */
         private fun drawPrograms(c: Canvas, now: Long) {
@@ -1189,14 +1229,15 @@ class GuideLayer(private val tv: Tv) : Layer {
             // что играет в плеере у этого канала: эфир — идущая передача, архив — передача с кадром (метка «играет» на ней)
             val watching = tv.state.channel?.key == ch.key
             val arch = watching && tv.state.archive != null
-            val pos = if (arch) tv.position() else now
+            val pos = if (arch) archNow else now
             val playingArchive = arch && p.start <= pos && pos < p.stop
             val playingLive = watching && !arch && live
             val bg = when { pf -> U.WHITE; ghost -> U.FILL_ACTIVE; (live && !arch) || playingArchive -> U.FILL_PLAYING; else -> 0 }
             if (bg != 0) U.roundRect(c, l, y, r, y + h, U.px(U.RADIUS_S), bg)
             if (ghost) outline(c, l, y, r, y + h)
             val fg = if (pf) U.BLACK else if (past) U.wa(0.62f) else U.WHITE
-            val cy = if (live) y + rowH / 2 - 0.1f * em else y + h / 2
+            val tall = live || playingArchive
+            val cy = if (tall) y + rowH / 2 - 0.1f * em else y + h / 2
             pProgTime.color = fg
             c.drawText(Fmt.hhmm(p.start), l + 0.8f * em, cy - (pProgTime.descent() + pProgTime.ascent()) / 2, pProgTime)
             // значки справа: LIVE, архив, напоминание — белые (в строке фокуса чёрные)
@@ -1227,12 +1268,14 @@ class GuideLayer(private val tv: Tv) : Layer {
             val pt = if (live || playingArchive) pProgTitleBold else pProgTitle
             pt.color = fg
             U.drawText(c, p.title, tx, cy, ix - tx - 0.3f * em, pt)
-            if (live) {
-                // шкала прогресса идущей передачи
+            if (tall) {
+                // шкала прогресса идущей передачи; у играющей архивной — янтарная, по времени кадра архива
                 val by = y + h - 0.95f * em
                 val bw = r - 0.8f * em - tx
                 U.roundRect(c, tx, by, tx + bw, by + 0.25f * em, 0.12f * em, if (pf) 0x33000000 else U.wa(0.22f))
-                U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, now), by + 0.25f * em, 0.12f * em, if (pf) U.BLACK else U.WHITE)
+                val at = if (playingArchive) pos else now
+                U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, at), by + 0.25f * em, 0.12f * em,
+                    if (playingArchive) U.ARCHIVE else if (pf) U.BLACK else U.WHITE)
             }
         }
 

@@ -380,7 +380,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             // при показанной инфопанели OK — пауза/продолжить (при перемотке — применить её сразу)
             if (seek != null) return applySeek()
             if (info.visible) return togglePause()
-            openGuide()
+            openGuide(onArchive = true)
         }
 
         override fun long() {
@@ -1046,13 +1046,15 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
 
     // ================================================================== гид и окна
 
-    fun openGuide(toGrid: Boolean = false) {
+    /** [onArchive] — OK в архиве: в видах со списком программ фокус сразу на играющей передаче (в сетке — каналы) */
+    fun openGuide(toGrid: Boolean = false, onArchive: Boolean = false) {
         info.hide()
         if (!layers.contains(guide)) {
             layers.toList().forEach { remove(it) }
             push(guide)
         }
         guide.open(state.channel, state.groupKey, toGrid)
+        if (onArchive && state.archive != null) guide.focusArchive()
     }
 
     /** Закрыть гид. Без видео гид закрывать некуда — это запрос на выход */
