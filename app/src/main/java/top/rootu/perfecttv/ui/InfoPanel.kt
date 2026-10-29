@@ -75,6 +75,7 @@ class InfoPanel(val view: View) {
     private val remain: TextView = view.findViewById(R.id.info_remain)
     private val next: TextView = view.findViewById(R.id.info_next)
     private val seekBubble: TextView = view.findViewById(R.id.info_seek)
+    private val liveLabel: TextView = view.findViewById(R.id.info_live)
     private val moreBox: View = view.findViewById(R.id.info_more)
     private val banner: ImageView = view.findViewById(R.id.info_banner)
     private val upnext: LinearLayout = view.findViewById(R.id.info_upnext)
@@ -129,6 +130,10 @@ class InfoPanel(val view: View) {
         set(timeEnd, Fmt.hhmm(to))
         val f = { x: Long -> Fmt.progress(from, to, x) }
         bar.archive = m.archive
+        // архив идущей передачи (или слота около эфира): красная черта «эфир» на шкале — там, куда дойдёт архив
+        val now = Clock.now()
+        liveAt = if (m.archive && to > from && now in from..to) (now - from).toFloat() / (to - from) else -1f
+        bar.liveMark = liveAt
         bar.set(f(m.position), if (m.ahead > 0) maxOf(f(m.position + m.ahead), f(m.position) + 0.01f) else f(m.position), m.seek?.let { f(it) })
         // справа от шкалы: эфир — сколько осталось, архив — время кадра (при перемотке оно в пузыре)
         set(remain, when {
@@ -146,6 +151,7 @@ class InfoPanel(val view: View) {
             seekBubble.visibility = View.VISIBLE
         } else {
             seekBubble.visibility = View.INVISIBLE
+            liveLabel.visibility = View.INVISIBLE
             next.visibility = View.VISIBLE
             set(next, nextText(m))
         }
@@ -172,6 +178,7 @@ class InfoPanel(val view: View) {
     }
 
     private var seekAt = 0f
+    private var liveAt = -1f
 
     /** Пузырь перемотки — под маркером шкалы (шкала и строка пузыря начинаются с одного края) */
     private fun placeSeek() {
@@ -182,7 +189,27 @@ class InfoPanel(val view: View) {
         seekBubble.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         val w = seekBubble.measuredWidth
         val max = ((seekBubble.parent as View).width - w).toFloat()
-        seekBubble.translationX = (bar.left + bar.width * seekAt.coerceIn(0f, 1f) - w / 2f).coerceIn(0f, maxOf(0f, max))
+        val bx = (bar.left + bar.width * seekAt.coerceIn(0f, 1f) - w / 2f).coerceIn(0f, maxOf(0f, max))
+        seekBubble.translationX = bx
+        placeLiveLabel(bx, w)
+    }
+
+    /** Подпись «Эфир» под красной чертой; не перекрывает пузырь перемотки — сдвигается к его краю, нет места — скрыта */
+    private fun placeLiveLabel(bubbleX: Float, bubbleW: Int) {
+        if (liveAt < 0f) { liveLabel.visibility = View.INVISIBLE; return }
+        liveLabel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val w = liveLabel.measuredWidth
+        val total = (liveLabel.parent as View).width.toFloat()
+        val gap = U.px(0.5f)
+        val tick = bar.left + bar.width * liveAt
+        var x = (tick - w / 2f).coerceIn(0f, maxOf(0f, total - w))
+        if (x < bubbleX + bubbleW + gap && x + w + gap > bubbleX) {
+            // пересекаются: справа от пузыря, если черта правее его середины, иначе слева
+            x = if (tick >= bubbleX + bubbleW / 2f) bubbleX + bubbleW + gap else bubbleX - gap - w
+        }
+        if (x < 0f || x + w > total) { liveLabel.visibility = View.INVISIBLE; return }
+        liveLabel.translationX = x
+        liveLabel.visibility = View.VISIBLE
     }
 
     // ---------------------------------------------------------- подсказки клавиш
@@ -482,6 +509,12 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
             if (field != v) { field = v; invalidate() }
         }
 
+    /** Положение «эфира» на шкале в архиве (0..1), -1 — не показывать: красная черта */
+    var liveMark = -1f
+        set(v) {
+            if (field != v) { field = v; invalidate() }
+        }
+
     fun set(v: Float, b: Float, s: Float?) {
         if (v == value && b == buffer && s == seek) return
         value = v; buffer = b; seek = s
@@ -503,6 +536,11 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
         U.roundRect(c, 0f, top, w * buffer, bottom, r, U.wa(0.35f))
         val on = if (archive) U.ARCHIVE else U.WHITE
         U.roundRect(c, 0f, top, w * value, bottom, r, if (seek != null) (on and 0xFFFFFF) or (0x99 shl 24) else on)
+        if (liveMark >= 0f) {
+            val half = U.px(0.12f)
+            val x = (w * liveMark).coerceIn(half, w - half)
+            U.roundRect(c, x - half, 0f, x + half, h, half, U.LIVE)
+        }
         seek?.let {
             // маркер: белый с тёмной обводкой — виден и на белой части полосы
             val half = U.px(0.25f)

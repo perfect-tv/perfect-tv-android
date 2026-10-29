@@ -134,6 +134,19 @@
                     android:textColor="@color/text_85"
                     android:textSize="13sp" />
 
+                <!-- «Эфир» под красной чертой шкалы при перемотке архива (позицию задаёт код, рядом с пузырём) -->
+                <TextView
+                    android:id="@+id/info_live"
+                    style="@style/Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="@string/live"
+                    android:textColor="@color/live"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="invisible" />
+
                 <TextView
                     android:id="@+id/info_seek"
                     style="@style/Text"

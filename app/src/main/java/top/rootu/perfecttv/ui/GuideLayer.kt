@@ -1273,9 +1273,9 @@ class GuideLayer(private val tv: Tv) : Layer {
                 val by = y + h - 0.95f * em
                 val bw = r - 0.8f * em - tx
                 U.roundRect(c, tx, by, tx + bw, by + 0.25f * em, 0.12f * em, if (pf) 0x33000000 else U.wa(0.22f))
-                val at = if (playingArchive) pos else now
-                U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, at), by + 0.25f * em, 0.12f * em,
-                    if (playingArchive) U.ARCHIVE else if (pf) U.BLACK else U.WHITE)
+                // эфирный прогресс (белый), у играющего архива идущей передачи поверх него — янтарный до кадра архива
+                if (live) U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, now), by + 0.25f * em, 0.12f * em, if (pf) U.BLACK else U.WHITE)
+                if (playingArchive) U.roundRect(c, tx, by, tx + bw * Fmt.progress(p.start, p.stop, pos), by + 0.25f * em, 0.12f * em, U.ARCHIVE)
             }
         }
 
