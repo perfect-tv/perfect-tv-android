@@ -194,21 +194,13 @@ class InfoPanel(val view: View) {
         placeLiveLabel(bx, w)
     }
 
-    /** Подпись «Эфир» под красной чертой; не перекрывает пузырь перемотки — сдвигается к его краю, нет места — скрыта */
+    /** Метка «Эфир» — под красной чертой; пузырь перемотки (он выше в порядке отрисовки) перекрывает её, а не сдвигает */
     private fun placeLiveLabel(bubbleX: Float, bubbleW: Int) {
         if (liveAt < 0f) { liveLabel.visibility = View.INVISIBLE; return }
         liveLabel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         val w = liveLabel.measuredWidth
         val total = (liveLabel.parent as View).width.toFloat()
-        val gap = U.px(0.5f)
-        val tick = bar.left + bar.width * liveAt
-        var x = (tick - w / 2f).coerceIn(0f, maxOf(0f, total - w))
-        if (x < bubbleX + bubbleW + gap && x + w + gap > bubbleX) {
-            // пересекаются: справа от пузыря, если черта правее его середины, иначе слева
-            x = if (tick >= bubbleX + bubbleW / 2f) bubbleX + bubbleW + gap else bubbleX - gap - w
-        }
-        if (x < 0f || x + w > total) { liveLabel.visibility = View.INVISIBLE; return }
-        liveLabel.translationX = x
+        liveLabel.translationX = (bar.left + bar.width * liveAt - w / 2f).coerceIn(0f, maxOf(0f, total - w))
         liveLabel.visibility = View.VISIBLE
     }
 
