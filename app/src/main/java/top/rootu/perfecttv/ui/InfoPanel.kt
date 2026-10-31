@@ -537,9 +537,12 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
         val on = if (archive) U.ARCHIVE else U.WHITE
         U.roundRect(c, 0f, top, w * value, bottom, r, if (seek != null) (on and 0xFFFFFF) or (0x99 shl 24) else on)
         if (liveMark >= 0f) {
+            // красная черта «эфир»: не выше ползунка перемотки (при перемотке — той же высоты), без перемотки — не выше полосы
             val half = U.px(0.12f)
             val x = (w * liveMark).coerceIn(half, w - half)
-            U.roundRect(c, x - half, 0f, x + half, h, half, U.LIVE)
+            val edge = U.px(0.1f)
+            if (seek != null) U.roundRect(c, x - half, edge, x + half, h - edge, half, U.LIVE)
+            else U.roundRect(c, x - half, top, x + half, bottom, half, U.LIVE)
         }
         seek?.let {
             // маркер: белый с тёмной обводкой — виден и на белой части полосы
