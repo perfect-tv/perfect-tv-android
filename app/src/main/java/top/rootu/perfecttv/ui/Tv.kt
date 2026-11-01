@@ -135,6 +135,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 updateInfo()
                 (layers.lastOrNull() as? ScheduleLayer)?.refresh()
             }
+            is DataEvent.EpgRead -> {
+                guide.refresh()
+                updateInfo()
+            }
             is DataEvent.PlaylistProgress -> if (e.playlistId == playlist?.id) onPlaylistProgress(e)
         }
     }

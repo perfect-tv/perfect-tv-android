@@ -281,9 +281,50 @@ class Repo(context: Context) {
             return emptyList()
         }
         val shift = Math.round(ch.tvgShift * 3600).toLong()
+        if (Looper.myLooper() === Looper.getMainLooper() && epgBusy()) {
+            // идёт загрузка программы: читать БД в главном потоке нельзя — запись загрузчика замедляет чтение в разы
+            // (замер: 100–240 мс на канал вместо 5–40), а строки гида просят программу каждым кадром. Читаем в фоне,
+            // пока — пусто (в строке «…»); когда прочитано — событие EpgRead перерисовывает.
+            if (reading.add(ck)) readWorker.execute {
+                val list = readProgrammes(m.first, m.second, shift)
+                main.post {
+                    reading.remove(ck)
+                    // загрузка успела закончиться и сбросить кэш — прочитанное могло устареть: не кэшируем, прочитается заново
+                    if (epgBusy()) cache[ck] = CachedEpg(m.first, list)
+                    scheduleReadEvent()
+                }
+            }
+            return emptyList()
+        }
+        val t0 = System.nanoTime()
+        val list = readProgrammes(m.first, m.second, shift)
+        epgIcon(ch)
+        cache[ck] = CachedEpg(m.first, list)
+        // диагностика: чтение программы в главном потоке дольше кадра — признак борьбы с загрузчиком за БД
+        val ms = (System.nanoTime() - t0) / 1_000_000
+        if (ms >= 30 && Looper.myLooper() === Looper.getMainLooper()) Log.w("IPTV", "slow epg read ${ms} ms (${list.size} передач)")
+        return list
+    }
+
+    /** Идёт (или стоит в очереди) загрузка программы какого-либо источника */
+    fun epgBusy() = queued.isNotEmpty()
+
+    // чтение программы в фоне: каналы в работе и отдельный поток (не поток загрузчика — тот занят разбором)
+    private val reading = HashSet<String>()
+    private val readWorker = Executors.newSingleThreadExecutor { r -> Thread(r, "epg-read").apply { priority = Thread.NORM_PRIORITY - 1 } }
+    private val readEvent = Runnable { Bus.post(DataEvent.EpgRead) }
+
+    // одно событие на пачку прочитанных каналов, а не по событию на канал
+    private fun scheduleReadEvent() {
+        main.removeCallbacks(readEvent)
+        main.postDelayed(readEvent, 80)
+    }
+
+    /** Передачи источника [sourceId] / xml-канала [xml] по возрастанию, без перекрытий, со сдвигом [shift] секунд */
+    private fun readProgrammes(sourceId: Long, xml: String, shift: Long): List<Programme> {
         val list = ArrayList<Programme>()
         db.readableDatabase.rawQuery("SELECT start,stop,title,sub_title,descr,category,icon FROM programme WHERE source_id=? AND xml_id=? ORDER BY start",
-            arrayOf(m.first.toString(), m.second)).use { c ->
+            arrayOf(sourceId.toString(), xml)).use { c ->
             while (c.moveToNext()) {
                 val p = Programme(c.getLong(0) + shift, c.getLong(1) + shift, c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getString(6))
                 val prev = list.lastOrNull()
@@ -291,8 +332,6 @@ class Repo(context: Context) {
                 if (p.stop > p.start) list.add(p)
             }
         }
-        epgIcon(ch)
-        cache[ck] = CachedEpg(m.first, list)
         return list
     }
 

@@ -10,6 +10,9 @@ sealed class DataEvent {
 
     /** Программа источника пополнилась (пачка записана) или загрузка закончилась */
     data class EpgProgress(val sourceId: Long, val url: String, val programmes: Int, val percent: Int, val done: Boolean, val error: String? = null) : DataEvent()
+
+    /** Программа каналов прочитана из БД в фоне (пока идёт загрузка программы) и лежит в кэше — перерисовать */
+    object EpgRead : DataEvent()
 }
 
 object Bus {
