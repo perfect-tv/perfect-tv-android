@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Диагностика и лог ошибки: слева текст отчёта (прокрутка ↑/↓), справа действия, QR после выгрузки -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/settings_bg"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:padding="@dimen/screen_pad">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.6"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/report_title"
+            style="@style/Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:id="@+id/report_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_soft"
+            android:focusable="true"
+            android:nextFocusRight="@+id/report_copy"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/report_text"
+                style="@style/Text.Multi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="@color/text_70"
+                android:textSize="10sp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="16dp"
+        android:layout_weight="0.8"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/report_copy"
+            style="@style/Text.Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="0dp"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@+id/report_scroll"
+            android:text="@string/report_copy" />
+
+        <TextView
+            android:id="@+id/report_upload"
+            style="@style/Text.Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="0dp"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/report_upload" />
+
+        <TextView
+            android:id="@+id/report_close"
+            style="@style/Text.Button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="0dp"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/close" />
+
+        <TextView
+            android:id="@+id/report_hint"
+            style="@style/Text.Multi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/report_upload_hint"
+            android:textColor="@color/text_50"
+            android:textSize="10.5sp" />
+
+        <LinearLayout
+            android:id="@+id/report_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/report_qr"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/report_url"
+                style="@style/Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

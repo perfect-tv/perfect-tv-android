@@ -350,6 +350,9 @@ class SettingsActivity : Activity() {
             android.widget.Toast.makeText(this, str(R.string.logo_cache_cleared), android.widget.Toast.LENGTH_SHORT).show()
             showMain()
         }
+        item(col, str(R.string.diagnostics), if (top.rootu.perfecttv.core.Crash.last(this) != null) str(R.string.diagnostics_crash) else "", str(R.string.diagnostics_sub)) {
+            startActivity(android.content.Intent(this, ReportActivity::class.java))
+        }
         return first
     }
 

@@ -10,6 +10,9 @@ class App : Application() {
         super.onCreate()
         Prefs.init(this)
         top.rootu.perfecttv.core.Lang.init(this)
+        // процесс экрана ошибки и диагностики: без сети, БД и логотипов (и без перехвата ошибок — иначе петля)
+        if (top.rootu.perfecttv.core.Crash.isCrashProcess(this)) return
+        top.rootu.perfecttv.core.Crash.init(this)
         Net.init(this)
         repo = Repo(this)
         top.rootu.perfecttv.ui.Logos.init(this)

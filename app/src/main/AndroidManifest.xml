@@ -32,6 +32,18 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.PerfectTv">
 
+        <!-- экран ошибки и диагностика — в отдельном процессе: основной после фатальной ошибки уже мёртв -->
+        <activity
+            android:name=".ui.CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".ui.ReportActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:screenOrientation="landscape" />
+
         <activity
             android:name=".ui.TvActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
