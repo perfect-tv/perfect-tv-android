@@ -447,6 +447,7 @@
     <string name="crash_restart">Restart</string>
     <string name="crash_details">Details</string>
     <string name="crash_exit">Exit</string>
+    <string name="downloads_folder">Downloads</string>
     <string name="any_cert">Accept any certificates</string>
     <string name="any_cert_sub">for playlists, guide, logos and streams over HTTPS: expired, self-signed or mismatched certificates are accepted; no protection against interception</string>
     <string name="deinterlace">Deinterlacing</string>
