@@ -448,6 +448,10 @@
     <string name="crash_details">Подробности</string>
     <string name="crash_exit">Выйти</string>
     <string name="downloads_folder">Загрузки</string>
+    <string name="backup_not_a_backup">Это не резервная копия Perfect TV</string>
+    <string name="backup_unknown_date">неизвестной даты</string>
+    <string name="backup_restore_confirm_x">Восстановить копию от %1$s? Плейлисты и ваши данные (избранное, скрытое, блокировки, напоминания, настройки) будут заменены, приложение перезапустится.</string>
+    <string name="backup_restore_do">Восстановить</string>
     <string name="any_cert">Принимать любые сертификаты</string>
     <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>

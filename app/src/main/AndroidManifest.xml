@@ -34,6 +34,46 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.PerfectTv">
 
+        <!-- открытие файла копии *.perfecttv: подтверждение восстановления. Менеджеры отдают файл по-разному
+             (content:// или file://, с типом и без, расширение — в пути или только в имени), поэтому два фильтра и несколько шаблонов пути -->
+        <activity
+            android:name=".ui.RestoreActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\..*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.perfecttv" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\..*\\.perfecttv" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.perfecttv" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-perfecttv" />
+            </intent-filter>
+        </activity>
+
         <!-- экран ошибки и диагностика — в отдельном процессе: основной после фатальной ошибки уже мёртв -->
         <activity
             android:name=".ui.CrashActivity"

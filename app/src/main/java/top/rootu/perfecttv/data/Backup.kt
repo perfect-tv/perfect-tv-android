@@ -15,12 +15,25 @@ import top.rootu.perfecttv.core.Prefs
  * на них из остальных таблиц остаются верными.
  */
 object Backup {
-    const val FILE = "perfecttv-backup.json"
+    /** Прежнее имя файла копии (старые копии восстанавливаются и с ним) */
+    const val LEGACY_FILE = "perfecttv-backup.json"
+    const val EXT = "perfecttv"
+    const val MIME = "application/x-perfecttv"
+
+    /** Имя файла копии: `backup-20261115192016.perfecttv` (местное время) */
+    fun fileName(now: Long = System.currentTimeMillis()): String =
+        "backup-" + java.text.SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.US).format(java.util.Date(now)) + "." + EXT
+
+    /** Дата создания копии (unix-секунды) или null, если это не копия Perfect TV (чужой JSON, мусор) */
+    fun created(json: String): Long? = try {
+        val o = JSONObject(json)
+        if (!o.has("tables") || !o.has("prefs")) null else o.optLong("created", 0L)
+    } catch (_: Exception) { null }
     private const val VERSION = 1
     private val TABLES = listOf("playlist", "favorite", "history", "hidden", "locked", "score", "reminder")
 
     fun export(db: SQLiteDatabase): String {
-        val root = JSONObject().put("version", VERSION)
+        val root = JSONObject().put("version", VERSION).put("created", top.rootu.perfecttv.core.Clock.now())
         val prefs = JSONObject()
         for ((k, v) in Prefs.all()) {
             if (k.startsWith("home_")) continue   // id карточек главного экрана — свои у каждого устройства

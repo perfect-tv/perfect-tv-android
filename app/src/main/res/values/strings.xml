@@ -448,6 +448,10 @@
     <string name="crash_details">Details</string>
     <string name="crash_exit">Exit</string>
     <string name="downloads_folder">Downloads</string>
+    <string name="backup_not_a_backup">This is not a Perfect TV backup</string>
+    <string name="backup_unknown_date">an unknown date</string>
+    <string name="backup_restore_confirm_x">Restore the backup from %1$s? Playlists and your data (favourites, hidden, locks, reminders, settings) will be replaced and the app will restart.</string>
+    <string name="backup_restore_do">Restore</string>
     <string name="any_cert">Accept any certificates</string>
     <string name="any_cert_sub">for playlists, guide, logos and streams over HTTPS: expired, self-signed or mismatched certificates are accepted; no protection against interception</string>
     <string name="deinterlace">Deinterlacing</string>
