@@ -401,15 +401,15 @@ class SettingsActivity : Activity() {
                     put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
                     // не «application/json»: MediaStore дописал бы к имени .json
                     put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
-                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/" + top.rootu.perfecttv.data.Backup.FOLDER)
                 }) ?: throw java.io.IOException("MediaStore")
                 contentResolver.openOutputStream(uri, "wt")?.use { it.write(json.toByteArray()) } ?: throw java.io.IOException("write")
             } else {
-                val dir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val dir = java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), top.rootu.perfecttv.data.Backup.FOLDER)
                 dir.mkdirs()
                 java.io.File(dir, name).writeText(json)
             }
-            toast(str(R.string.backup_saved_x, str(R.string.downloads_folder) + "/" + name))
+            toast(str(R.string.backup_saved_x, str(R.string.downloads_folder) + "/" + top.rootu.perfecttv.data.Backup.FOLDER + "/" + name))
         } catch (e: Exception) {
             // «Загрузок» нет или записать нельзя — в папку приложения
             try {
@@ -422,46 +422,75 @@ class SettingsActivity : Activity() {
         }
     }
 
-    /** Самая новая копия в «Загрузках» (MediaStore, API 29+): `backup-*.perfecttv`, иначе файл прежнего имени */
-    private fun downloadsUri(): android.net.Uri? {
-        if (android.os.Build.VERSION.SDK_INT < 29) return null
-        val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        for ((sel, arg) in listOf("backup-%." + top.rootu.perfecttv.data.Backup.EXT to true, top.rootu.perfecttv.data.Backup.LEGACY_FILE to false)) {
-            contentResolver.query(collection, arrayOf(android.provider.MediaStore.Downloads._ID),
-                android.provider.MediaStore.Downloads.DISPLAY_NAME + (if (arg) " LIKE ?" else "=?"), arrayOf(sel), android.provider.MediaStore.Downloads.DATE_ADDED + " DESC")?.use {
-                if (it.moveToFirst()) return android.content.ContentUris.withAppendedId(collection, it.getLong(0))
+    /** Найденная копия: [uri] (MediaStore) или [file], дата изменения (unix-секунды) и размер */
+    private class Found(val name: String, val uri: android.net.Uri?, val file: java.io.File?, val modified: Long, val size: Long) {
+        fun read(cr: android.content.ContentResolver): String? = try {
+            if (uri != null) cr.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } else file?.readText()
+        } catch (_: Exception) { null }
+    }
+
+    private fun isBackupName(n: String) = n.endsWith("." + top.rootu.perfecttv.data.Backup.EXT) || n == top.rootu.perfecttv.data.Backup.LEGACY_FILE
+
+    /**
+     * Копии на устройстве, новые сверху: «Загрузки/PerfectTV» и корень «Загрузок» (MediaStore на Android 10+ и файлы),
+     * папка приложения. Чужие файлы (положенные файловым менеджером) на Android 10+ приложению не видны — их открывают
+     * из менеджера (`*.perfecttv`) или системным выбором.
+     */
+    private fun findBackups(): List<Found> {
+        val out = ArrayList<Found>()
+        if (android.os.Build.VERSION.SDK_INT >= 29) try {
+            val coll = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            contentResolver.query(coll, arrayOf(android.provider.MediaStore.Downloads._ID, android.provider.MediaStore.Downloads.DISPLAY_NAME,
+                android.provider.MediaStore.Downloads.DATE_MODIFIED, android.provider.MediaStore.Downloads.SIZE), null, null, null)?.use { c ->
+                while (c.moveToNext()) {
+                    val n = c.getString(1) ?: continue
+                    if (isBackupName(n)) out.add(Found(n, android.content.ContentUris.withAppendedId(coll, c.getLong(0)), null, c.getLong(2), c.getLong(3)))
+                }
             }
-        }
-        return null
-    }
-
-    /** Копия из «Загрузок» (MediaStore или файл), затем из папки приложения — самая новая; null — нигде нет */
-    private fun readLocalBackup(): String? {
-        try {
-            downloadsUri()?.let { u -> contentResolver.openInputStream(u)?.use { return it.readBytes().toString(Charsets.UTF_8) } }
         } catch (_: Exception) {
         }
-        val dirs = listOf(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), backupDir())
-        for (dir in dirs) try {
-            val files = dir.listFiles { f -> f.isFile && (f.name.endsWith("." + top.rootu.perfecttv.data.Backup.EXT) || f.name == top.rootu.perfecttv.data.Backup.LEGACY_FILE) }
-            files?.maxByOrNull { it.lastModified() }?.let { return it.readText() }
+        val dl = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        for (dir in listOf(java.io.File(dl, top.rootu.perfecttv.data.Backup.FOLDER), dl, backupDir())) try {
+            dir.listFiles { f -> f.isFile && isBackupName(f.name) }?.forEach { out.add(Found(it.name, null, it, it.lastModified() / 1000, it.length())) }
         } catch (_: Exception) {
         }
-        return null
+        // один файл мог прийти и из MediaStore, и из каталога
+        return out.distinctBy { it.name + ":" + it.size }.sortedByDescending { it.modified }
     }
 
-    private fun backupOpen() {
+    /** «Восстановить из копии»: список копий (подпапка «Загрузок») + «Выбрать файл…» при наличии системного выбора */
+    private fun backupOpen() = showBackups()
+
+    private fun showBackups() {
+        editing = -6
+        val col = page(str(R.string.backup_restore))
+        val list = findBackups()
+        var first: View? = null
+        val fmt = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT, Lang.locale)
+        for (b in list) {
+            val v = item(col, b.name, "", fmt.format(java.util.Date(b.modified * 1000)) + " · " + Fmt.size(b.size)) {
+                val json = b.read(contentResolver)
+                if (json == null) toast(str(R.string.backup_failed_x, b.name)) else backupRestore(json)
+            }
+            if (first == null) first = v
+        }
+        if (list.isEmpty()) note(col, str(R.string.backup_list_empty_x, str(R.string.downloads_folder) + "/" + top.rootu.perfecttv.data.Backup.FOLDER))
         val i = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(android.content.Intent.CATEGORY_OPENABLE)
             type = "*/*"
         }
-        if (hasPicker(i)) try {
-            @Suppress("DEPRECATION")
-            return startActivityForResult(i, BACKUP_OPEN)
-        } catch (_: android.content.ActivityNotFoundException) {
+        if (hasPicker(i)) {
+            val v = item(col, str(R.string.backup_pick_file), "", "") {
+                try {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(i, BACKUP_OPEN)
+                } catch (_: android.content.ActivityNotFoundException) {
+                    toast(str(R.string.backup_failed_x, ""))
+                }
+            }
+            if (first == null) first = v
         }
-        val json = readLocalBackup() ?: return toast(str(R.string.backup_not_found_x, str(R.string.downloads_folder) + "/backup-*." + top.rootu.perfecttv.data.Backup.EXT))
-        backupRestore(json)
+        focus(col, first)
     }
 
     /** Восстановление из копии — через подтверждение с датой копии (фокус на «Отмена») */

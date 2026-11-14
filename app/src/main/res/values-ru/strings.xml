@@ -452,6 +452,8 @@
     <string name="backup_unknown_date">неизвестной даты</string>
     <string name="backup_restore_confirm_x">Восстановить копию от %1$s? Плейлисты и ваши данные (избранное, скрытое, блокировки, напоминания, настройки) будут заменены, приложение перезапустится.</string>
     <string name="backup_restore_do">Восстановить</string>
+    <string name="backup_pick_file">Выбрать файл…</string>
+    <string name="backup_list_empty_x">Копий нет в «%1$s». Сохраните копию или откройте файл *.perfecttv из файлового менеджера.</string>
     <string name="any_cert">Принимать любые сертификаты</string>
     <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>

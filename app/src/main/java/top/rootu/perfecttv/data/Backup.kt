@@ -19,6 +19,8 @@ object Backup {
     const val LEGACY_FILE = "perfecttv-backup.json"
     const val EXT = "perfecttv"
     const val MIME = "application/x-perfecttv"
+    /** Подпапка «Загрузок», куда уходят копии */
+    const val FOLDER = "PerfectTV"
 
     /** Имя файла копии: `backup-20261115192016.perfecttv` (местное время) */
     fun fileName(now: Long = System.currentTimeMillis()): String =
