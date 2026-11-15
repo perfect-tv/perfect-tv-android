@@ -60,6 +60,9 @@ dependencies {
     // программные аудиодекодеры FFmpeg (MP2, AC-3, E-AC-3, DTS…) для устройств, где их нет в системе; Media3 1.9.0
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
+    // поиск утечек памяти: только в отладочной сборке (в release нет ни библиотеки, ни её экрана)
+    debugImplementation(libs.leakcanary.android)
+
     testImplementation(libs.junit)
     // XmlPullParser для JVM-тестов (на устройстве — встроенный KXml)
     testImplementation(libs.kxml2)

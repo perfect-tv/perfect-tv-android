@@ -6,7 +6,7 @@ import android.os.SystemClock
 import android.view.KeyEvent
 
 /**
- * Разбор нажатий пульта («Долгие нажатия»).
+ * Разбор нажатий пульта (docs/controls.md, «Долгие нажатия»).
  *
  * Если у слоя для направления есть долгое действие ([Layer.hasLong]), короткое срабатывает
  * на keyup, а долгое — через [LONG_PRESS] удержания. Если нет — сразу на keydown;

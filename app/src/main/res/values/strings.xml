@@ -454,6 +454,9 @@
     <string name="backup_restore_do">Restore</string>
     <string name="backup_pick_file">Choose a file…</string>
     <string name="backup_list_empty_x">No backups in “%1$s”. Save a backup or open a *.perfecttv file from a file manager.</string>
+    <string name="leakcanary">LeakCanary</string>
+    <string name="leakcanary_sub">debug build: leaked objects found while the app runs</string>
+    <string name="leakcanary_missing">LeakCanary is not in this build</string>
     <string name="any_cert">Accept any certificates</string>
     <string name="any_cert_sub">for playlists, guide, logos and streams over HTTPS: expired, self-signed or mismatched certificates are accepted; no protection against interception</string>
     <string name="deinterlace">Deinterlacing</string>

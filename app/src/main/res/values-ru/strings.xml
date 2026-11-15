@@ -454,6 +454,9 @@
     <string name="backup_restore_do">Восстановить</string>
     <string name="backup_pick_file">Выбрать файл…</string>
     <string name="backup_list_empty_x">Копий нет в «%1$s». Сохраните копию или откройте файл *.perfecttv из файлового менеджера.</string>
+    <string name="leakcanary">LeakCanary</string>
+    <string name="leakcanary_sub">отладочная сборка: утечки памяти, найденные за время работы</string>
+    <string name="leakcanary_missing">LeakCanary нет в этой сборке</string>
     <string name="any_cert">Принимать любые сертификаты</string>
     <string name="any_cert_sub">для плейлистов, программы, логотипов и потоков по HTTPS: просроченные, самоподписанные и с чужим именем узла принимаются; защиты от подмены соединения нет</string>
     <string name="deinterlace">Деинтерлейсинг</string>

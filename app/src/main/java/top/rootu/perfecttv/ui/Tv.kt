@@ -37,7 +37,7 @@ import top.rootu.perfecttv.player.Playback
  *   HLS с EXT-X-PROGRAM-DATE-TIME (Flussonic и др.) — реальное время кадра из плейлиста
  *     ([Playback.wallClockMs]): не зависит от того, с какого места плеер начал;
  *   иначе position = archive.start + (periodPosition − archive.base) / 1000,
- *     где base — позиция плеера, соответствующая началу ссылки (см. §8).
+ *     где base — позиция плеера, соответствующая началу ссылки (см. docs/TZ.md, §8).
  */
 class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: Playback) {
 

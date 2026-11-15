@@ -350,6 +350,14 @@ class SettingsActivity : Activity() {
             android.widget.Toast.makeText(this, str(R.string.logo_cache_cleared), android.widget.Toast.LENGTH_SHORT).show()
             showMain()
         }
+        // LeakCanary есть только в отладочной сборке: экран утечек запускается по имени класса, без зависимости в release
+        if (top.rootu.perfecttv.BuildConfig.DEBUG) item(col, str(R.string.leakcanary), "", str(R.string.leakcanary_sub)) {
+            try {
+                startActivity(android.content.Intent().setClassName(packageName, "leakcanary.internal.activity.LeakActivity"))
+            } catch (_: Exception) {
+                toast(str(R.string.leakcanary_missing))
+            }
+        }
         item(col, str(R.string.diagnostics), if (top.rootu.perfecttv.core.Crash.last(this) != null) str(R.string.diagnostics_crash) else "", str(R.string.diagnostics_sub)) {
             startActivity(android.content.Intent(this, ReportActivity::class.java))
         }

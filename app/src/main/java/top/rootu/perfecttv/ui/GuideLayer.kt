@@ -562,7 +562,7 @@ class GuideLayer(private val tv: Tv) : Layer {
     @SuppressLint("ViewConstructor")
     private inner class GuideView(context: Context) : View(context) {
         private val em = U.em
-        // текст — не мельче 1,1 em (11 sp): «Масштаб»
+        // текст — не мельче 1,1 em (11 sp): docs/design.md, «Масштаб»
         private val pTitle = U.paint(1.8f, bold = true)
         private val pChannel = U.paint(1.2f, U.wa(0.7f))
         private val pTime = U.paint(1.2f, U.wa(0.8f))

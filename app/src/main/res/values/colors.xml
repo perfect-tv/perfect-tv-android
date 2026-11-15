@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Палитра интерфейса; в коде — U.* (читается отсюда) -->
+<!-- Палитра интерфейса (docs/design.md); в коде — U.* (читается отсюда) -->
 <resources>
     <color name="white">#FFEBEBEB</color>
     <color name="black">#FF000000</color>

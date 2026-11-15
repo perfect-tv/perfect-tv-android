@@ -4,7 +4,7 @@ import java.net.URLEncoder
 import java.util.TimeZone
 
 /**
- * Шаблоны URL архива (catchup) (§8; примеры — CatchupUrlTest).
+ * Шаблоны URL архива (catchup) (docs/TZ.md, §8; примеры — CatchupUrlTest).
  *
  * Подстановки:
  *   ${start} ${utc} ${end} ${utcend} ${offset} ${duration} ${now} ${lutc} ${timestamp}

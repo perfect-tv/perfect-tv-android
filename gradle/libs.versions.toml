@@ -11,6 +11,7 @@ junit = "4.13.2"
 kxml2 = "2.3.0"
 tvprovider = "1.0.0"
 zxing = "3.5.3"
+leakcanary = "2.14"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -24,6 +25,7 @@ media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp"
 media3-effect = { module = "androidx.media3:media3-effect", version.ref = "media3" }
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 tvprovider = { module = "androidx.tvprovider:tvprovider", version.ref = "tvprovider" }
 coil = { module = "io.coil-kt:coil", version.ref = "coil" }

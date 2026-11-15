@@ -10,7 +10,7 @@ import android.widget.ScrollView
 /**
  * Окно «Управление»: кнопки по разделам. ↑/↓ — прокрутка,
  * PG± — на страницу, OK/«Назад» — закрыть. Текст держать в согласии с раскладкой
- * (Tv, GuideLayer, ScheduleLayer).
+ * (Tv, GuideLayer, ScheduleLayer) и docs/controls.md.
  */
 class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(context, 56f, 0.86f) {
 

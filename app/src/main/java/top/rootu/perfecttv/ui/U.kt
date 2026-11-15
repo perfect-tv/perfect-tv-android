@@ -15,7 +15,7 @@ import top.rootu.perfecttv.core.Clock
 import java.util.Calendar
 
 /**
- * Палитра, размеры и общие приёмы рисования.
+ * Палитра, размеры и общие приёмы рисования (docs/design.md).
  * Размеры — в em: 1 em = высота экрана / 54 (13,3 px на 720p, 20 px на 1080p).
  */
 object U {

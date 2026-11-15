@@ -4,7 +4,7 @@ import java.io.BufferedReader
 
 /**
  * Потоковый парсер M3U/M3U8: читает построчно и отдаёт каналы по одному в [onChannel],
- * весь файл в памяти не держит. Правила — §4.
+ * весь файл в памяти не держит. Правила — docs/TZ.md, §4.
  */
 class M3uParser(private val defaultGroup: String = "") {
 
