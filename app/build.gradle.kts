@@ -1,3 +1,27 @@
+// Версия из git: имя — `git describe` по тегу v<число>.<число>.<число> (релиз собирает .github/workflows/release.yml
+// по такому тегу), код — число коммитов. Без тегов (или без git) — 0.0.1-dev-<хеш>; сборка после тега — 1.2.3-5-gabcdef.
+fun gitOutput(vararg command: String): String = try {
+    providers.exec {
+        commandLine(*command)
+        isIgnoreExitValue = true   // нет git или тегов — не ломать сборку
+    }.standardOutput.asText.get().trim()
+} catch (e: Exception) {
+    ""
+}
+
+val gitVersionCode: Int by lazy { gitOutput("git", "rev-list", "--count", "HEAD").toIntOrNull() ?: 1 }
+
+val gitVersionName: String by lazy {
+    val described = gitOutput("git", "describe", "--tags", "--match", "v[0-9]*", "--dirty")
+    if (described.isNotEmpty() && !described.contains("fatal")) described.removePrefix("v")
+    else gitOutput("git", "rev-parse", "--short", "HEAD").let { if (it.isNotEmpty()) "0.0.1-dev-$it" else "0.0.1" }
+}
+
+// Ключ подписи релиза — из окружения (CI): путь KEYSTORE_FILE относительно модуля app. Без него release подписывается
+// debug-ключом (для установки на свою приставку). Обновление поверх установленной сборки возможно только при той же подписи.
+fun envOrNull(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+val releaseKeystorePath: String? = envOrNull("KEYSTORE_FILE")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -11,16 +35,26 @@ android {
         applicationId = "top.rootu.perfecttv"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = gitVersionCode
+        versionName = gitVersionName
+    }
+
+    signingConfigs {
+        releaseKeystorePath?.let { path ->
+            create("release") {
+                storeFile = file(path)
+                storePassword = envOrNull("KEYSTORE_PASSWORD")
+                keyAlias = envOrNull("RELEASE_SIGN_KEY_ALIAS")
+                keyPassword = envOrNull("RELEASE_SIGN_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // пока без своей подписи: release подписывается debug-ключом для установки на приставку
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystorePath != null) "release" else "debug")
         }
     }
     compileOptions {
@@ -66,4 +100,6 @@ dependencies {
     testImplementation(libs.junit)
     // XmlPullParser для JVM-тестов (на устройстве — встроенный KXml)
     testImplementation(libs.kxml2)
+    // настоящий org.json для JVM-тестов (в android.jar для тестов — заглушки)
+    testImplementation(libs.json)
 }

@@ -368,6 +368,11 @@ class SettingsActivity : Activity() {
     /** «О программе»: версия, ссылки (на ТВ их не нажать — окно с QR-кодом), лицензии */
     private fun sectionAbout(col: LinearLayout): View? {
         val first = item(col, "Perfect TV", str(R.string.about_version, top.rootu.perfecttv.BuildConfig.VERSION_NAME), str(R.string.about_sub)) { }
+        toggle(col, str(R.string.update_auto), Prefs.updateCheck, str(R.string.update_auto_sub)) { Prefs.updateCheck = it; showMain() }
+        val found = top.rootu.perfecttv.core.Updater.available()
+        item(col, str(R.string.update_check), if (found != null) str(R.string.update_available_x, found.version) else "", str(R.string.update_check_sub)) {
+            if (found != null) UpdateDialog.show(this, found) else UpdateDialog.checkNow(this) { showMain() }
+        }
         for ((title, sub, url) in listOf(
             Triple(str(R.string.about_telegram), str(R.string.about_telegram_sub), top.rootu.perfecttv.core.About.TELEGRAM),
             Triple(str(R.string.about_donate), str(R.string.about_donate_sub), top.rootu.perfecttv.core.About.DONATE),

@@ -115,6 +115,29 @@ object Prefs {
         get() = bool("any_cert", true)
         set(v) = sp.edit().putBoolean("any_cert", v).apply()
 
+    /** Проверять обновления на GitHub при запуске (core/Updater.kt) */
+    var updateCheck: Boolean
+        get() = bool("update_check", true)
+        set(v) = sp.edit().putBoolean("update_check", v).apply()
+
+    /** Когда в последний раз проверяли (unix-секунды) */
+    var updateLast: Long
+        get() = sp.getLong("update_last", 0L)
+        set(v) = sp.edit().putLong("update_last", v).apply()
+
+    /** Найденная новая версия (JSON из Updater.toJson), пусто — нет; версия, о которой окно уже показывали */
+    var updateJson: String
+        get() = sp.getString("update_json", "") ?: ""
+        set(v) = sp.edit().putString("update_json", v).apply()
+    var updateSeen: String
+        get() = sp.getString("update_seen", "") ?: ""
+        set(v) = sp.edit().putString("update_seen", v).apply()
+
+    /** Только debug-сборка: свой адрес API релизов (проверка на макете сервера) */
+    var updateApi: String
+        get() = sp.getString("update_api", "") ?: ""
+        set(v) = sp.edit().putString("update_api", v).apply()
+
     /** Оформление субтитров (индексы списков в `SubtitleStyle`): размер %, цвет, фон, обводка, отступ снизу % */
     var subSize: Int
         get() = sp.getInt("sub_size", 100)

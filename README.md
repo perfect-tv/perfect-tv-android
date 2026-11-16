@@ -29,7 +29,11 @@ GNU GPL 3.0 (`LICENSE`), сторонние компоненты — в `NOTICE`
 ./gradlew testDebugUnitTest
 ```
 
-APK — `app/build/outputs/apk/debug/app-debug.apk`. Release (`assembleRelease`) пока подписывается debug-ключом.
+APK — `app/build/outputs/apk/debug/app-debug.apk`. Release (`assembleRelease`) без ключа в окружении подписывается debug-ключом.
+
+### Версия и выпуск
+
+Версия приложения — из git: имя `git describe` по тегу `v<число>.<число>.<число>`, код — число коммитов (без тегов — `0.0.1-dev-<хеш>`). Выпуск: `git tag v1.2.5 && git push origin v1.2.5` — `.github/workflows/release.yml` прогоняет тесты, собирает подписанный `app-release.apk` и публикует релиз GitHub; именно его приложение предлагает установить («Настройки → О программе»). Секреты репозитория: `KEYSTORE_GIT_REPOSITORY`, `KEYSTORE_ACCESS_TOKEN` (закрытый репозиторий с ключом), `KEYSTORE_FILE` (путь от модуля `app`), `KEYSTORE_PASSWORD`, `RELEASE_SIGN_KEY_ALIAS`, `RELEASE_SIGN_KEY_PASSWORD`. Подпись должна быть одной и той же во всех релизах: иначе Android не обновит приложение поверх.
 
 ## Проверка на эмуляторе
 

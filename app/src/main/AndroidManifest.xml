@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- копия в «Загрузки» на Android 9 и ниже (с 10 — через MediaStore без разрешения) -->
+    <!-- установка скачанного обновления (core/Updater.kt) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -118,6 +120,17 @@
             android:exported="false"
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- скачанный APK обновления отдаётся установщику по content:// -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
 
         <!-- баннеры карточек главного экрана: файлы из cacheDir/posters, читает лаунчер -->
         <provider

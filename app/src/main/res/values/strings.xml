@@ -505,4 +505,20 @@
     <string name="about_license_ffmpeg">Audio decoders — FFmpeg 6.0 (LGPL 2.1+) as a separate library; its source is available from ffmpeg.org.</string>
     <string name="about_tmdb">Movie descriptions and posters — The Movie Database (TMDB). This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="about_trademarks">Android and Google TV are trademarks of Google LLC. Perfect TV is an independent app, not affiliated with Google. The name and logo “Perfect TV” are not covered by the GPL.</string>
+    <string name="update_title_x">Version %1$s is available</string>
+    <string name="update_current_x">installed: %1$s</string>
+    <string name="update_do">Update</string>
+    <string name="update_install">Install</string>
+    <string name="update_downloading_x">Downloading %1$d%%</string>
+    <string name="update_download_failed">Could not download the update</string>
+    <string name="update_allow_install">Allow installing from this app in the Android settings, then press Install</string>
+    <string name="update_install_failed">Could not start the installer</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_latest">The latest version is installed</string>
+    <string name="update_error">Could not check for updates</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_check_sub">GitHub releases; the new version is downloaded and installed from here</string>
+    <string name="update_available_x">%1$s available</string>
+    <string name="update_auto">Check for updates on start</string>
+    <string name="update_auto_sub">at most every 6 hours; only a request to GitHub is made, nothing about you is sent</string>
 </resources>

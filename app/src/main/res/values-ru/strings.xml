@@ -505,4 +505,20 @@
     <string name="about_license_ffmpeg">Декодеры звука — FFmpeg 6.0 (LGPL 2.1+) отдельной библиотекой; исходный код — на ffmpeg.org.</string>
     <string name="about_tmdb">Описания и постеры фильмов — The Movie Database (TMDB). Этот продукт использует API TMDB, но не одобрен и не сертифицирован TMDB.</string>
     <string name="about_trademarks">Android и Google TV — товарные знаки Google LLC. Perfect TV — независимое приложение, не связанное с Google. Название и логотип «Perfect TV» лицензией GPL не охвачены.</string>
+    <string name="update_title_x">Доступна версия %1$s</string>
+    <string name="update_current_x">установлена: %1$s</string>
+    <string name="update_do">Обновить</string>
+    <string name="update_install">Установить</string>
+    <string name="update_downloading_x">Загрузка %1$d%%</string>
+    <string name="update_download_failed">Не удалось скачать обновление</string>
+    <string name="update_allow_install">Разрешите установку из этого приложения в настройках Android и нажмите «Установить»</string>
+    <string name="update_install_failed">Не удалось запустить установщик</string>
+    <string name="update_checking">Проверяю обновления…</string>
+    <string name="update_latest">Установлена последняя версия</string>
+    <string name="update_error">Не удалось проверить обновления</string>
+    <string name="update_check">Проверить обновления</string>
+    <string name="update_check_sub">релизы на GitHub; новая версия скачивается и устанавливается отсюда</string>
+    <string name="update_available_x">доступна %1$s</string>
+    <string name="update_auto">Проверять обновления при запуске</string>
+    <string name="update_auto_sub">не чаще раза в 6 часов; уходит только запрос на GitHub, ничего о вас не передаётся</string>
 </resources>

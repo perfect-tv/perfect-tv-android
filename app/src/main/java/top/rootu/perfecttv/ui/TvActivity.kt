@@ -45,6 +45,7 @@ class TvActivity : Activity() {
         tv = Tv(this, root, pb)
         reminderFromIntent(intent)
         externalFromIntent(intent)
+        UpdateDialog.auto(this)
     }
 
     @Deprecated("Deprecated in Java")
