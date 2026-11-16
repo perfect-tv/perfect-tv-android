@@ -489,4 +489,20 @@
     <string name="ttx_sec_view">Вид</string>
     <string name="ttx_sec_pages">Страницы</string>
     <string name="help_ttx_pg">Подстраница вперёд / назад</string>
+    <string name="about_app">О программе</string>
+    <string name="about_version">версия %1$s</string>
+    <string name="about_sub">IPTV-плеер для Android TV: свой плейлист и программа передач, архив, управление с пульта</string>
+    <string name="about_telegram">Телеграм-канал</string>
+    <string name="about_telegram_sub">новости, новые версии, вопросы</string>
+    <string name="about_donate">Поддержать проект</string>
+    <string name="about_donate_sub">если программа нравится — спасибо!</string>
+    <string name="about_github">Исходный код</string>
+    <string name="about_github_sub">GitHub: код, ошибки и предложения</string>
+    <string name="about_scan_hint">Наведите камеру телефона на код</string>
+    <string name="about_licenses">Лицензии</string>
+    <string name="about_license_app">Perfect TV — свободная программа, лицензия GNU GPL 3.0; исходный код — на GitHub.</string>
+    <string name="about_license_libs">Media3 / ExoPlayer, OkHttp, Coil, ZXing, AndroidX, Kotlin coroutines — Apache License 2.0.</string>
+    <string name="about_license_ffmpeg">Декодеры звука — FFmpeg 6.0 (LGPL 2.1+) отдельной библиотекой; исходный код — на ffmpeg.org.</string>
+    <string name="about_tmdb">Описания и постеры фильмов — The Movie Database (TMDB). Этот продукт использует API TMDB, но не одобрен и не сертифицирован TMDB.</string>
+    <string name="about_trademarks">Android и Google TV — товарные знаки Google LLC. Perfect TV — независимое приложение, не связанное с Google. Название и логотип «Perfect TV» лицензией GPL не охвачены.</string>
 </resources>

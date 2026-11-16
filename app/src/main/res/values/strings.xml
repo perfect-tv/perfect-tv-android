@@ -489,4 +489,20 @@
     <string name="ttx_sec_view">View</string>
     <string name="ttx_sec_pages">Pages</string>
     <string name="help_ttx_pg">Next / previous subpage</string>
+    <string name="about_app">About</string>
+    <string name="about_version">version %1$s</string>
+    <string name="about_sub">IPTV player for Android TV: your own playlist and programme guide, catch-up archive, remote-first</string>
+    <string name="about_telegram">Telegram channel</string>
+    <string name="about_telegram_sub">news, new versions, questions</string>
+    <string name="about_donate">Support the project</string>
+    <string name="about_donate_sub">if you like the app — thank you!</string>
+    <string name="about_github">Source code</string>
+    <string name="about_github_sub">GitHub: code, bugs and suggestions</string>
+    <string name="about_scan_hint">Point your phone camera at the code</string>
+    <string name="about_licenses">Licenses</string>
+    <string name="about_license_app">Perfect TV is free software under the GNU GPL 3.0 license; the source code is on GitHub.</string>
+    <string name="about_license_libs">Media3 / ExoPlayer, OkHttp, Coil, ZXing, AndroidX, Kotlin coroutines — Apache License 2.0.</string>
+    <string name="about_license_ffmpeg">Audio decoders — FFmpeg 6.0 (LGPL 2.1+) as a separate library; its source is available from ffmpeg.org.</string>
+    <string name="about_tmdb">Movie descriptions and posters — The Movie Database (TMDB). This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="about_trademarks">Android and Google TV are trademarks of Google LLC. Perfect TV is an independent app, not affiliated with Google. The name and logo “Perfect TV” are not covered by the GPL.</string>
 </resources>

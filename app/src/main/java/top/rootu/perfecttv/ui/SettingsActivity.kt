@@ -69,7 +69,7 @@ class SettingsActivity : Activity() {
     // ------------------------------------------------------------------ разделы
 
     private fun sectionTitles() = listOf(str(R.string.playlists), str(R.string.viewing), str(R.string.appearance), str(R.string.channel_list),
-        str(R.string.parental_lock), "TMDB", str(R.string.data_and_backup))
+        str(R.string.parental_lock), "TMDB", str(R.string.data_and_backup), str(R.string.about_app))
 
     private fun buildNav() {
         nav.removeAllViews()
@@ -235,7 +235,8 @@ class SettingsActivity : Activity() {
             3 -> sectionChannels(col)
             4 -> sectionLock(col)
             5 -> sectionTmdb(col)
-            else -> sectionData(col)
+            6 -> sectionData(col)
+            else -> sectionAbout(col)
         }
         // после пересоздания экрана (язык, размер) — на тот же пункт
         val back = intent.getIntExtra(EXTRA_FOCUS_INDEX, -1)
@@ -362,6 +363,39 @@ class SettingsActivity : Activity() {
             startActivity(android.content.Intent(this, ReportActivity::class.java))
         }
         return first
+    }
+
+    /** «О программе»: версия, ссылки (на ТВ их не нажать — окно с QR-кодом), лицензии */
+    private fun sectionAbout(col: LinearLayout): View? {
+        val first = item(col, "Perfect TV", str(R.string.about_version, top.rootu.perfecttv.BuildConfig.VERSION_NAME), str(R.string.about_sub)) { }
+        for ((title, sub, url) in listOf(
+            Triple(str(R.string.about_telegram), str(R.string.about_telegram_sub), top.rootu.perfecttv.core.About.TELEGRAM),
+            Triple(str(R.string.about_donate), str(R.string.about_donate_sub), top.rootu.perfecttv.core.About.DONATE),
+            Triple(str(R.string.about_github), str(R.string.about_github_sub), top.rootu.perfecttv.core.About.GITHUB))) {
+            item(col, title, url.removePrefix("https://"), sub) { showLink(title, url) }
+        }
+        section(col, str(R.string.about_licenses))
+        for (t in listOf(R.string.about_license_app, R.string.about_license_libs, R.string.about_license_ffmpeg, R.string.about_tmdb, R.string.about_trademarks))
+            note(col, str(t))
+        return first
+    }
+
+    /** Ссылка QR-кодом: телефон наводят на экран (окно «Ввод с телефона» без сервера) */
+    private fun showLink(title: String, url: String) {
+        val v = layoutInflater.inflate(R.layout.phone_input, null)
+        v.findViewById<TextView>(R.id.phone_title).text = title
+        v.findViewById<android.widget.ImageView>(R.id.phone_qr).setImageBitmap(PhoneInput.qr(url, 600))
+        v.findViewById<TextView>(R.id.phone_url).text = url.removePrefix("https://")
+        v.findViewById<TextView>(R.id.phone_hint).text = str(R.string.about_scan_hint)
+        val close = v.findViewById<TextView>(R.id.phone_close)
+        val d = android.app.Dialog(this)
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        d.setContentView(v)
+        d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        close.setOnClickListener { d.dismiss() }
+        close.isSelected = true
+        d.show()
+        close.requestFocus()
     }
 
     // ------------------------------------------------------------------ резервная копия

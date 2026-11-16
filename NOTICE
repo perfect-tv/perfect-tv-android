@@ -1,0 +1,42 @@
+Perfect TV — IPTV-плеер для Android TV
+Copyright (C) 2026 Perfect TV (https://github.com/perfect-tv) и участники проекта
+
+Perfect TV — свободная программа: её можно распространять и изменять на условиях
+GNU General Public License версии 3 (см. файл LICENSE). Программа распространяется без
+каких-либо гарантий.
+
+Название и логотип «Perfect TV» — не часть лицензии на код. Форк, который распространяется
+под другим названием и логотипом, — пожалуйста; под названием «Perfect TV» (в том числе
+в магазинах приложений) — только по согласованию с владельцем проекта.
+
+Perfect TV — независимое приложение. Android и Google TV — товарные знаки Google LLC.
+Приложение не содержит каналов и плейлистов: источник вещания пользователь указывает сам
+и отвечает за право на его просмотр.
+
+------------------------------------------------------------------------------------------
+Сторонние компоненты (в сборке)
+------------------------------------------------------------------------------------------
+
+Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0):
+  AndroidX Media3 (ExoPlayer, HLS, DASH, RTSP, datasource-okhttp, effect, ui) — The Android Open Source Project
+  AndroidX (core-ktx, recyclerview, tvprovider)                               — The Android Open Source Project
+  OkHttp, Okio                                                                — Square, Inc.
+  Coil                                                                        — Coil Contributors
+  ZXing core                                                                  — ZXing authors
+  Kotlin, kotlinx.coroutines                                                  — JetBrains s.r.o. и участники
+
+FFmpeg (https://ffmpeg.org) — LGPL 2.1 или новее:
+  Программные декодеры звука (MP2, AC-3, E-AC-3, DTS и др.) — расширение Media3 `decoder_ffmpeg`
+  с FFmpeg 6.0, собранное отдельной динамической библиотекой (`app/libs/lib-decoder-ffmpeg-release.aar`).
+  Библиотека используется без изменений исходного кода FFmpeg; исходный код FFmpeg — на ffmpeg.org,
+  замена библиотеки на свою сборку (того же Media3) допустима. LGPL 2.1+ совместима с GPL 3.
+
+Только для разработки (в release-сборку не входят):
+  LeakCanary (Apache 2.0, Square, Inc.) — debug-сборка; kXML2 (BSD, Stefan Haustein) и JUnit (EPL 1.0) — тесты.
+
+Данные:
+  Описания и постеры фильмов — The Movie Database (TMDB). Этот продукт использует API TMDB,
+  но не одобрен и не сертифицирован TMDB. Ключ TMDB пользователь вводит сам.
+
+Сторонний код сменился — обновить этот файл и раздел «Лицензии» в «Настройки → О программе»
+(строки `about_license_*` в `res/values*/strings.xml`).

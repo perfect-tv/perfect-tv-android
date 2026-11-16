@@ -13,6 +13,10 @@
 - [docs/PLAN.md](docs/PLAN.md) — план по фазам и что проверено;
 - [docs/redesign.md](docs/redesign.md) — аудит интерфейса и план редизайна, макеты — `docs/mockups/redesign.html`.
 
+## Лицензия и участие
+
+GNU GPL 3.0 (`LICENSE`), сторонние компоненты — в `NOTICE`. Название и логотип «Perfect TV» лицензией не охвачены. Хотите помочь — `CONTRIBUTING.md` (в том числе соглашение `CLA.md`). Поддержать проект: Настройки → О программе → «Поддержать проект» (QR) или <https://boosty.to/rootu/donate>.
+
 ## Сборка
 
 Нужны JDK 17 и Android SDK (путь — в `local.properties`, `sdk.dir=…`).
