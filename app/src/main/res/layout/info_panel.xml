@@ -68,7 +68,7 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <TextView
+            <top.rootu.perfecttv.ui.MarqueeTextView
                 android:id="@+id/info_title"
                 style="@style/Text"
                 android:layout_width="match_parent"

@@ -314,6 +314,7 @@ class SettingsActivity : Activity() {
         number(col, str(R.string.hide_info_panel_after), listOf(3, 5, 7, 10), Prefs.infoHide, label = { str(R.string.x_s, it) }) { Prefs.infoHide = it; showMain() }
         choice(col, str(R.string.keyboard_layout), listOf(str(R.string.layout_standard), str(R.string.layout_abc)), if (Prefs.keyboardAbc) 1 else 0) { Prefs.keyboardAbc = it == 1; showMain() }
         toggle(col, str(R.string.key_hints), Prefs.keyHints, str(R.string.a_row_at_the_bottom_of_the_pinned)) { Prefs.keyHints = it; showMain() }
+        toggle(col, str(R.string.marquee), Prefs.marquee, str(R.string.marquee_sub)) { Prefs.marquee = it; showMain() }
         toggle(col, str(R.string.smooth_animations), Prefs.animations, str(R.string.turn_off_on_weak_boxes)) { Prefs.animations = it; Anim.on = it; showMain() }
         return first
     }

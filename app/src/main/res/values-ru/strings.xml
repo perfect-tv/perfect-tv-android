@@ -117,6 +117,8 @@
     <string name="on">Вкл.</string>
     <string name="off">Выкл.</string>
     <string name="turn_off_on_weak_boxes">выключить на слабых приставках</string>
+    <string name="marquee">Бегущая строка</string>
+    <string name="marquee_sub">выделенное название, которое не влезает, прокручивается (выключено — обрезается «…»)</string>
     <string name="start_with_the_last_channel">Запускать последний канал</string>
     <string name="off_the_guide_opens_on_start">выключено — при запуске открывается гид</string>
     <string name="adaptive_sorting">Адаптивная сортировка</string>

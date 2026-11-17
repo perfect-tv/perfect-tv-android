@@ -68,7 +68,7 @@ class InfoPanel(val view: View) {
     private val chName: TextView = view.findViewById(R.id.info_channel)
     private val badges: TextView = view.findViewById(R.id.info_badges)
     private val clock: TextView = view.findViewById(R.id.info_clock)
-    private val title: TextView = view.findViewById(R.id.info_title)
+    private val title: MarqueeTextView = view.findViewById(R.id.info_title)
     private val timeStart: TextView = view.findViewById(R.id.info_start)
     private val timeEnd: TextView = view.findViewById(R.id.info_end)
     private val bar: InfoBar = view.findViewById(R.id.info_bar)

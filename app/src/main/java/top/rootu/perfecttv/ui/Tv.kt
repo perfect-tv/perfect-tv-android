@@ -265,6 +265,9 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (playlist?.id != p.id) return
         playlist = p
         if (err != null) {
+            // просматриваемый плейлист (видео играет от другого) не загрузился — без окна ошибки:
+            // список пуст, выбрать другой плейлист или «Назад» (вернётся прежний)
+            if (previewOrigin != null) return toast.show(str(R.string.the_playlist_did_not_load) + ": " + errorText(err))
             if ((catalog?.channels?.size ?: 0) == 0) return showError(err)
             toast.show(str(R.string.the_playlist_was_not_updated) + errorText(err))
             return
@@ -272,9 +275,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val cur = state.channel
         catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         // тот же канал в новом каталоге (по ключу)
-        cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
+        // при просмотре чужого плейлиста играющий канал — из другого каталога, не подменять
+        if (previewOrigin == null) cur?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         if (layers.contains(guide)) guide.reload()
-        if (state.channel == null) startFromLast()
+        if (state.channel == null && previewOrigin == null) startFromLast()
     }
 
     /**
@@ -475,7 +479,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false, unlocked: Boolean = false) {
         // блокировка: заблокированный канал или категория — только с PIN; играющий повторно не спрашиваем
         // из закрытого канала, открытого по PIN, в другой закрытый — PIN уже вводили, не спрашиваем
-        if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && !sessionUnlocked(ch) && !pinPassed) {
+        // PIN-состояние (сессия, «PIN действует») относится к играющему плейлисту: при выборе канала
+        // из просматриваемого другого плейлиста оно не переносится
+        val foreign = previewOrigin != null
+        if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && (foreign || (!sessionUnlocked(ch) && !pinPassed))) {
             main.removeCallbacks(switchRun)
             pending = null
             val dir = switchDirection
@@ -492,7 +499,15 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         main.removeCallbacks(switchRun)
         pending = null
         // канал выбран в просматриваемом плейлисте — он становится открытым
-        if (previewOrigin != null) { previewOrigin = null; playlist?.let { Prefs.lastPlaylist = it.id } }
+        if (foreign) {
+            previewOrigin = null
+            playlist?.let { Prefs.lastPlaylist = it.id }
+            unlockedKeys.clear()
+            pinPassed = false
+            beforeLocked = null
+            historyBeforeLocked = null
+            if (unlocked && !Prefs.pinEveryTime) { unlockedKeys.add(ch.key); unlockedKeys.add("g:" + ch.groupKey) }
+        }
         // PIN «действует», пока смотрим закрытые каналы подряд; открытый канал — сброс. Канал,
         // который заблокировали прямо во время просмотра, PIN не открывал — флаг не ставится.
         if (ch !== state.channel) {
@@ -1690,7 +1705,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             onSelect = { it ->
                 remove(layer!!)
                 val p = list.first { p -> p.id.toString() == it.action }
-                if (p.id != playlist?.id) switchPlaylist(p)
+                if (p.id != playlist?.id) pickPlaylist(p)
             }, onBack = { remove(layer!!) }, start = list.indexOfFirst { it.id == playlist?.id })
         push(layer)
     }
@@ -1718,6 +1733,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
      */
     fun previewPlaylist(p: Playlist) {
         if (p.id == playlist?.id) return
+        // вернулись к играющему плейлисту — это отмена просмотра
+        if (p.id == previewOrigin?.id) { revertPlaylistPreview(); return }
         if (previewOrigin == null) previewOrigin = playlist
         playlist = p
         val cat = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
@@ -1735,6 +1752,22 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         catalog = repo.loadCatalog(p, str(R.string.favourites), str(R.string.all_channels))
         state.channel?.let { c -> catalog?.byKey?.get(c.key)?.let { state.channel = it } }
         return true
+    }
+
+    /**
+     * Пользователь выбрал другой плейлист (меню). Что-то играет — оно продолжает играть, пока не
+     * выберут канал: открывается гид с каналами нового плейлиста ([previewPlaylist]). Не играет
+     * ничего — обычная смена ([switchPlaylist]).
+     */
+    fun pickPlaylist(p: Playlist) {
+        if (!hasVideo()) return switchPlaylist(p)
+        previewPlaylist(p)
+        info.hide()
+        if (!layers.contains(guide)) {
+            layers.toList().forEach { remove(it) }
+            push(guide)
+        } else layers.toList().reversed().forEach { if (it !== guide) remove(it) }
+        guide.open(null, null)
     }
 
     fun switchPlaylist(p: Playlist) {

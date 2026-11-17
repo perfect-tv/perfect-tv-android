@@ -137,6 +137,8 @@ class TvActivity : Activity() {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_FIRST, true))
             return
         }
+        // не выбранный до конца просмотр другого плейлиста отменяется: открыт тот, что играл
+        t.revertPlaylistPreview()
         val p = list.firstOrNull { it.id == Prefs.lastPlaylist } ?: list[0]
         if (t.playlist?.id != p.id || t.catalog == null) t.switchPlaylist(p)
         else {

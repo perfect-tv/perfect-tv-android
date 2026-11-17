@@ -562,6 +562,14 @@ class GuideLayer(private val tv: Tv) : Layer {
     @SuppressLint("ViewConstructor")
     private inner class GuideView(context: Context) : View(context) {
         private val em = U.em
+        /** Бегущие строки выделенных строк: слоты: 0 — канал, 1 — передача, 2 — ячейка сетки, 3 — заголовок шапки */
+        private val marq = Marquee(this)
+
+        override fun onDetachedFromWindow() {
+            marq.stop()
+            super.onDetachedFromWindow()
+        }
+
         // текст — не мельче 1,1 em (11 sp): docs/design.md, «Масштаб»
         private val pTitle = U.paint(1.8f, bold = true)
         private val pChannel = U.paint(1.2f, U.wa(0.7f))
@@ -705,6 +713,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             drawBody(c, now)
             if (moved) c.restore()
+            marq.end()
         }
 
         private fun drawBody(c: Canvas, now: Long) {
@@ -968,7 +977,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val cell = if (listP != null) Cell(listP.start, listP.stop, listP) else Cells.at(tv.repo.programmes(ch), ref)
             val p = cell.program
             U.drawText(c, ch.title(), x, t + 0.6f * em, w, pChannel)
-            U.drawText(c, p?.title ?: str(R.string.no_programme), x, t + 2.35f * em, w, pTitle)
+            marq.draw(c, 3, Marquee.key(ch.key, cell.start), true, p?.title ?: str(R.string.no_programme), x, t + 2.35f * em, w, pTitle)
             U.drawText(c, Fmt.dayTimeRange(cell.start, cell.end), x, t + 4.05f * em, w, pTime)
             val desc = p?.desc ?: ""
             if (desc.isNotEmpty()) {
@@ -993,7 +1002,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val x = padX + logoW + 1.2f * em
             val clockW = pClock.measureText("00:00") + em + closeW()
             val w = width - padX - x - clockW
-            U.drawText(c, ch.title(), x, t + 1.5f * em, w, pTitle)
+            marq.draw(c, 3, Marquee.key(ch.key), true, ch.title(), x, t + 1.5f * em, w, pTitle)
             val sub = ch.group + if (ch.hasArchive) " · " + str(R.string.archive_x_d, ch.archiveDays) else ""
             U.drawText(c, sub, x, t + 3.5f * em, w, pChannel)
         }
@@ -1116,7 +1125,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val locked = tv.catalog?.isLocked(ch) == true
             val isz = 1.5f * em
             val iw = ((if (fav) 1 else 0) + (if (ch.hasArchive) 1 else 0) + (if (locked) 1 else 0)) * (isz + 0.35f * em)
-            U.drawText(c, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
+            marq.draw(c, 0, Marquee.key(ch.key), chFocus, ch.name, x, cy, r - x - 0.8f * em - iw, pn)
             val ic = if (chFocus) U.BLACK else U.wa(0.7f)
             var ix = r - 0.8f * em
             if (ch.hasArchive) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ic); ix -= 0.35f * em }
@@ -1154,7 +1163,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 }
                 if (tw > em) {
                     pCell.color = if (isFocus) U.BLACK else if (isPast) U.wa(0.45f) else U.WHITE
-                    U.drawText(c, cell.title.ifEmpty { if (isFocus) Fmt.timeRange(cell.start, cell.end) else "" }, tl, cy, tw, pCell)
+                    marq.draw(c, 2, Marquee.key(ch.key, cell.start), isFocus, cell.title.ifEmpty { if (isFocus) Fmt.timeRange(cell.start, cell.end) else "" }, tl, cy, tw, pCell)
                 }
             }
         }
@@ -1267,7 +1276,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val tx = l + 5.4f * em
             val pt = if (live || playingArchive) pProgTitleBold else pProgTitle
             pt.color = fg
-            U.drawText(c, p.title, tx, cy, ix - tx - 0.3f * em, pt)
+            marq.draw(c, 1, Marquee.key(ch.key, p.start), pf, p.title, tx, cy, ix - tx - 0.3f * em, pt)
             if (tall) {
                 // шкала прогресса идущей передачи; у играющей архивной — янтарная, по времени кадра архива
                 val by = y + h - 0.95f * em

@@ -267,6 +267,11 @@ object Prefs {
         get() = bool("autoplay_last", true)
         set(v) = sp.edit().putBoolean("autoplay_last", v).apply()
 
+    /** Бегущая строка: выделенное название, не влезающее в ширину, прокручивается (иначе — «…») */
+    var marquee: Boolean
+        get() = bool("marquee", true)
+        set(v) = sp.edit().putBoolean("marquee", v).apply()
+
     /** Язык интерфейса: "" — системный, "ru", "en" */
     var language: String
         get() = sp.getString("language", "") ?: ""

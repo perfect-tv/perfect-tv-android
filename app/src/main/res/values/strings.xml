@@ -121,6 +121,8 @@
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="turn_off_on_weak_boxes">turn off on weak boxes</string>
+    <string name="marquee">Scrolling long titles</string>
+    <string name="marquee_sub">the selected title that does not fit scrolls (off — cut with “…”)</string>
     <string name="start_with_the_last_channel">Start with the last channel</string>
     <string name="off_the_guide_opens_on_start">off — the guide opens on start</string>
     <string name="adaptive_sorting">Adaptive sorting</string>
