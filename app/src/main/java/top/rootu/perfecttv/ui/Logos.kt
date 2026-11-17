@@ -278,16 +278,31 @@ object Logos {
     private val badgeBg = Color.argb(195, 26, 27, 28)
     private val badgePaint = U.paint(1f, U.wa(0.92f), bold = true)
 
+    private val badgePath = android.graphics.Path()
+    private val badgeRect = android.graphics.RectF()
+    private val badgeRadii = FloatArray(8)
+
+    /**
+     * Бейдж номера — вплотную к левому верхнему углу подложки: этот угол скруглён как у подложки, правый верхний
+     * и левый нижний — прямые, правый нижний скруглён (радиус подложки, не меньше четверти высоты бейджа).
+     */
     private fun drawBadge(c: Canvas, num: Int, l: Float, t: Float, h: Float, radius: Float) {
         val text = num.toString()
         badgePaint.textSize = maxOf(U.px(0.9f), h * 0.26f)
         val bh = badgePaint.textSize * 1.5f
         val bw = maxOf(bh * 1.2f, badgePaint.measureText(text) + badgePaint.textSize * 1.2f)
-        // бейдж отступает от угла подложки, радиус — вложенный: внешний минус отступ (но не острее четверти высоты)
-        val inset = minOf(radius * 0.5f, h * 0.06f).coerceAtLeast(U.px(0.15f))
-        val r = maxOf(radius - inset, bh * 0.25f)
-        U.roundRect(c, l + inset, t + inset, l + inset + bw, t + inset + bh, minOf(r, bh / 2), badgeBg)
-        c.drawText(text, l + inset + (bw - badgePaint.measureText(text)) / 2, t + inset + bh / 2 - (badgePaint.descent() + badgePaint.ascent()) / 2, badgePaint)
+        val tl = minOf(radius, bh / 2)
+        val br = radius.coerceIn(bh * 0.25f, bh / 2)
+        badgeRadii.fill(0f)
+        badgeRadii[0] = tl; badgeRadii[1] = tl
+        badgeRadii[4] = br; badgeRadii[5] = br
+        badgeRect.set(l, t, l + bw, t + bh)
+        badgePath.rewind()
+        badgePath.addRoundRect(badgeRect, badgeRadii, android.graphics.Path.Direction.CW)
+        U.fill.style = android.graphics.Paint.Style.FILL
+        U.fill.color = badgeBg
+        c.drawPath(badgePath, U.fill)
+        c.drawText(text, l + (bw - badgePaint.measureText(text)) / 2, t + bh / 2 - (badgePaint.descent() + badgePaint.ascent()) / 2, badgePaint)
     }
 
     /** Логотип для ImageView: перерисовывается, когда битмап загрузится */
