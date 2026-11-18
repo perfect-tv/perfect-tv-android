@@ -48,7 +48,7 @@ class Playback(context: Context) {
 
     /** Cookie провайдера на время одного запуска канала (см. [Cookies]) */
     private val cookies = Cookies()
-    private val http = OkHttpDataSource.Factory(Net.client.newBuilder().addNetworkInterceptor(cookies).build())
+    private val http = OkHttpDataSource.Factory(Net.client.newBuilder().cookieJar(cookies).build())
         .setUserAgent(Net.USER_AGENT)
     private val dataSource = http
 
