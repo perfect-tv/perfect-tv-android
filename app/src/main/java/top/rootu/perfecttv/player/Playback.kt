@@ -46,8 +46,24 @@ class Playback(context: Context) {
     private var userAgent = Net.USER_AGENT
     var listener: Listener? = null
 
-    private val dataSource = OkHttpDataSource.Factory(Net.client)
+    /** Cookie провайдера на время одного запуска канала (см. [Cookies]) */
+    private val cookies = Cookies()
+    private val http = OkHttpDataSource.Factory(Net.client.newBuilder().addNetworkInterceptor(cookies).build())
         .setUserAgent(Net.USER_AGENT)
+    private val dataSource = http
+
+    /** Источники данных: http(s) — OkHttp, udp / rtp — [UdpSources] */
+    private fun source(): DataSource = UdpSources.Factory(DataSource.Factory { dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource() }).createDataSource()
+
+    // мультикаст по Wi-Fi без этой блокировки отбрасывается прошивкой (по Ethernet не нужна)
+    private val multicastLock: android.net.wifi.WifiManager.MulticastLock? = try {
+        (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager)
+            ?.createMulticastLock("perfecttv-multicast")?.apply { setReferenceCounted(false) }
+    } catch (_: Exception) { null }
+
+    private fun multicast(on: Boolean) {
+        try { multicastLock?.let { if (on && !it.isHeld) it.acquire() else if (!on && it.isHeld) it.release() } } catch (_: Exception) {}
+    }
 
     // программный видеодекодер (поправка для потоков, у которых аппаратный зависает на первом кадре): при включённом
     // флаге программные декодеры идут в списке первыми; флаг читается при каждом запуске декодера
@@ -83,9 +99,7 @@ class Playback(context: Context) {
         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         .setEnableDecoderFallback(true)
         .setMediaCodecSelector(codecSelector))
-        .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory {
-            dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource()
-        }.setLoadErrorHandlingPolicy(loadPolicy))
+        .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory { source() }.setLoadErrorHandlingPolicy(loadPolicy))
         .setLoadControl(DefaultLoadControl.Builder()
             // быстрый старт после переключения канала; дальше буфер растёт как обычно
             .setBufferDurationsMs(15_000, 50_000, 1_000, 2_000)
@@ -104,7 +118,7 @@ class Playback(context: Context) {
      * без этого флага ExoPlayer не видит ни одного ключевого кадра — поток «висит» на буферизации или стоит
      * на первом кадре. Для обычных потоков (с IDR) разницы нет.
      */
-    private val hlsFactory = HlsMediaSource.Factory(DataSource.Factory { dataSource.setUserAgent(userAgent).setDefaultRequestProperties(headers).createDataSource() })
+    private val hlsFactory = HlsMediaSource.Factory(DataSource.Factory { source() })
         .setExtractorFactory(TeletextHlsExtractorFactory(tsFlags, teletext))
         .setLoadErrorHandlingPolicy(loadPolicy)
 
@@ -240,6 +254,8 @@ class Playback(context: Context) {
             }
         }
         headers = h
+        cookies.clear()
+        multicast(UdpSources.isUdp(url))
         val b = MediaItem.Builder().setUri(Uri.parse(url))
         (if (forceHls) MimeTypes.APPLICATION_M3U8 else mimeOf(url))?.let { b.setMimeType(it) }
         val live = MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(C.TIME_UNSET)
@@ -258,6 +274,7 @@ class Playback(context: Context) {
 
     fun stop() {
         player.stop()
+        multicast(false)
         stallCount = -1L
         stallTicks = 0
     }
@@ -436,6 +453,7 @@ class Playback(context: Context) {
 
     fun release() {
         main.removeCallbacksAndMessages(null)
+        multicast(false)
         player.release()
     }
 
