@@ -2,9 +2,10 @@
 <!-- Пункт меню канала: название, справа значение или «›» (подменю); выбранный — белый -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="26dp"
+    android:layout_height="30dp"
     android:background="@drawable/bg_row"
     android:clickable="true"
+    android:focusable="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="8dp"
@@ -18,7 +19,7 @@
         android:layout_weight="1"
         android:duplicateParentState="true"
         android:textColor="@color/text_sel"
-        android:textSize="13sp" />
+        android:textSize="14sp" />
 
     <TextView
         android:id="@+id/item_value"
@@ -29,5 +30,5 @@
         android:duplicateParentState="true"
         android:maxWidth="150dp"
         android:textColor="@color/text_sel_60"
-        android:textSize="12sp" />
+        android:textSize="13sp" />
 </LinearLayout>
