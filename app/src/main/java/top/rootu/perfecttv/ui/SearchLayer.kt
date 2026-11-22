@@ -16,6 +16,8 @@ import top.rootu.perfecttv.core.str
 import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Repo
 import java.util.concurrent.Executors
+import androidx.core.graphics.withClip
+import kotlin.math.abs
 
 /**
  * Поиск по каналам и программе (на Canvas, во весь экран). Слева — поле запроса, клавиатура
@@ -77,11 +79,11 @@ class SearchLayer(
 
     // ================================================================== клавиатура
 
-    private fun letters(l: Int): List<String> = when {
-        l == RU && Prefs.keyboardAbc -> listOf("абвгдеёжзий", "клмнопрстуф", "хцчшщъыьэюя")
-        l == RU -> listOf("йцукенгшщзх", "фывапролджэ", "ячсмитьбюъё")
-        l == EN && Prefs.keyboardAbc -> listOf("abcdefghijk", "lmnopqrstuv", "wxyz+',.?*;")
-        l == EN -> listOf("qwertyuiop+", "asdfghjkl';", "zxcvbnm,.?*")
+    private fun letters(l: Int): List<String> = when (l) {
+        RU if Prefs.keyboardAbc -> listOf("абвгдеёжзий", "клмнопрстуф", "хцчшщъыьэюя")
+        RU -> listOf("йцукенгшщзх", "фывапролджэ", "ячсмитьбюъё")
+        EN if Prefs.keyboardAbc -> listOf("abcdefghijk", "lmnopqrstuv", "wxyz+',.?*;")
+        EN -> listOf("qwertyuiop+", "asdfghjkl';", "zxcvbnm,.?*")
         else -> listOf("@#$%&()<>*\"", "_/\\:;+=?!,.")
     }
 
@@ -154,7 +156,7 @@ class SearchLayer(
         val plan = repo.searchPlan(channels())
         val now = Clock.now()
         worker.execute {
-            val hits = try { repo.searchProgrammes(plan, w, now) { g != gen } } catch (e: Exception) { emptyList() }
+            val hits = try { repo.searchProgrammes(plan, w, now) { g != gen } } catch (_: Exception) { emptyList() }
             main.post {
                 if (g != gen) return@post
                 found = hits
@@ -400,13 +402,25 @@ class SearchLayer(
             }
             // длинный запрос — виден его конец
             val tw = pQuery.measureText(query, 0, query.length)
-            val save = c.save()
-            c.clipRect(x, t, x + w + 0.5f * em, t + fieldH)
-            val tx = if (tw > w) x + w - tw else x
-            c.drawText(query, 0, query.length, tx, cy - (pQuery.descent() + pQuery.ascent()) / 2, pQuery)
-            U.fill.color = U.WHITE
-            c.drawRect(tx + tw + 0.15f * em, cy - 0.9f * em, tx + tw + 0.3f * em, cy + 0.9f * em, U.fill)
-            c.restoreToCount(save)
+            c.withClip(x, t, x + w + 0.5f * em, t + fieldH) {
+                val tx = if (tw > w) x + w - tw else x
+                c.drawText(
+                    query,
+                    0,
+                    query.length,
+                    tx,
+                    cy - (pQuery.descent() + pQuery.ascent()) / 2,
+                    pQuery
+                )
+                U.fill.color = U.WHITE
+                c.drawRect(
+                    tx + tw + 0.15f * em,
+                    cy - 0.9f * em,
+                    tx + tw + 0.3f * em,
+                    cy + 0.9f * em,
+                    U.fill
+                )
+            }
         }
 
         private fun stroke(color: Int, w: Float) {
@@ -434,12 +448,19 @@ class SearchLayer(
                     }
                     val fg = if (focus) U.BLACK else U.WHITE
                     val cy = y + keyH / 2
-                    if (k.action == DEL) drawDel(c, x + w / 2, cy, fg)
-                    else if (k.action == VOICE) drawMic(c, x + w / 2, cy, fg)
-                    else {
-                        val p = if (k.label.length > 1) pFn else pKey
-                        p.color = fg
-                        c.drawText(k.label, x + (w - p.measureText(k.label)) / 2, cy - (p.descent() + p.ascent()) / 2, p)
+                    when (k.action) {
+                        DEL -> drawDel(c, x + w / 2, cy, fg)
+                        VOICE -> drawMic(c, x + w / 2, cy, fg)
+                        else -> {
+                            val p = if (k.label.length > 1) pFn else pKey
+                            p.color = fg
+                            c.drawText(
+                                k.label,
+                                x + (w - p.measureText(k.label)) / 2,
+                                cy - (p.descent() + p.ascent()) / 2,
+                                p
+                            )
+                        }
                     }
                 }
                 y += keyH + gap
@@ -532,7 +553,7 @@ class SearchLayer(
                 total += h(items[i])
             }
             target = if (zone == Zone.RESULTS) (fy - vh / 2 + fh / 2).coerceIn(0f, maxOf(0f, total - vh)) else 0f
-            if (Anim.on && Math.abs(target - scroll) > 0.5f) {
+            if (Anim.on && abs(target - scroll) > 0.5f) {
                 scroll += (target - scroll) * 0.35f
                 postInvalidateOnAnimation()
             } else scroll = target

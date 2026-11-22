@@ -13,11 +13,16 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.toBitmap
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.ui.Logos
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
+import top.rootu.perfecttv.BuildConfig
+import kotlin.math.abs
 
 /**
  * Баннеры карточек главного экрана (16:9, [W] × [H]). Логотипы бывают квадратными, круглыми
@@ -31,7 +36,7 @@ import java.io.FileOutputStream
  * и передачи, готовый файл не рисуется заново.
  */
 object Posters {
-    const val AUTHORITY = "top.rootu.perfecttv.posters"
+    const val AUTHORITY = "${BuildConfig.APPLICATION_ID}.posters"
     const val W = 800
     const val H = 450
     /** Прямоугольник логотипа, ширина к высоте (как подложка логотипа в инфопанели: 96 × 66) */
@@ -40,11 +45,11 @@ object Posters {
 
     fun dir(context: Context) = File(context.cacheDir, "posters").also { it.mkdirs() }
 
-    fun uri(name: String): Uri = Uri.parse("content://$AUTHORITY/$name")
+    fun uri(name: String): Uri = "content://$AUTHORITY/$name".toUri()
 
     /** Имя файла баннера: канал + начало передачи; «a» — с картинкой передачи, «n» — без неё */
     private fun fileName(ch: Channel, p: Programme?, art: Boolean) =
-        "${ch.playlistId}_${Math.abs(ch.key.hashCode())}_${p?.start ?: 0}${if (art) "a" else "n"}.jpg"
+        "${ch.playlistId}_${abs(ch.key.hashCode())}_${p?.start ?: 0}${if (art) "a" else "n"}.jpg"
 
     /** Сколько живёт баннер после последней публикации: карточки обновляются при каждом уходе из приложения, дольше они лаунчеру не нужны */
     private const val TTL_MS = 24 * 3600_000L
@@ -107,7 +112,7 @@ object Posters {
                 val withIcon = File(dir(context), fileName(ch, p, true).replace("a.jpg", "i.jpg"))
                 if (withIcon.length() > 0) { touch(withIcon); return Made(uri(withIcon.name), withIcon.name) }
                 val art = fetchArt(context, imageUrl) ?: return appBanner(context)
-                val icon = context.getDrawable(R.drawable.icon)!!.toBitmap(256, 256)
+                val icon = AppCompatResources.getDrawable(context, R.drawable.icon)!!.toBitmap(256, 256)
                 return save(withIcon, render(art, icon))
             }
             val art = fetchArt(context, imageUrl)
@@ -134,8 +139,8 @@ object Posters {
     fun appBanner(context: Context): Made? {
         val file = File(dir(context), APP_BANNER)
         if (file.length() > 0) { touch(file); return Made(uri(APP_BANNER), APP_BANNER) }
-        val d = context.getDrawable(R.drawable.banner) ?: return null
-        val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val d = AppCompatResources.getDrawable(context, R.drawable.banner) ?: return null
+        val bm = createBitmap(W, H)
         d.setBounds(0, 0, W, H)
         d.draw(Canvas(bm))
         return save(file, bm)
@@ -153,7 +158,7 @@ object Posters {
 
     /** Баннер целиком (отдельная функция — чтобы рисование не зависело от сети) */
     fun render(art: Bitmap?, logo: Bitmap): Bitmap {
-        val bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val bm = createBitmap(W, H)
         val c = Canvas(bm)
         if (art == null) {
             // серый фон и логотип на нём — как «О передаче» в плеере

@@ -10,8 +10,8 @@
     <color name="fill_btn">#1FEBEBEB</color>      <!-- кнопка в окнах -->
     <color name="fill_now">#2BEBEBEB</color>      <!-- текущая передача -->
     <color name="fill_marked">#2EEBEBEB</color>   <!-- отмечено (играет), подложка шкалы -->
-    <color name="fill_playing">#4DEBEBEB</color>  <!-- играющая передача в окне программы и её дата: заметно светлее обычной подложки -->
-    <color name="fill_active">#38EBEBEB</color>   <!-- строка в фокусе вне активной зоны -->
+    <color name="fill_playing">#30EBEBEB</color>    <!-- играющая передача в окне программы -->
+    <color name="fill_active">#30EBEBEB</color>   <!-- строка в фокусе вне активной зоны -->
     <color name="line">#14EBEBEB</color>
     <color name="line_strong">#1AEBEBEB</color>  <!-- разделитель инфопанели и описания -->
     <!-- панели и окна -->

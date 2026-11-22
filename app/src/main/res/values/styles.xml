@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Текст и кнопки окон. Размер текста: 1 em = 10 sp -->
+<!-- Текст и кнопки окон. Размер текста: 1.2 em = 12 sp -->
 <resources>
     <style name="Text">
         <item name="android:textColor">@color/white</item>
