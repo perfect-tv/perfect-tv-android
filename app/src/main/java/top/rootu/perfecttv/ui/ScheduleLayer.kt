@@ -6,9 +6,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.widget.LinearLayout
 import android.view.View
 import top.rootu.perfecttv.data.Channel
+import androidx.core.graphics.withClip
+import kotlin.math.abs
 
 /**
  * Окно «Программа и архив» / «Напоминания» (виртуальный список на Canvas). Слева — вкладки дат
@@ -16,8 +19,8 @@ import top.rootu.perfecttv.data.Channel
  * что сделает OK). Вкладки видов «Программа» / «Напоминания · N» — кнопками в шапке окна справа
  * (view_pill.xml), фокус на них — → из списка; если вид один — без кнопок.
  *
- * Подсветка: белая заливка — только фокус (строка, вкладка даты или вида); рамкой — то, куда
- * вернётся фокус: дата строки, пока фокус в списке, и передача дня, пока фокус на датах; серым —
+ * Подсветка: белая заливка — только фокус (строка, вкладка даты или вида); серым — то, куда
+ * вернётся фокус: дата строки, пока фокус в списке, и передача дня, пока фокус на датах; рамкой —
  * играющая передача и её дата, открытый вид.
  */
 class ScheduleLayer(
@@ -339,16 +342,16 @@ class ScheduleLayer(
 
         override fun onDraw(c: Canvas) {
             // плавная прокрутка к цели
-            if (Math.abs(target - scrollY0) > 0.5f) {
+            if (abs(target - scrollY0) > 0.5f) {
                 scrollY0 += (target - scrollY0) * 0.35f
                 postInvalidateOnAnimation()
             } else scrollY0 = target
-            // рамка фокуса — к своей строке тем же шагом, что и прокрутка
+            // трекинг фокуса — к своей строке тем же шагом, что и прокрутка
             val fi = if (zone == Zone.LIST && index in rows.indices && !rows[index].separator) index else -1
             if (fi >= 0) {
                 val ty = top(fi)
                 val th = h(rows[fi])
-                if (!focusSet || !Anim.on || (Math.abs(ty - focusY) < 0.5f && Math.abs(th - focusH) < 0.5f)) {
+                if (!focusSet || !Anim.on || (abs(ty - focusY) < 0.5f && abs(th - focusH) < 0.5f)) {
                     focusY = ty; focusH = th; focusSet = true
                 } else {
                     focusY += (ty - focusY) * 0.35f
@@ -366,7 +369,7 @@ class ScheduleLayer(
                 val save = Fade.begin(c, listL, 0f, listR, height.toFloat())
                 var y = -scrollY0
                 val focusDay: Long? = null
-                // фокус на датах: рамкой — передача, на которую он перейдёт по →
+                // фокус на датах: серым — передача, на которую он перейдёт по →
                 val frame = if (zone == Zone.TABS) tabs.getOrNull(tabIndex)?.let { dayTarget(it.day) } ?: -1 else -1
                 val rl = listL + 0.7f * em
                 val rr = listR - 0.7f * em
@@ -374,13 +377,9 @@ class ScheduleLayer(
                     val r = rows[i]
                     val rh = h(r)
                     if (y + rh >= 0 && y <= height) drawRow(c, r, rl, rr, y, rh, focusDay, false)
-                    if (i == frame) {
-                        val sw = 0.15f * em
-                        U.fill.style = android.graphics.Paint.Style.STROKE
-                        U.fill.strokeWidth = sw
-                        U.fill.color = U.wa(0.8f)
-                        c.drawRoundRect(rl + sw / 2, y + sw / 2, rr - sw / 2, y + rh - sw / 2, 0.5f * em, 0.5f * em, U.fill)
-                        U.fill.style = android.graphics.Paint.Style.FILL
+                    if (i == frame && !rows[i].playing) {
+                        // серая подложка
+                        U.roundRect(c, rl, y, rr, y + rh, U.px(U.RADIUS_S), U.FILL_ACTIVE)
                     }
                     y += rh
                     if (y > height) break
@@ -389,17 +388,17 @@ class ScheduleLayer(
                 if (fi >= 0) {
                     val ft = focusY - scrollY0
                     U.roundRect(c, rl, ft, rr, ft + focusH, 0.5f * em, U.WHITE)
-                    val clip = c.save()
-                    c.clipRect(rl, ft, rr, ft + focusH)
-                    y = -scrollY0
-                    for (i in rows.indices) {
-                        val r = rows[i]
-                        val rh = h(r)
-                        if (!r.separator && y + rh > ft && y < ft + focusH) drawRow(c, r, rl, rr, y, rh, focusDay, true)
-                        y += rh
-                        if (y > ft + focusH) break
+                    c.withClip(rl, ft, rr, ft + focusH) {
+                        y = -scrollY0
+                        for (i in rows.indices) {
+                            val r = rows[i]
+                            val rh = h(r)
+                            if (!r.separator && y + rh > ft && y < ft + focusH)
+                                drawRow(c, r, rl, rr, y, rh, focusDay, true)
+                            y += rh
+                            if (y > ft + focusH) break
+                        }
                     }
-                    c.restoreToCount(clip)
                 }
                 // затемнение: сверху — если прокручено, снизу — если ниже ещё есть строки
                 val fl = Fade.length
@@ -469,7 +468,12 @@ class ScheduleLayer(
                 U.drawText(c, r.title, l + 0.8f * em, y + rh - 0.95f * em, rr - l, pSep)
                 return
             }
-            if (!focus && r.playing) U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_PLAYING)
+            if (!focus && r.playing) {
+                // фон
+                U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_PLAYING)
+                // рамка
+                outline(c, l, y, rr, y + rh,0.5f * em ) // U.px(U.RADIUS_S)
+            }
             val fg = if (focus) U.BLACK else U.WHITE
             val cy = y + rh / 2
             var x = l + 0.8f * em
@@ -484,57 +488,70 @@ class ScheduleLayer(
             if (r.channel == null) {
                 // уголок рисуем линиями, а не символом шрифта: по вертикали он точно в центре строки
                 val s = 0.27f * em
-                U.fill.style = android.graphics.Paint.Style.STROKE
+                U.fill.style = Paint.Style.STROKE
                 U.fill.strokeWidth = 0.11f * em
-                U.fill.strokeCap = android.graphics.Paint.Cap.ROUND
+                U.fill.strokeCap = Paint.Cap.ROUND
                 U.fill.color = if (focus) U.BLACK else U.wa(0.5f)
                 c.drawLine(x, cy - s, x + s, cy, U.fill)
                 c.drawLine(x + s, cy, x, cy + s, U.fill)
-                U.fill.style = android.graphics.Paint.Style.FILL
-                U.fill.strokeCap = android.graphics.Paint.Cap.BUTT
+                U.fill.style = Paint.Style.FILL
+                U.fill.strokeCap = Paint.Cap.BUTT
                 x += 1.1f * em
             }
             val isz = 1.7f * em
-            val nIcons = (if (r.playing) 1 else 0) + (if (r.remind) 1 else 0) + (if (r.archive && !r.live) 1 else 0)
-            val liveW = if (r.live) pLive.measureText("LIVE") + 2f * LIVE_PAD + 0.2f * em else 0f
-            val iw = nIcons * (isz + 0.5f * em) + liveW + (if (r.playing && r.live) 0.3f * em else 0f)
+            val liveText = context.getString(R.string.live) // .uppercase(getDefault())
+            val pad = LIVE_PAD * em
+            val lw = if (r.live) pLive.measureText(liveText) else 0f
+            // что реально рисуется справа, слева направо (как считаем ширину)
+            val showPlay = r.playing && !r.live
+            val showArchive = r.archive && !r.live
+            val showRemind = r.remind
+            // суммарная ширина блока значков/бейджа + межэлементные отступы
+            var iw = 0f
+            if (showPlay) iw += isz
+            if (showRemind) iw += isz // + 0.5f * em
+            if (showArchive) iw += isz // + 0.5f * em
+            if (r.live) {
+                if (iw > 0f) iw += 0.4f * em // отступ между бейджем и значками
+                iw += lw + 2f * pad
+            }
             val p = if (r.live || r.playing) pTitleBold else pTitle
             p.color = color
+            // правый отступ под значки (absolute x)
+            val titleRight = rr - 0.8f * em - iw - (if (iw > 0f) 0.8f * em else 0f)
+            // ширина доступная названию передачи — зависит от titleRight
+            val avail = (titleRight - x).coerceAtLeast(0f)
             if (r.sub.isNotEmpty()) {
-                U.drawText(c, r.title, x, cy - 0.85f * em, rr - x - iw - 0.8f * em, p)
+                U.drawText(c, r.title, x, cy - 0.85f * em, avail, p)
                 pSub.color = if (focus) U.BLACK else U.wa(0.6f)
-                U.drawText(c, r.sub, x, cy + 1f * em, rr - x - iw - 0.8f * em, pSub)
-            } else U.drawText(c, r.title, x, cy, rr - x - iw - 0.8f * em, p)
-            // идущая передача: тонкая шкала под названием (в эфире — красная)
+                U.drawText(c, r.sub, x, cy + 1f * em, avail, pSub)
+            } else U.drawText(c, r.title, x, cy, avail, p)
+            // прогресс под названием
             if (r.progress >= 0f) {
-                val bw = rr - x - iw - 0.8f * em
                 val by = y + rh - 0.45f * em
-                U.roundRect(c, x, by, x + bw, by + 0.2f * em, 0.1f * em, if (focus) 0x33000000 else U.FILL_MARKED)
-                U.roundRect(c, x, by, x + bw * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.WHITE)
+                U.roundRect(c, x, by, x + avail, by + 0.2f * em, 0.1f * em, if (focus) 0x33000000 else U.FILL_MARKED)
+                U.roundRect(c, x, by, x + avail * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.WHITE)
             }
+            // draw
             var ix = rr - 0.8f * em
             if (r.live) {
-                pLive.color = fg
-                val lw = pLive.measureText("LIVE")
-                val pad = LIVE_PAD * em
+                pLive.color = if (r.playing) U.LIVE else fg
                 ix -= lw + pad
-                U.fill.style = android.graphics.Paint.Style.STROKE
+                U.fill.style = Paint.Style.STROKE
                 U.fill.strokeWidth = 0.12f * em
-                U.fill.color = fg
+                U.fill.color = if (r.playing) U.LIVE else fg
                 c.drawRoundRect(ix - pad, cy - 0.85f * em, ix + lw + pad, cy + 0.85f * em, 0.3f * em, 0.3f * em, U.fill)
-                U.fill.style = android.graphics.Paint.Style.FILL
-                c.drawText("LIVE", ix, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
+                U.fill.style = Paint.Style.FILL
+                c.drawText(liveText, ix, cy - (pLive.descent() + pLive.ascent()) / 2, pLive)
                 ix -= pad + 0.4f * em
             }
-            val ic = if (focus) U.BLACK else U.wa(0.8f)
-            // значки архива и напоминания — без цвета: белые, в белой строке фокуса — чёрные
-            val ia = ic
-            if (r.archive && !r.live) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
-            if (r.remind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
-            if (r.playing) {
-                // треугольник занимает 14/24 высоты значка: рисуем крупнее, чтобы он был ростом с рамку LIVE (1,7 em)
-                val ps = 2.8f * em
-                Icons.draw(c, Icons.Kind.PLAY, ix - ps * 19 / 24, cy - ps / 2, ps, ic)
+            val ia = if (focus) U.BLACK else U.wa(0.8f)
+            val ip = if (r.live) U.LIVE else U.ARCHIVE
+            if (showArchive) { ix -= isz; Icons.draw(c, Icons.Kind.ARCHIVE, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
+            if (showRemind) { ix -= isz; Icons.draw(c, Icons.Kind.REMIND, ix, cy - isz / 2, isz, ia); ix -= 0.5f * em }
+            if (showPlay) {
+                val ps = 2.0f * em
+                Icons.draw(c, Icons.Kind.PLAY, ix - ps * 19 / 24, cy - ps / 2, ps, ip)
             }
         }
 
@@ -560,20 +577,16 @@ class ScheduleLayer(
                 if (y + th < 0 || y > height) continue
                 val focus = zone == Zone.TABS && k == tabIndex
                 val active = t.day == activeDay
-                // фокус — белая заливка; день строки в фокусе списка — только рамка (фокус не здесь)
+                // фокус — белая заливка; день строки в фокусе списка — без рамки (фокус не здесь)
                 val bg = when {
                     focus -> U.WHITE
-                    t.day == playing -> U.FILL_PLAYING
+                    active -> U.FILL_ACTIVE
+                    // t.day == playing -> U.FILL_PLAYING
                     else -> 0
                 }
                 if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S), bg)
-                if (active) {
-                    val sw = 0.15f * em
-                    U.fill.style = android.graphics.Paint.Style.STROKE
-                    U.fill.strokeWidth = sw
-                    U.fill.color = U.wa(0.8f)
-                    c.drawRoundRect(l + 0.5f * em + sw / 2, y + sw / 2, w - 0.6f * em - sw / 2, y + th - sw / 2, U.px(U.RADIUS_S), U.px(U.RADIUS_S), U.fill)
-                    U.fill.style = android.graphics.Paint.Style.FILL
+                if (t.day == playing) { // active
+                    outline(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S))
                 }
                 val p = if (focus || active) pTabBold else pTab
                 p.color = if (focus) U.BLACK else if (active || t.day == playing) U.WHITE else U.wa(0.7f)
@@ -619,6 +632,15 @@ class ScheduleLayer(
             target = (target + dy).coerceIn(0f, maxOf(0f, total() - height))
             scrollY0 = target
             invalidate()
+        }
+
+        private fun outline(c: Canvas, l: Float, t: Float, r: Float, b: Float, rad: Float = U.px(U.RADIUS_S)) {
+            val sw = 0.12f * em
+            U.fill.style = Paint.Style.STROKE
+            U.fill.strokeWidth = sw
+            U.fill.color = U.wa(0.25f)
+            c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, rad, rad, U.fill)
+            U.fill.style = Paint.Style.FILL
         }
 
         @SuppressLint("ClickableViewAccessibility")
