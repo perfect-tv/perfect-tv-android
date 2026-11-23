@@ -908,13 +908,13 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var hintList: List<Pair<String, String>> = emptyList()
 
         private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
-            Zone.PLAYLISTS -> listOf("↑ ↓" to str(R.string.hint_playlist), "→" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
-            Zone.CATS -> listOf("↑ ↓" to str(R.string.category), "→" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
-            Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_to_channels), "→" to str(R.string.hint_dates), "↑ ↓" to str(R.string.hint_programme_pick))
-            Zone.DATES -> listOf("↑ ↓" to str(R.string.hint_date), "←" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))
-            Zone.GRID -> listOf("OK" to str(R.string.about), "← →" to str(R.string.hint_programmes), str(R.string.key_back) to str(R.string.hint_to_channels))
-            Zone.CHANNELS -> listOf("OK" to str(R.string.watch), "←" to str(R.string.hint_categories),
-                "→" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
+            Zone.PLAYLISTS -> listOf("▲ ▼" to str(R.string.hint_playlist), "▶︎" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
+            Zone.CATS -> listOf("▲ ▼" to str(R.string.category), "▶︎" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
+            Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "◀︎" to str(R.string.hint_to_channels), "▶︎" to str(R.string.hint_dates), "▲ ▼" to str(R.string.hint_programme_pick))
+            Zone.DATES -> listOf("▲ ▼" to str(R.string.hint_date), "◀︎" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))
+            Zone.GRID -> listOf("OK" to str(R.string.about), "◀︎  ▶︎" to str(R.string.hint_programmes), str(R.string.key_back) to str(R.string.hint_to_channels))
+            Zone.CHANNELS -> listOf("OK" to str(R.string.watch), "◀︎" to str(R.string.hint_categories),
+                "▶︎" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
         }
 
         /** Подсказки клавиш под списком: клавиша в рамке и действие */

@@ -19,6 +19,11 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Programme
+import kotlin.math.roundToInt
+import androidx.core.view.isNotEmpty
+import androidx.core.view.isVisible
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Инфопанель внизу экрана (info_panel.xml): затемнение во всю ширину, логотип, канал, бейджи,
@@ -90,14 +95,14 @@ class InfoPanel(val view: View) {
         // интерфейса): картинка 25% (16:9), «Далее на канале» 27%, остальное — описание
         val dm = view.resources.displayMetrics
         val cw = dm.widthPixels - 2 * view.resources.getDimensionPixelSize(R.dimen.screen_pad)
-        banner.layoutParams.width = Math.round(cw * 0.25f)
-        banner.layoutParams.height = Math.round(cw * 0.25f * 9 / 16)
-        upnext.layoutParams.width = Math.round(cw * 0.27f)
+        banner.layoutParams.width = (cw * 0.25f).roundToInt()
+        banner.layoutParams.height = (cw * 0.25f * 9 / 16).roundToInt()
+        upnext.layoutParams.width = (cw * 0.27f).roundToInt()
         // описание не выше картинки: строк столько, сколько помещается рядом с одной строкой тегов
         // (число зависит от размера интерфейса, высота панели не прыгает от длины текста)
         moreTags.isSingleLine = true
         moreTags.ellipsize = android.text.TextUtils.TruncateAt.END
-        val gap = Math.round(6 * dm.density)
+        val gap = (6 * dm.density).roundToInt()
         moreText.maxLines = maxOf(2, ((banner.layoutParams.height - moreTags.lineHeight - gap) / moreText.lineHeight))
         if (U.touch) {
             // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
@@ -144,7 +149,7 @@ class InfoPanel(val view: View) {
         })
         if (m.seek != null) {
             val diff = m.seek - Clock.now()
-            set(seekBubble, hhmmss(m.seek) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(Math.abs(diff)))
+            set(seekBubble, hhmmss(m.seek) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(abs(diff)))
             seekAt = f(m.seek)
             placeSeek()
             next.visibility = View.INVISIBLE
@@ -216,7 +221,7 @@ class InfoPanel(val view: View) {
         U.show(hints, show)
         if (!show) return
         val key = "$hintArchive$hintPaused$more"
-        if (key == hintsKey && hints.childCount > 0) return
+        if (key == hintsKey && hints.isNotEmpty()) return
         hintsKey = key
         hints.removeAllViews()
         val inflater = android.view.LayoutInflater.from(view.context)
@@ -227,11 +232,11 @@ class InfoPanel(val view: View) {
             hints.addView(v)
         }
         hint("OK", str(if (hintPaused) R.string.hint_resume else R.string.hint_pause))
-        if (more) hint("↑", str(R.string.hint_collapse)) else {
-            hint("↓", str(R.string.about))
-            hint("↑", str(R.string.close))
+        if (more) hint("▲", str(R.string.hint_collapse)) else {
+            hint("▼", str(R.string.about))
+            hint("▲", str(R.string.close))
         }
-        hint("←  →", str(if (hintArchive) R.string.hint_seek else R.string.hint_channel))
+        hint("◀︎  ▶︎", str(if (hintArchive) R.string.hint_seek else R.string.hint_channel))
         hint(str(R.string.key_hold_ok), str(R.string.menu))
     }
 
@@ -240,7 +245,7 @@ class InfoPanel(val view: View) {
         fun badge(text: String, bg: Int, fg: Int = U.WHITE, icon: Int = BadgeSpan.NONE) {
             if (sb.isNotEmpty()) sb.append(" ")
             val s = sb.length
-            sb.append(if (text.isEmpty()) " " else text)
+            sb.append(text.ifEmpty { " " })
             sb.setSpan(BadgeSpan(bg, fg, icon), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         if (m.error) badge(str(R.string.error), U.LIVE)
@@ -284,7 +289,7 @@ class InfoPanel(val view: View) {
             val cap = capHeight(paint)
             val tw = if (icon == PAUSE) 0f else paint.measureText(text, start, end)
             val iw = iconWidth(cap) + if (icon == HISTORY) cap * 0.4f else 0f
-            return Math.round(tw + iw + 2 * padH + gap)
+            return (tw + iw + 2 * padH + gap).roundToInt()
         }
 
         override fun draw(c: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: android.graphics.Paint) {
@@ -389,7 +394,7 @@ class InfoPanel(val view: View) {
         moreAnim?.cancel()
         moreAnim = null
         val lp = moreBox.layoutParams
-        val shown = moreBox.visibility == View.VISIBLE
+        val shown = moreBox.isVisible
         if (!Anim.on || !visible || view.width == 0) {
             lp.height = LinearLayout.LayoutParams.WRAP_CONTENT
             moreBox.alpha = 1f
@@ -411,7 +416,7 @@ class InfoPanel(val view: View) {
         anim.interpolator = android.view.animation.DecelerateInterpolator()
         anim.addUpdateListener {
             val f = it.animatedValue as Float
-            lp.height = Math.round(from + (to - from) * f)
+            lp.height = (from + (to - from) * f).roundToInt()
             moreBox.alpha = a0 + ((if (show) 1f else 0f) - a0) * minOf(1f, f * 1.25f)
             moreBox.requestLayout()
         }
@@ -471,7 +476,7 @@ class InfoPanel(val view: View) {
 private class Scrim(private val fade: Float, private val color: Int) : android.graphics.drawable.Drawable() {
     private val paint = android.graphics.Paint()
 
-    private fun c(k: Float) = (color and 0xFFFFFF) or (Math.round(android.graphics.Color.alpha(color) * k) shl 24)
+    private fun c(k: Float) = (color and 0xFFFFFF) or ((android.graphics.Color.alpha(color) * k).roundToInt() shl 24)
 
     override fun onBoundsChange(b: android.graphics.Rect) {
         val h = b.height().toFloat()

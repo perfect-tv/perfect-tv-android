@@ -616,11 +616,11 @@ class SearchLayer(
                 hintZone = zone
                 val ok = "OK"
                 hintList = when (zone) {
-                    Zone.KEYS -> listOf(ok to str(R.string.hint_type), "→" to str(R.string.hint_results), "↓" to str(R.string.queries),
+                    Zone.KEYS -> listOf(ok to str(R.string.hint_type), "▶︎" to str(R.string.hint_results), "▼" to str(R.string.queries),
                         str(R.string.key_hold_ok) to str(R.string.hint_clear_field))
-                    Zone.MIC -> listOf(ok to str(R.string.hint_voice), "↓" to str(R.string.hint_keyboard))
-                    Zone.QUERIES -> listOf(ok to str(R.string.hint_use_query), str(R.string.key_hold_ok) to str(R.string.hint_forget_query), "↑" to str(R.string.hint_keyboard))
-                    Zone.RESULTS -> listOf(ok to str(R.string.watch), str(R.string.key_hold_ok) to str(R.string.hint_programme), "←" to str(R.string.hint_keyboard))
+                    Zone.MIC -> listOf(ok to str(R.string.hint_voice), "▼" to str(R.string.hint_keyboard))
+                    Zone.QUERIES -> listOf(ok to str(R.string.hint_use_query), str(R.string.key_hold_ok) to str(R.string.hint_forget_query), "▲" to str(R.string.hint_keyboard))
+                    Zone.RESULTS -> listOf(ok to str(R.string.watch), str(R.string.key_hold_ok) to str(R.string.hint_programme), "◀︎" to str(R.string.hint_keyboard))
                 }
             }
             val cy = height - padY - 0.8f * em
