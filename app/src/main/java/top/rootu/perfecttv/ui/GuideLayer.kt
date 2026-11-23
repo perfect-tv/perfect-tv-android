@@ -925,7 +925,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 hintList = hintsFor(zone)
                 catsTitle = str(R.string.search)
             }
-            val cy = height - padBottom - 0.8f * em
+            val cy = height - padBottom - 0.8f * em // hintsBase
             var x = padX
             for ((key, action) in hintList) {
                 val kw = maxOf(2f * em, Keycap.width(key, pHintKey) + em)
@@ -1195,7 +1195,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val pTabBold = U.paint(1.25f, bold = true)
         private var plScroll = 0f
 
-        private val listBottom get() = height - padBottom - hintsH
+        private val listBottom get() = height - padBottom - hintsH - 1.0f * em // 1.0f * em - list gap to hints
 
         private fun progH(p: Programme, now: Long) = if ((p.start <= now && now < p.stop) || (archNow >= 0 && p.start <= archNow && archNow < p.stop)) rowH + 0.9f * em else rowH
 
@@ -1228,7 +1228,10 @@ class GuideLayer(private val tv: Tv) : Layer {
                 plScroll += (target - plScroll) * 0.35f
                 postInvalidateOnAnimation()
             } else plScroll = target
+
             val save = Fade.begin(c, l, top, r, bottom)
+            c.save()
+            c.clipRect(l, top, r, bottom)
             var y = top - plScroll
             for (i in rows.indices) {
                 val h = progH(rows[i], now)
@@ -1236,6 +1239,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 y += h + gap
                 if (y > bottom) break
             }
+            c.restore()
             Fade.end(c, save, l, top, r, bottom, plScroll / Fade.length, (total - viewH - plScroll) / Fade.length)
         }
 
@@ -1320,7 +1324,10 @@ class GuideLayer(private val tv: Tv) : Layer {
             else days.indexOf(dayOf(if (zone == Zone.CHANNELS) liveIndex() else plIndex.coerceIn(0, plRows.size - 1))).coerceAtLeast(0)
             val viewH = bottom - top
             val off = (cur * step - viewH / 2 + th / 2).coerceIn(0f, maxOf(0f, days.size * step - viewH))
+
             val save = Fade.begin(c, l, top, r, bottom)
+            c.save()
+            c.clipRect(l, top, r, bottom)
             for (k in days.indices) {
                 val y = top + k * step - off
                 if (y + th < top || y > bottom) continue
@@ -1336,6 +1343,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 c.drawText(a, (l + r - p.measureText(a)) / 2, y + th / 2 - 0.6f * em - (p.descent() + p.ascent()) / 2, p)
                 c.drawText(b, (l + r - p.measureText(b)) / 2, y + th / 2 + 0.75f * em - (p.descent() + p.ascent()) / 2, p)
             }
+            c.restore()
             Fade.end(c, save, l, top, r, bottom, off / Fade.length, (days.size * step - viewH - off) / Fade.length)
         }
 
