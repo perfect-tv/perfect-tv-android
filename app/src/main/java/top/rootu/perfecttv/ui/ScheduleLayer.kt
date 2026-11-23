@@ -638,7 +638,7 @@ class ScheduleLayer(
             val sw = 0.12f * em
             U.fill.style = Paint.Style.STROKE
             U.fill.strokeWidth = sw
-            U.fill.color = U.wa(0.25f)
+            U.fill.color = U.wa(0.5f)
             c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, rad, rad, U.fill)
             U.fill.style = Paint.Style.FILL
         }

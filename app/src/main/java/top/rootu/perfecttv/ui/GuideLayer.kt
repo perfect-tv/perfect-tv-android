@@ -655,7 +655,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         // вид «Список»: rail 0 — каналы целиком, 1 — колонка логотипов и панель передачи справа
         private var rail = 0f
         private val contentW get() = width - 2 * padX
-        private val railW get() = 5.6f * em
+        private val railW get() = 4.9f * em // 4.3f + 0.3f * 2
         private val datesW get() = 5.4f * em
         private val panelFullW get() = contentW * 0.30f
         private val chW get() = (contentW * 0.30f).let { full -> if (grid) full else full + (railW - full) * rail }
@@ -1114,14 +1114,14 @@ class GuideLayer(private val tv: Tv) : Layer {
             val bg = if (chFocus) U.WHITE else if (focus) U.FILL_ACTIVE else U.FILL
             U.roundRect(c, l, y, r, y + rowH, U.px(U.RADIUS_S), bg)
             // фокус ушёл в программу или на даты — канал остаётся обведённым: сюда он вернётся
-            // if (focus && !chFocus && !grid && (zone == Zone.PROGRAMS || zone == Zone.DATES)) outline(c, l, y, r, y + rowH, U.px(U.RADIUS_S))
+            if (focus && !chFocus && !grid && rail == 1.0f && (zone == Zone.PROGRAMS || zone == Zone.DATES)) outline(c, l, y, r, y + rowH, U.px(U.RADIUS_S))
             val fg = if (chFocus) U.BLACK else U.WHITE
             val cy = y + rowH / 2
-            var x = l + 0.35f * em
+            var x = l + 0.3f * em // левый отступ logo
             Logos.draw(c, context, ch, x, y + 0.25f * em, x + 4.3f * em, y + rowH - 0.25f * em, plate = chFocus, corner = U.px(U.RADIUS) - 0.25f * em) { invalidate() }
             // колонка логотипов (выехало описание): только логотип
             if (!grid && r - l < 10f * em) return
-            x += 4.3f * em + 0.7f * em
+            x += 4.3f * em + 0.5f * em
             // колонка номеров — только в режиме «рядом с названием»
             if (Prefs.numberMode == Prefs.NUMBER_NEAR_NAME) {
                 pNum.color = if (chFocus) U.BLACK else U.wa(0.5f)
@@ -1182,7 +1182,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val sw = 0.12f * em
             U.fill.style = Paint.Style.STROKE
             U.fill.strokeWidth = sw
-            U.fill.color = U.wa(0.25f)
+            U.fill.color = U.wa(0.5f)
             c.drawRoundRect(l + sw / 2, t + sw / 2, r - sw / 2, b - sw / 2, rad, rad, U.fill)
             U.fill.style = Paint.Style.FILL
         }
