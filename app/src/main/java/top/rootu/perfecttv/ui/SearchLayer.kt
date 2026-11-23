@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
+import android.view.MotionEvent
 import android.view.View
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.Clock
@@ -340,7 +341,7 @@ class SearchLayer(
         private val rowH = 3.3f * em
         private val headH = 2.7f * em
         private val sugH = 3f * em
-        private val hintsH get() = if (Prefs.keyHints) 2.6f * em else 0f
+        private val hintsH get() = if (Prefs.keyHints && !U.touch) 2.6f * em else 0f
 
         private val pQuery = U.paint(1.7f)
         private val pPlace = U.paint(1.4f, U.wa(0.45f))
@@ -358,6 +359,11 @@ class SearchLayer(
         private var scroll = 0f
         private var target = 0f
 
+        init {
+            isClickable = true
+            isFocusable = true
+        }
+
         fun resetScroll() { scroll = 0f; target = 0f }
 
         private fun h(i: Item) = if (i.kind == HEAD) headH else rowH
@@ -370,6 +376,87 @@ class SearchLayer(
             drawQueries(c)
             drawResults(c)
             drawHints(c)
+        }
+
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (e.action != MotionEvent.ACTION_UP) return true
+            val x = e.x
+            val y = e.y
+
+            // 1) microphone square left of the field (when micLeft)
+            if (micLeft && x in padX..(padX + fieldH) && y in padY..(padY + fieldH)) {
+                voice()
+                invalidate()
+                return true
+            }
+
+            // 2) keyboard rows
+            var ky = keysTop
+            for (r in rows.indices) {
+                val rowBottom = ky + keyH
+                if (y in ky..rowBottom) {
+                    for (i in rows[r].indices) {
+                        val k = rows[r][i]
+                        val kx = padX + k.col * (keyW + gap)
+                        val kw = k.span * keyW + (k.span - 1) * gap
+                        if (x in kx..(kx + kw)) {
+                            kr = r; kc = i
+                            zone = Zone.KEYS
+                            press(k)
+                            return true
+                        }
+                    }
+                }
+                ky += keyH + gap
+            }
+
+            // 3) query suggestions (below the keyboard)
+            if (sugs.isNotEmpty()) {
+                var sy = keysTop + rows.size * (keyH + gap) + 0.6f * em + headH
+                val bottom = height - padY - hintsH
+                for (i in sugs.indices) {
+                    if (sy + sugH > bottom) break
+                    if (y in sy..(sy + sugH) && x in padX..(padX + leftW)) {
+                        si = i
+                        zone = Zone.QUERIES
+                        // same as enter() in QUERIES: apply the suggestion
+                        sugs.getOrNull(si)?.let {
+                            query.setLength(0)
+                            query.append(it.text.take(MAX_QUERY))
+                            zone = Zone.KEYS
+                            changed()
+                        }
+                        return true
+                    }
+                    sy += sugH
+                }
+            }
+
+            // 4) results (right column)
+            val l = padX + leftW + 2.4f * em
+            val r = width - padX
+            if (x in l..r && y in padY..(height - padY - hintsH) && items.isNotEmpty()) {
+                // walk items exactly like drawResults does, using the current scroll
+                var iy = padY - scroll
+                for (i in items.indices) {
+                    val ih = h(items[i])
+                    if (items[i].kind != HEAD && y in iy..(iy + ih)) {
+                        ri = i
+                        zone = Zone.RESULTS
+                        // same as enter() in RESULTS
+                        items.getOrNull(ri)?.let { it0 ->
+                            val ch = it0.channel ?: return@let
+                            remember()
+                            if (it0.kind == CHANNEL) onChannel(ch) else onProgramme(ch, it0.start, it0.stop)
+                        }
+                        invalidate()
+                        return true
+                    }
+                    iy += ih
+                }
+            }
+
+            return true
         }
 
         private fun drawField(c: Canvas) {
