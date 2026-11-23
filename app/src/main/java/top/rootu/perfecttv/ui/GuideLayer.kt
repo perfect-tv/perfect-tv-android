@@ -26,8 +26,6 @@ import kotlin.math.roundToInt
 import androidx.core.graphics.withClip
 import androidx.core.graphics.withTranslation
 import androidx.core.graphics.withSave
-import java.util.Locale
-import java.util.Locale.getDefault
 
 /**
  * ТВ-гид: список каналов и сетка программы (вид «ТВ-гид») или текущая передача и «далее»
@@ -632,6 +630,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         // строка подсказок под списком (настройка «Подсказки клавиш»)
         private val hintsH get() = if (Prefs.keyHints && !U.touch) 1.9f * em else 0f
+        private val hintsCy get() = height - padBottom - 0.8f * em // hintsBase
 
         private val padX get() = 4f * em
         private val padTop get() = 2.4f * em
@@ -659,7 +658,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val datesW get() = 5.4f * em
         private val panelFullW get() = contentW * 0.30f
         private val chW get() = (contentW * 0.30f).let { full -> if (grid) full else full + (railW - full) * rail }
-        private val datesR get() = width - padX - (if (rail > 0f) panelFullW * rail + em else 0f)
+        private val datesR get() = width - padX - (panelFullW + em) * rail
         private val datesL get() = datesR - datesW
         private val progL get() = padX + chW + 1.2f * em
         private val progR get() = datesL - em
@@ -689,11 +688,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             // панель описания: каналы сжимаются до логотипов, справа выезжает панель
             val wantRail = if (descOn && (zone == Zone.PROGRAMS || zone == Zone.DATES)) 1f else 0f
-            if (!Anim.on || abs(wantRail - rail) < 0.01f) rail = wantRail
-            else {
-                rail += (wantRail - rail) * 0.3f
-                postInvalidateOnAnimation()
-            }
+            val step = (wantRail - rail) * 0.3f
+            if (!Anim.on || abs(step) * panelFullW < 0.5f) rail = wantRail
+            else { rail += step; postInvalidateOnAnimation() }
             drawTop(c, now)
             // колонка категорий выезжает слева, список и сетка уезжают вправо за край экрана
             val target = if (zone == Zone.CATS || zone == Zone.PLAYLISTS || (catsFixed && zone == Zone.CHANNELS)) 1f else 0f
@@ -925,7 +922,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 hintList = hintsFor(zone)
                 catsTitle = str(R.string.search)
             }
-            val cy = height - padBottom - 0.8f * em // hintsBase
+            val cy = hintsCy
             var x = padX
             for ((key, action) in hintList) {
                 val kw = maxOf(2f * em, Keycap.width(key, pHintKey) + em)
@@ -1361,8 +1358,10 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         /** Строк описания, что помещаются под картинкой, временем и названием (две строки) и над подсказкой OK */
         private fun panelDescLines(top: Float, bottom: Float, ih: Float): Int {
-            val used = ih + 1.2f * em + 1.9f * em + pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em + 2.4f * em
-            return maxOf(1, ((bottom - top - used) / (pPanelDesc.fontSpacing * 1.12f)).toInt())
+            // if the OK row is hidden, description may run down to the layer bottom
+            val descBottom = if (hintsH > 0f) hintsCy - 0.85f * em else bottom - 0.3f * em
+            val used = ih + 1.2f * em + 1.9f * em + pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em
+            return maxOf(1, ((descBottom - top - used) / (pPanelDesc.fontSpacing * 1.12f)).toInt())
         }
 
         private fun layoutOf(s: String, p: TextPaint, w: Int, lines: Int) =
@@ -1378,7 +1377,10 @@ class GuideLayer(private val tv: Tv) : Layer {
             val l = width - padX - pw + (1f - rail) * (pw + padX)
             val top = bodyTop
             val bottom = listBottom
-            val s = c.saveLayerAlpha(l, top, l + pw, bottom, (255 * rail).roundToInt())
+            val layerBottom = if (hintsH > 0f) maxOf(height - padBottom, hintsCy + 0.85f * em + 0.05f * em)
+            else height - padBottom
+            val strokePad = 0.1f * em
+            c.saveLayerAlpha(l - strokePad, top, l + pw  + strokePad, layerBottom, (255 * rail).roundToInt())
             val ih = minOf(pw * 9f / 16f, (bottom - top) * 0.4f)
             val bm = if (p.icon.isNotEmpty()) Logos.bitmapUrl(context, p.icon, 512, 288) { invalidate() } else null
             if (bm != null) {
@@ -1401,11 +1403,12 @@ class GuideLayer(private val tv: Tv) : Layer {
                 }
             } else Logos.draw(c, context, ch, l, top, l + pw, top + ih, badge = false) { invalidate() }
             val w = pw.toInt()
-            val key = ch.key + ":" + p.start + ":" + w
+            val key = ch.key + ":" + p.start + ":" + w + ":" + ih.toInt() + ":" + top.toInt()
             if (key != panelKey) {
                 panelKey = key
                 panelTitle = layoutOf(p.title, pPanelTitle, w, 2)
-                panelDesc = if (p.desc.isEmpty()) null else layoutOf(p.desc, pPanelDesc, w, panelDescLines(top, bottom, ih))
+                panelDesc = if (p.desc.isEmpty()) null
+                else layoutOf(p.desc, pPanelDesc, w, panelDescLines(top, layerBottom, ih ))
             }
             var y = top + ih + 1.2f * em
             pPanelSub.color = U.wa(0.7f)
@@ -1415,22 +1418,23 @@ class GuideLayer(private val tv: Tv) : Layer {
             panelTitle?.let { c.save(); c.translate(l, y); it.draw(c); c.restore(); y += pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em }
             panelDesc?.let { c.save(); c.translate(l, y); it.draw(c); c.restore() }
             // клавиша OK в рамке и действие — как в окне «Программа»
-            val live = p.start <= now && now < p.stop
-            val action = str(when {
-                live -> R.string.watch_live
-                p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> R.string.watch_from_archive
-                else -> R.string.about
-            })
-            val cy = bottom - 0.9f * em
-            val kw = maxOf(2f * em, pHintKey.measureText("OK") + em)
-            U.fill.style = Paint.Style.STROKE
-            U.fill.strokeWidth = 0.1f * em
-            U.fill.color = U.wa(0.4f)
-            c.drawRoundRect(l, cy - 0.85f * em, l + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
-            U.fill.style = Paint.Style.FILL
-            c.drawText("OK", l + (kw - pHintKey.measureText("OK")) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
-            c.drawText(action, l + kw + 0.6f * em, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
-            c.restoreToCount(s)
+            if (hintsH > 0f) {
+                val live = p.start <= now && now < p.stop
+                val action = str(when {
+                    live -> R.string.watch_live
+                    p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> R.string.watch_from_archive
+                    else -> R.string.about
+                })
+                val cy = hintsCy
+                val kw = maxOf(2f * em, pHintKey.measureText("OK") + em)
+                U.fill.style = Paint.Style.STROKE
+                U.fill.strokeWidth = 0.1f * em
+                U.fill.color = U.wa(0.4f)
+                c.drawRoundRect(l, cy - 0.85f * em, l + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
+                U.fill.style = Paint.Style.FILL
+                c.drawText("OK", l + (kw - pHintKey.measureText("OK")) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
+                c.drawText(action, l + kw + 0.6f * em, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
+            }
         }
 
         // ---------------------------------------------------------- тач и мышь
