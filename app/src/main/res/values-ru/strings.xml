@@ -284,6 +284,7 @@
     <string name="x_h_x_min_left">ещё %1$s ч %2$s мин</string>
     <string name="key_hints">Подсказки клавиш</string>
     <string name="a_row_at_the_bottom_of_the_pinned">строка внизу закреплённой инфопанели</string>
+    <string name="key_ok">OK</string>
     <string name="key_hold_ok">удерж. «OK»</string>
     <string name="key_back">Назад</string>
     <string name="hint_pause">Пауза</string>

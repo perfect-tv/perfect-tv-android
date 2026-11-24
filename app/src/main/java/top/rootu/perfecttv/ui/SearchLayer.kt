@@ -739,7 +739,7 @@ class SearchLayer(
             if (hintsH == 0f) return
             if (hintZone != zone) {
                 hintZone = zone
-                val ok = "OK"
+                val ok = str(R.string.key_ok)
                 hintList = when (zone) {
                     Zone.KEYS -> listOf(ok to str(R.string.hint_type), "▶︎" to str(R.string.hint_results), "▼" to str(R.string.queries),
                         str(R.string.key_hold_ok) to str(R.string.hint_clear_field))

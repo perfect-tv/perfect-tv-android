@@ -905,12 +905,39 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var hintList: List<Pair<String, String>> = emptyList()
 
         private fun hintsFor(z: Zone): List<Pair<String, String>> = when (z) {
-            Zone.PLAYLISTS -> listOf("▲ ▼" to str(R.string.hint_playlist), "▶︎" to str(R.string.hint_categories), str(R.string.key_back) to str(R.string.hint_cancel))
-            Zone.CATS -> listOf("▲ ▼" to str(R.string.category), "▶︎" to str(R.string.hint_to_channels), str(R.string.key_back) to str(R.string.hint_cancel))
-            Zone.PROGRAMS -> listOf("OK" to str(R.string.watch), "◀︎" to str(R.string.hint_to_channels), "▶︎" to str(R.string.hint_dates), "▲ ▼" to str(R.string.hint_programme_pick))
-            Zone.DATES -> listOf("▲ ▼" to str(R.string.hint_date), "◀︎" to str(R.string.hint_programmes), "OK" to str(R.string.watch), str(R.string.key_back) to str(R.string.hint_to_channels))
-            Zone.GRID -> listOf("OK" to str(R.string.about), "◀︎  ▶︎" to str(R.string.hint_programmes), str(R.string.key_back) to str(R.string.hint_to_channels))
-            Zone.CHANNELS -> listOf("OK" to str(R.string.watch), "◀︎" to str(R.string.hint_categories),
+            Zone.PLAYLISTS -> listOf(
+                "▲ ▼" to str(R.string.hint_playlist),
+                "▶︎" to str(R.string.hint_categories),
+                str(R.string.key_back) to str(R.string.hint_cancel)
+            )
+            Zone.CATS -> listOf(
+                "▲ ▼" to str(R.string.category),
+                "▶︎" to str(R.string.hint_to_channels),
+                str(R.string.key_back) to str(R.string.hint_cancel),
+                str(R.string.key_hold_ok) to str(R.string.menu)
+            )
+            Zone.PROGRAMS -> listOf(
+                str(R.string.key_ok) to "${str(R.string.watch)} / ${str(R.string.about)}",
+                "◀︎" to str(R.string.hint_to_channels),
+                "▲ ▼" to str(R.string.hint_programme_pick),
+                "▶︎" to str(R.string.hint_dates),
+                // str(R.string.key_hold_ok) to str(R.string.about)
+            )
+            Zone.DATES -> listOf(
+                "▲ ▼" to str(R.string.hint_date),
+                "◀︎" to str(R.string.hint_programmes),
+                str(R.string.key_back) to str(R.string.hint_to_channels),
+                str(R.string.key_hold_ok) to str(R.string.menu)
+            )
+            Zone.GRID -> listOf(
+                str(R.string.key_ok) to str(R.string.about),
+                "◀︎  ▶︎" to str(R.string.hint_programmes),
+                str(R.string.key_back) to str(R.string.hint_to_channels),
+                str(R.string.key_hold_ok) to str(R.string.menu)
+            )
+            Zone.CHANNELS -> listOf(
+                "◀︎" to str(R.string.hint_categories),
+                str(R.string.key_ok) to str(R.string.watch),
                 "▶︎" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
         }
 
@@ -1418,7 +1445,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             panelTitle?.let { c.save(); c.translate(l, y); it.draw(c); c.restore(); y += pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em }
             panelDesc?.let { c.save(); c.translate(l, y); it.draw(c); c.restore() }
             // клавиша OK в рамке и действие — как в окне «Программа»
-            if (hintsH > 0f) {
+            if (hintsH > 0f && zone != Zone.DATES) {
                 val live = p.start <= now && now < p.stop
                 val action = str(when {
                     live -> R.string.watch_live
@@ -1426,13 +1453,14 @@ class GuideLayer(private val tv: Tv) : Layer {
                     else -> R.string.about
                 })
                 val cy = hintsCy
-                val kw = maxOf(2f * em, pHintKey.measureText("OK") + em)
+                val ok = str(R.string.key_ok)
+                val kw = maxOf(2f * em, pHintKey.measureText(ok) + em)
                 U.fill.style = Paint.Style.STROKE
                 U.fill.strokeWidth = 0.1f * em
                 U.fill.color = U.wa(0.4f)
                 c.drawRoundRect(l, cy - 0.85f * em, l + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
                 U.fill.style = Paint.Style.FILL
-                c.drawText("OK", l + (kw - pHintKey.measureText("OK")) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
+                c.drawText(ok, l + (kw - pHintKey.measureText(ok)) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
                 c.drawText(action, l + kw + 0.6f * em, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
             }
         }

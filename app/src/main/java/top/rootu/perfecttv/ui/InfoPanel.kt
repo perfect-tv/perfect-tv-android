@@ -231,7 +231,7 @@ class InfoPanel(val view: View) {
             v.findViewById<TextView>(R.id.hint_action).text = action
             hints.addView(v)
         }
-        hint("OK", str(if (hintPaused) R.string.hint_resume else R.string.hint_pause))
+        hint(str(R.string.key_ok), str(if (hintPaused) R.string.hint_resume else R.string.hint_pause))
         if (more) hint("▲", str(R.string.hint_collapse)) else {
             hint("▼", str(R.string.about))
             hint("▲", str(R.string.close))

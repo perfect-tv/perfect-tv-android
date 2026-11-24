@@ -284,6 +284,7 @@
     <string name="x_h_x_min_left">%1$s h %2$s min left</string>
     <string name="key_hints">Key hints</string>
     <string name="a_row_at_the_bottom_of_the_pinned">a row at the bottom of the pinned info panel</string>
+    <string name="key_ok">OK</string>
     <string name="key_hold_ok">hold “OK”</string>
     <string name="key_back">Back</string>
     <string name="hint_pause">Pause</string>
@@ -356,7 +357,7 @@
     <string name="key_space">space</string>
     <string name="hint_type">Type</string>
     <string name="hint_results">Results</string>
-    <string name="hint_clear_field">On ⌫ — clear</string>
+    <string name="hint_clear_field">on ⌫ — clear</string>
     <string name="hint_use_query">Use</string>
     <string name="hint_forget_query">Remove from recent</string>
     <string name="hint_keyboard">To the keyboard</string>

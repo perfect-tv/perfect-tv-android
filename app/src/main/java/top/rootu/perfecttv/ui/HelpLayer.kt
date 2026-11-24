@@ -51,7 +51,7 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
                 "◀︎ / ▶︎" to str(R.string.previous_next_channel_of_the),
                 "PG+ / PG−" to str(R.string.next_previous_channel),
                 "0–9" to str(R.string.channel_by_number_below_hints_for),
-                "OK" to str(R.string.tv_guide_with_the_info_panel_open),
+                str(R.string.key_ok) to str(R.string.tv_guide_with_the_info_panel_open),
                 str(R.string.hold_ok_menu) to str(R.string.channel_menu),
                 "▼" to str(R.string.info_panel_again_programme),
                 str(R.string.hold_down) to str(R.string.recent_channels),
@@ -75,13 +75,13 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
                 "▲ / ▼" to str(R.string.programme),
                 "◀︎" to str(R.string.to_dates_up_down_day_left_back_to),
                 "▶︎" to str(R.string.to_archive_reminders_tabs_up_down),
-                "OK" to str(R.string.past_from_archive_current_live),
+                str(R.string.key_ok) to str(R.string.past_from_archive_current_live),
                 str(R.string.hold_ok) to str(R.string.programme_card_watch_from_start)
             ),
             str(R.string.help_search) to listOf(
                 str(R.string.help_search_keys) to str(R.string.help_search_open),
                 "◀︎ ▲ ▼ ▶︎" to str(R.string.help_search_nav),
-                "OK" to str(R.string.help_search_ok),
+                str(R.string.key_ok) to str(R.string.help_search_ok),
                 str(R.string.hold_ok) to str(R.string.help_search_hold),
                 str(R.string.help_search_mic) to str(R.string.help_search_voice)
             ),
@@ -97,7 +97,7 @@ class HelpLayer(context: Context, private val onClose: () -> Unit) : PopupLayer(
             str(R.string.programme_card) to listOf(
                 "◀︎ / ▶︎" to str(R.string.buttons),
                 "▲ / ▼" to str(R.string.scroll_description),
-                "OK" to str(R.string.button_action)
+                str(R.string.key_ok) to str(R.string.button_action)
             ),
             str(R.string.parental_lock) to listOf(
                 str(R.string.channel_menu) to str(R.string.lock_channel_category_by_pin_the_pin),
