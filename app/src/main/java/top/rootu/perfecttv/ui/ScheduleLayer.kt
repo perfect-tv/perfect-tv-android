@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.view.View
 import top.rootu.perfecttv.data.Channel
 import androidx.core.graphics.withClip
+import top.rootu.perfecttv.core.str
 import kotlin.math.abs
 
 /**
@@ -233,8 +234,8 @@ class ScheduleLayer(
             // кнопки видов в шапке: ←/→ — соседняя (вид меняется сразу), с первой ← и ↓ — в список
             Zone.VIEWS -> when (name) {
                 "right" -> switchView(viewIndex + 1)
-                "left" -> if (viewIndex > 0) switchView(viewIndex - 1) else { zone = Zone.LIST; list.invalidate() }
-                "down" -> { zone = Zone.LIST; list.invalidate() }
+                "left" -> if (viewIndex > 0) switchView(viewIndex - 1) else enterList()
+                "down" -> if (rows.any { !it.separator }) enterList()
             }
             // даты — слева: → обратно в список
             Zone.TABS -> when (name) {
@@ -256,7 +257,7 @@ class ScheduleLayer(
 
     override fun enter() {
         when (zone) {
-            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate(); applyPills() }
+            Zone.VIEWS -> if (rows.any { !it.separator }) enterList() else { list.invalidate(); applyPills() }
             Zone.TABS -> toList()
             Zone.LIST -> rows.getOrNull(index)?.let { if (!it.separator) content.onSelect(it) }
         }
@@ -268,7 +269,7 @@ class ScheduleLayer(
 
     override fun back() {
         when (zone) {
-            Zone.VIEWS -> { zone = Zone.LIST; list.invalidate(); applyPills() }
+            Zone.VIEWS -> if (rows.any { !it.separator }) enterList() else onBack() // или всегда enterList()
             Zone.TABS -> toList()
             Zone.LIST -> onBack()
         }
@@ -277,6 +278,15 @@ class ScheduleLayer(
     override fun destroy() {
         unwatch?.invoke()
         unwatch = null
+    }
+
+    /** Перейти из кнопки вида в список; если в виде нет строк — остаться на кнопке */
+    private fun enterList() {
+        zone = Zone.LIST
+        if (index < 0) index = next(-1, 1)
+        list.scrollToFocus(false)
+        list.invalidate()
+        applyPills()
     }
 
     // ================================================================== отрисовка
@@ -326,10 +336,15 @@ class ScheduleLayer(
             return y
         }
 
+        private val listBottomInset get() = 0.85f * em
+
         /** Строка [i] — в середину окна */
         fun scrollToRow(i: Int, jump: Boolean) {
             if (i < 0 || height == 0) return
-            val t = (top(i) - height / 2f + h(rows[i]) / 2).coerceIn(0f, maxOf(0f, total() - height))
+            val inset = listBottomInset
+            val vh = height - inset
+            val t = (top(i) - vh / 2f + h(rows[i]) / 2)
+                .coerceIn(0f, maxOf(0f, total() - vh))
             target = t
             if (jump || !Anim.on) scrollY0 = t
             if (jump || !Anim.on) focusSet = false
@@ -422,20 +437,39 @@ class ScheduleLayer(
         private fun drawDetail(c: Canvas, l: Float, r: Float) {
             U.fill.color = U.LINE
             c.drawRect(l, 0f, l + 0.1f * em, height.toFloat(), U.fill)
-            // фокус на датах — в списке подсвечен заголовок дня, а не передача: панель пустая
             if (zone == Zone.TABS) return
             val row = rows.getOrNull(index)?.takeIf { !it.separator } ?: return
             val x = l + 1.6f * em
             val w = (r - x - 1.4f * em).toInt()
             if (w <= 0) return
+
+            // заголовок
             if (row !== detailRow) {
                 detailRow = row
-                // без программы название строки — само время: в панели его не повторять
                 detailTitle = if (row.range.endsWith(row.title)) null else layout(row.title, pDetailTitle, w, 3)
-                val maxLines = maxOf(2, ((height - 12f * em) / (pDetailText.textSize * 1.3f)).toInt())
-                detailText = if (row.desc.isEmpty()) null else layout(row.desc, pDetailText, w, maxLines)
+                detailText = null
             }
+
+            // верх описания
             var y = 1.4f * em
+            if (row.range.isNotEmpty()) y += 2.3f * em
+            detailTitle?.let { y += it.height + 0.9f * em }
+            val descTop = y
+
+            // подсказка OK: центр и её верхняя граница — из одного источника
+            val hintCy = height - 2.0f * em
+            val hintTop = if (row.action.isNotEmpty()) hintCy - 0.85f * em else height - 0.8f * em
+            val gap = 0.5f * em
+            val availH = (hintTop - descTop - gap).coerceAtLeast(0f)
+            val lineH = pDetailText.fontSpacing * 1.15f
+            val lines = maxOf(1, (availH / lineH).toInt())
+
+            if (detailText == null && row.desc.isNotEmpty()) {
+                detailText = layout(row.desc, pDetailText, w, lines)
+            }
+
+            // отрисовка
+            y = 1.4f * em
             if (row.range.isNotEmpty()) {
                 pRange.color = U.wa(0.75f)
                 U.drawText(c, row.range, x, y + 0.7f * em, w.toFloat(), pRange)
@@ -444,18 +478,17 @@ class ScheduleLayer(
             detailTitle?.let { c.save(); c.translate(x, y); it.draw(c); c.restore(); y += it.height + 0.9f * em }
             detailText?.let { c.save(); c.translate(x, y); it.draw(c); c.restore() }
             if (row.action.isNotEmpty()) {
-                // клавиша в рамке и действие — как в строке подсказок
-                val cy = height - 1.7f * em
-                val kw = pTab.measureText("OK") + em
-                U.fill.style = android.graphics.Paint.Style.STROKE
+                val ok = str(R.string.key_ok)
+                val kw = pTab.measureText(ok) + em
+                U.fill.style = Paint.Style.STROKE
                 U.fill.strokeWidth = 0.1f * em
                 U.fill.color = U.wa(0.4f)
-                c.drawRoundRect(x, cy - 0.85f * em, x + kw, cy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
-                U.fill.style = android.graphics.Paint.Style.FILL
+                c.drawRoundRect(x, hintCy - 0.85f * em, x + kw, hintCy + 0.85f * em, 0.4f * em, 0.4f * em, U.fill)
+                U.fill.style = Paint.Style.FILL
                 pTab.color = U.wa(0.8f)
-                c.drawText("OK", x + 0.5f * em, cy - (pTab.descent() + pTab.ascent()) / 2, pTab)
+                c.drawText(ok, x + 0.5f * em, hintCy - (pTab.descent() + pTab.ascent()) / 2, pTab)
                 pSub.color = U.wa(0.6f)
-                c.drawText(row.action, x + kw + 0.6f * em, cy - (pSub.descent() + pSub.ascent()) / 2, pSub)
+                c.drawText(row.action, x + kw + 0.6f * em, hintCy - (pSub.descent() + pSub.ascent()) / 2, pSub)
             }
         }
 
@@ -629,7 +662,8 @@ class ScheduleLayer(
         })
 
         private fun scrollBy(dy: Float) {
-            target = (target + dy).coerceIn(0f, maxOf(0f, total() - height))
+            val vh = height - listBottomInset
+            target = (target + dy).coerceIn(0f, maxOf(0f, total() - vh))
             scrollY0 = target
             invalidate()
         }
