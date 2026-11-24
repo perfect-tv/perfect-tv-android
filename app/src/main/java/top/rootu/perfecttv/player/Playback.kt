@@ -23,7 +23,10 @@ import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import org.json.JSONObject
+import top.rootu.perfecttv.R
+import top.rootu.perfecttv.core.Lang
 import top.rootu.perfecttv.core.Net
+import top.rootu.perfecttv.core.str
 import top.rootu.perfecttv.data.Channel
 
 /**
@@ -227,6 +230,9 @@ class Playback(context: Context) {
         listener?.onState(player.isPlaying, player.playbackState == Player.STATE_BUFFERING)
     }
 
+    /** Канал, для которого выбрана видеодорожка (на новом канале — снова «Авто») */
+    private var videoKey = ""
+
     /**
      * Включить поток канала.
      * @param url готовая ссылка (эфир или подготовленный шаблон архива)
@@ -234,6 +240,14 @@ class Playback(context: Context) {
      * @param forceHls считать поток HLS (ссылка без расширения, на которой автоопределение не справилось)
      */
     fun play(ch: Channel, url: String, positionMs: Long = C.TIME_UNSET, forceHls: Boolean = false) {
+        // видеодорожка выбирается для текущего канала; на новом — снова «Авто»
+        if (ch.key != videoKey) {
+            videoKey = ch.key
+            val tp = player.trackSelectionParameters
+            if (tp.overrides.keys.any { it.type == C.TRACK_TYPE_VIDEO }) {
+                player.trackSelectionParameters = tp.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
+            }
+        }
         // поправка, найденная раньше для этого канала (см. [checkStall])
         if (ch.key != teletextKey) { teletextKey = ch.key; teletext.reset() }
         fixKey = ch.key
@@ -342,7 +356,7 @@ class Playback(context: Context) {
         listener?.onFix(fixStep)
     }
 
-    // ---------------------------------------------------------- звук и субтитры
+    // ---------------------------------------------------------- дорожки потока
 
     /** Дорожка потока: [label] — название или язык, [selected] — играет сейчас */
     class Track(val group: androidx.media3.common.TrackGroup, val index: Int, val label: String, val language: String, val selected: Boolean)
@@ -354,7 +368,7 @@ class Playback(context: Context) {
         return n
     }
 
-    /** Дорожки типа [type] (C.TRACK_TYPE_AUDIO / C.TRACK_TYPE_TEXT), которые плеер умеет играть */
+    /** Дорожки типа [type] (C.TRACK_TYPE_VIDEO / AUDIO / TEXT), которые плеер умеет играть */
     fun tracks(type: Int): List<Track> {
         val out = ArrayList<Track>()
         for (g in player.currentTracks.groups) {
@@ -369,19 +383,40 @@ class Playback(context: Context) {
                     val ch = when (f.channelCount) { 1 -> "1.0"; 2 -> "2.0"; 6 -> "5.1"; 8 -> "7.1"; else -> f.channelCount.toString() }
                     label = if (label.isEmpty()) ch else "$label · $ch"
                 }
+                if (type == C.TRACK_TYPE_VIDEO) {
+                    val info = ArrayList<String>()
+                    if (f.width > 0 && f.height > 0) info.add("${f.width}×${f.height}")
+                    bitrate(f)?.let { info.add(it) }
+                    if (info.isNotEmpty()) label = (if (label.isEmpty()) "" else "$label · ") + info.joinToString(" · ")
+                }
                 out.add(Track(g.mediaTrackGroup, i, label, lang, g.isTrackSelected(i)))
             }
         }
         return out
     }
 
-    /** Выбрать дорожку; null — звук: как в потоке, субтитры: выключить */
+    /** Битрейт дорожки, если поток его сообщает: «12,5 Мбит/с» или «800 кбит/с» */
+    private fun bitrate(f: androidx.media3.common.Format): String? {
+        val bps = when {
+            f.averageBitrate > 0 -> f.averageBitrate
+            f.bitrate > 0 -> f.bitrate
+            f.peakBitrate > 0 -> f.peakBitrate
+            else -> return null
+        }
+        return if (bps >= 1_000_000) str(R.string.bitrate_mbps, String.format(Lang.locale, "%.1f", bps / 1_000_000.0))
+        else str(R.string.bitrate_kbps, (bps + 500) / 1000)
+    }
+
+    /** Дорожка типа [type] выбрана вручную; иначе играет авто (или как в потоке) */
+    fun isAuto(type: Int): Boolean = player.trackSelectionParameters.overrides.keys.none { it.type == type }
+
+    /** Выбрать дорожку; null — звук: как в потоке, субтитры: выключить, видео: авто */
     fun selectTrack(type: Int, t: Track?) {
         val b = player.trackSelectionParameters.buildUpon().clearOverridesOfType(type)
         if (t != null) {
             b.setTrackTypeDisabled(type, false).setOverrideForType(androidx.media3.common.TrackSelectionOverride(t.group, t.index))
             if (t.language.isNotEmpty()) { if (type == C.TRACK_TYPE_AUDIO) b.setPreferredAudioLanguage(t.language) else b.setPreferredTextLanguage(t.language) }
-        } else if (type == C.TRACK_TYPE_TEXT) b.setTrackTypeDisabled(type, true)
+        } else b.setTrackTypeDisabled(type, type == C.TRACK_TYPE_TEXT)
         player.trackSelectionParameters = b.build()
     }
 

@@ -299,9 +299,12 @@
     <string name="tile_fav_remove">Из избранного</string>
     <string name="app">Приложение</string>
     <string name="audio_and_subtitles">Звук и субтитры</string>
+    <string name="video_track">Видеодорожка</string>
     <string name="audio">Звук</string>
     <string name="subtitles">Субтитры</string>
     <string name="track_x">Дорожка %1$s</string>
+    <string name="bitrate_mbps">%1$s Мбит/с</string>
+    <string name="bitrate_kbps">%1$s кбит/с</string>
     <string name="auto">Авто</string>
     <string name="no_tracks">нет дорожек</string>
     <string name="selected_mark">●</string>

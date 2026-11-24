@@ -1528,6 +1528,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         quick.drop(4).forEach { t -> viewing.add(MenuLayer.Item(t.title, run = t.run)) }
         if (p != null) viewing.add(MenuLayer.Item(str(R.string.about), run = act("about")))
         if (current) {
+            val video = playback.tracks(C.TRACK_TYPE_VIDEO)
+            if (video.size > 1) viewing.add(MenuLayer.Item(str(R.string.video_track), videoValue(), sub = { videoPage(ch) }))
             val audio = playback.tracks(C.TRACK_TYPE_AUDIO)
             val text = playback.tracks(C.TRACK_TYPE_TEXT)
             if (audio.size > 1 || text.isNotEmpty()) {
@@ -1584,6 +1586,28 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             MenuLayer.Section(str(R.string.channel), channel),
             MenuLayer.Section(str(R.string.app), app)
         ))
+    }
+
+    /** «Видеодорожка»: авто или одна из дорожек потока (пункт есть, только если дорожек больше одной) */
+    private fun videoPage(ch: Channel): MenuLayer.Page {
+        fun label(t: Playback.Track, i: Int) = t.label.ifEmpty { str(R.string.track_x, i + 1) }
+        fun mark(on: Boolean) = if (on) str(R.string.selected_mark) else ""
+        val video = playback.tracks(C.TRACK_TYPE_VIDEO)
+        val auto = playback.isAuto(C.TRACK_TYPE_VIDEO)
+        // выбор применяется не мгновенно — страницу перестроить, когда плеер переключит дорожку
+        fun pick(t: Playback.Track?) {
+            playback.selectTrack(C.TRACK_TYPE_VIDEO, t)
+            main.postDelayed({ menu?.refresh() }, 400)
+        }
+        val items = arrayListOf(MenuLayer.Item(str(R.string.auto), mark(auto), keep = true) { pick(null) })
+        video.forEachIndexed { i, t -> items.add(MenuLayer.Item(label(t, i), mark(!auto && t.selected), keep = true) { pick(t) }) }
+        return MenuLayer.Page(str(R.string.video_track), ch.title(), sections = listOf(MenuLayer.Section("", items)))
+    }
+
+    /** Текущая видеодорожка: «Авто» или название выбранной */
+    private fun videoValue(): String {
+        if (playback.isAuto(C.TRACK_TYPE_VIDEO)) return str(R.string.auto)
+        return playback.tracks(C.TRACK_TYPE_VIDEO).firstOrNull { it.selected }?.label?.takeIf { it.isNotEmpty() } ?: str(R.string.auto)
     }
 
     /** «Звук и субтитры»: дорожки потока; выбор запоминается как предпочитаемый язык */

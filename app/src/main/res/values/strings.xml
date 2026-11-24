@@ -299,9 +299,12 @@
     <string name="tile_fav_remove">Unfavourite</string>
     <string name="app">App</string>
     <string name="audio_and_subtitles">Audio and subtitles</string>
+    <string name="video_track">Video track</string>
     <string name="audio">Audio</string>
     <string name="subtitles">Subtitles</string>
     <string name="track_x">Track %1$s</string>
+    <string name="bitrate_mbps">%1$s Mbit/s</string>
+    <string name="bitrate_kbps">%1$s kbit/s</string>
     <string name="auto">Auto</string>
     <string name="no_tracks">no tracks</string>
     <string name="selected_mark">●</string>
