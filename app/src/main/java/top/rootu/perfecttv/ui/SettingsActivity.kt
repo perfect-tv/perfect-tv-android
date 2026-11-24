@@ -52,7 +52,8 @@ class SettingsActivity : Activity() {
         section = intent.getIntExtra(EXTRA_SECTION, 0)
         buildNav()
         buildHints()
-        if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null) else showMain()
+        if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null)
+        else showSection(false) // фокус на первом (или EXTRA_SECTION) разделе // showMain()
         Bus.on(onData)
     }
 
