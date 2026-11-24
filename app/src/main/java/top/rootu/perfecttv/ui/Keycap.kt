@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ReplacementSpan
+import kotlin.math.roundToInt
 
 /**
  * Надпись на клавише в строке подсказок. Стрелки ← → ↑ ↓ в шрифте стоят у нижнего края строки
@@ -66,7 +67,7 @@ object Keycap {
                 val m = paint.fontMetricsInt
                 fm.ascent = m.ascent; fm.descent = m.descent; fm.top = m.top; fm.bottom = m.bottom
             }
-            return Math.round(advance(ch, paint))
+            return advance(ch, paint).roundToInt()
         }
 
         override fun draw(c: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {

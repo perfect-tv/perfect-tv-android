@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- главный экран Android TV: ряд «Избранные» и «Продолжить просмотр» -->
@@ -35,7 +36,8 @@
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="false"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.PerfectTv">
+        android:theme="@style/Theme.PerfectTv"
+        tools:targetApi="33">
 
         <!-- открытие файла копии *.perfecttv: подтверждение восстановления. Менеджеры отдают файл по-разному
              (content:// или file://, с типом и без, расширение — в пути или только в имени), поэтому два фильтра и несколько шаблонов пути -->
@@ -136,7 +138,7 @@
         <!-- баннеры карточек главного экрана: файлы из cacheDir/posters, читает лаунчер -->
         <provider
             android:name=".data.Posters$Provider"
-            android:authorities="top.rootu.perfecttv.posters"
+            android:authorities="${applicationId}.posters"
             android:exported="true" />
 
         <receiver android:name=".core.Alarms$Receiver" android:exported="false">

@@ -5,7 +5,7 @@ fun gitOutput(vararg command: String): String = try {
         commandLine(*command)
         isIgnoreExitValue = true   // нет git или тегов — не ломать сборку
     }.standardOutput.asText.get().trim()
-} catch (e: Exception) {
+} catch (_: Exception) {
     ""
 }
 
@@ -29,7 +29,7 @@ plugins {
 
 android {
     namespace = "top.rootu.perfecttv"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "top.rootu.perfecttv"
@@ -53,8 +53,15 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName(if (releaseKeystorePath != null) "release" else "debug")
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
     compileOptions {

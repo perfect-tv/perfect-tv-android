@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
+import android.view.MotionEvent
 import android.view.View
 import top.rootu.perfecttv.R
 import top.rootu.perfecttv.core.Clock
@@ -16,6 +17,8 @@ import top.rootu.perfecttv.core.str
 import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Repo
 import java.util.concurrent.Executors
+import androidx.core.graphics.withClip
+import kotlin.math.abs
 
 /**
  * Поиск по каналам и программе (на Canvas, во весь экран). Слева — поле запроса, клавиатура
@@ -53,8 +56,9 @@ class SearchLayer(
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "search") }
     private val query = StringBuilder()
+    private var caret = 0 // 0..query.length — позиция курсора в поле ввода
     private var lang = if (Lang.isEn) EN else RU
-    private var textLang = lang          // язык букв, к которому возвращает «символы»
+    private var textLang = lang // язык букв, к которому возвращает «символы»
     private var rows: List<List<Key>> = emptyList()
     private var kr = 1
     private var kc = 1
@@ -77,11 +81,11 @@ class SearchLayer(
 
     // ================================================================== клавиатура
 
-    private fun letters(l: Int): List<String> = when {
-        l == RU && Prefs.keyboardAbc -> listOf("абвгдеёжзий", "клмнопрстуф", "хцчшщъыьэюя")
-        l == RU -> listOf("йцукенгшщзх", "фывапролджэ", "ячсмитьбюъё")
-        l == EN && Prefs.keyboardAbc -> listOf("abcdefghijk", "lmnopqrstuv", "wxyz+',.?*;")
-        l == EN -> listOf("qwertyuiop+", "asdfghjkl';", "zxcvbnm,.?*")
+    private fun letters(l: Int): List<String> = when (l) {
+        RU if Prefs.keyboardAbc -> listOf("абвгдеёжзий", "клмнопрстуф", "хцчшщъыьэюя")
+        RU -> listOf("йцукенгшщзх", "фывапролджэ", "ячсмитьбюъё")
+        EN if Prefs.keyboardAbc -> listOf("abcdefghijk", "lmnopqrstuv", "wxyz+',.?*;")
+        EN -> listOf("qwertyuiop+", "asdfghjkl';", "zxcvbnm,.?*")
         else -> listOf("@#$%&()<>*\"", "_/\\:;+=?!,.")
     }
 
@@ -123,8 +127,16 @@ class SearchLayer(
 
     private fun press(k: Key) {
         when (k.action) {
-            TYPE -> if (query.length < MAX_QUERY) { query.append(k.text); changed() }
-            DEL -> if (query.isNotEmpty()) { query.setLength(query.length - 1); changed() }
+            TYPE -> if (query.length < MAX_QUERY) {
+                query.insert(caret, k.text)
+                caret += k.text.length
+                changed()
+            }
+            DEL -> if (caret > 0) {
+                query.deleteCharAt(caret - 1)
+                caret--
+                changed()
+            }
             TO_RU -> setLang(RU)
             TO_EN -> setLang(EN)
             TO_SYM -> setLang(SYM)
@@ -138,6 +150,7 @@ class SearchLayer(
     private val runSearch = Runnable { searchProgrammes() }
 
     private fun changed() {
+        caret = caret.coerceIn(0, query.length)
         gen++
         found = emptyList()
         main.removeCallbacks(runSearch)
@@ -154,7 +167,7 @@ class SearchLayer(
         val plan = repo.searchPlan(channels())
         val now = Clock.now()
         worker.execute {
-            val hits = try { repo.searchProgrammes(plan, w, now) { g != gen } } catch (e: Exception) { emptyList() }
+            val hits = try { repo.searchProgrammes(plan, w, now) { g != gen } } catch (_: Exception) { emptyList() }
             main.post {
                 if (g != gen) return@post
                 found = hits
@@ -219,6 +232,7 @@ class SearchLayer(
     fun setQuery(text: String) {
         query.setLength(0)
         query.append(text.trim().take(MAX_QUERY))
+        caret = query.length
         changed()
     }
 
@@ -243,7 +257,11 @@ class SearchLayer(
 
     override fun key(name: String, long: Boolean, digit: Int) {
         if (name == "digit") {
-            if (query.length < MAX_QUERY) { query.append(digit); changed() }
+            if (query.length < MAX_QUERY) {
+                query.insert(caret, digit.toString())
+                caret++
+                changed()
+            }
             return
         }
         when (zone) {
@@ -274,6 +292,7 @@ class SearchLayer(
                 "left" -> zone = Zone.KEYS
             }
         }
+        list.onKeyFocus()
         list.invalidate()
     }
 
@@ -284,6 +303,7 @@ class SearchLayer(
             Zone.QUERIES -> sugs.getOrNull(si)?.let {
                 query.setLength(0)
                 query.append(it.text.take(MAX_QUERY))
+                caret = query.length
                 zone = Zone.KEYS
                 changed()
             }
@@ -299,7 +319,7 @@ class SearchLayer(
     override fun long() {
         when (zone) {
             Zone.MIC -> voice()
-            Zone.KEYS -> if (rows[kr][kc].action == DEL && query.isNotEmpty()) { query.setLength(0); changed() } else press(rows[kr][kc])
+            Zone.KEYS -> if (rows[kr][kc].action == DEL && query.isNotEmpty()) { query.setLength(0); caret = 0; changed() } else press(rows[kr][kc])
             Zone.QUERIES -> sugs.getOrNull(si)?.takeIf { it.recent }?.let { s ->
                 Prefs.searchRecent = Prefs.searchRecent.filter { it != s.text }
                 update()
@@ -338,7 +358,7 @@ class SearchLayer(
         private val rowH = 3.3f * em
         private val headH = 2.7f * em
         private val sugH = 3f * em
-        private val hintsH get() = if (Prefs.keyHints) 2.6f * em else 0f
+        private val hintsH get() = if (Prefs.keyHints && !U.touch) 2.6f * em else 0f
 
         private val pQuery = U.paint(1.7f)
         private val pPlace = U.paint(1.4f, U.wa(0.45f))
@@ -355,10 +375,112 @@ class SearchLayer(
         private val path = Path()
         private var scroll = 0f
         private var target = 0f
+        private var autoScroll = true
 
-        fun resetScroll() { scroll = 0f; target = 0f }
+        // drag state for swipe-to-scroll results
+        private var downX = 0f
+        private var downY = 0f
+        private var dragging = false
+        private var gestureScrolled = false
+
+        init {
+            isClickable = true
+            isFocusable = true
+        }
+
+        fun resetScroll() { scroll = 0f; target = 0f; autoScroll = true }
+
+        /** Вызывается из key(): пользователь навигируется клавишами — вернуть автоцентрирование */
+        fun onKeyFocus() { autoScroll = true }
 
         private fun h(i: Item) = if (i.kind == HEAD) headH else rowH
+
+        // ------------------------------------------------------------------ геометрия
+
+        private val keysTop get() = padY + fieldH + 1.2f * em
+
+        private fun fieldLeft() = padX + (if (micLeft) fieldH + gap else 0f)
+        private fun fieldWidth() = leftW - (if (micLeft) fieldH + gap else 0f)
+        private fun fieldTextX() = fieldLeft() + 3.6f * em
+        private fun fieldTextW() = fieldWidth() - 4.8f * em
+
+        private fun inField(x: Float, y: Float): Boolean =
+            x in fieldLeft()..(fieldLeft() + fieldWidth()) && y in padY..(padY + fieldH)
+
+        private fun inMic(x: Float, y: Float): Boolean =
+            micLeft && x in padX..(padX + fieldH) && y in padY..(padY + fieldH)
+
+        private fun inResults(x: Float, y: Float): Boolean {
+            val l = padX + leftW + 2.4f * em
+            val r = width - padX
+            return x in l..r && y in padY..(height - padY - hintsH)
+        }
+
+        /** Индекс клавиши под точкой или null */
+        private fun keyAtPoint(x: Float, y: Float): Pair<Int, Int>? {
+            var ky = keysTop
+            for (r in rows.indices) {
+                if (y in ky..(ky + keyH)) {
+                    for (i in rows[r].indices) {
+                        val k = rows[r][i]
+                        val kx = padX + k.col * (keyW + gap)
+                        val kw = k.span * keyW + (k.span - 1) * gap
+                        if (x in kx..(kx + kw)) return r to i
+                    }
+                }
+                ky += keyH + gap
+            }
+            return null
+        }
+
+        /** Индекс подсказки под точкой или -1 */
+        private fun sugAtPoint(x: Float, y: Float): Int {
+            if (sugs.isEmpty()) return -1
+            var sy = keysTop + rows.size * (keyH + gap) + 0.6f * em + headH
+            val bottom = height - padY - hintsH
+            for (i in sugs.indices) {
+                if (sy + sugH > bottom) break
+                if (y in sy..(sy + sugH) && x in padX..(padX + leftW)) return i
+                sy += sugH
+            }
+            return -1
+        }
+
+        /** Индекс результата под точкой (с учётом текущего scroll) или -1 */
+        private fun resultAtPoint(x: Float, y: Float): Int {
+            if (items.isEmpty() || !inResults(x, y)) return -1
+            var iy = padY - scroll
+            for (i in items.indices) {
+                val ih = h(items[i])
+                if (items[i].kind != HEAD && y in iy..(iy + ih)) return i
+                iy += ih
+            }
+            return -1
+        }
+
+        /** Индекс курсора по x-координате в поле ввода */
+        private fun caretAt(tapX: Float): Int {
+            val rel = tapX - fieldTextX()
+            var best = 0
+            var bestDist = Float.MAX_VALUE
+            for (i in 0..query.length) {
+                val w = pQuery.measureText(query, 0, i)
+                val d = abs(w - rel)
+                if (d < bestDist) { bestDist = d; best = i }
+            }
+            return best
+        }
+
+        private fun maxScroll(): Float {
+            val top = padY
+            val bottom = height - padY - hintsH
+            val vh = bottom - top
+            var total = 0f
+            for (i in items.indices) total += h(items[i])
+            return maxOf(0f, total - vh)
+        }
+
+        // ------------------------------------------------------------------ отрисовка
 
         override fun onDraw(c: Canvas) {
             // непрозрачный фон: под поиском может быть гид, его текст просвечивал бы сквозь результаты
@@ -398,15 +520,22 @@ class SearchLayer(
                 c.drawRect(x - 0.3f * em, cy - 0.9f * em, x - 0.15f * em, cy + 0.9f * em, U.fill)
                 return
             }
-            // длинный запрос — виден его конец
-            val tw = pQuery.measureText(query, 0, query.length)
-            val save = c.save()
-            c.clipRect(x, t, x + w + 0.5f * em, t + fieldH)
-            val tx = if (tw > w) x + w - tw else x
-            c.drawText(query, 0, query.length, tx, cy - (pQuery.descent() + pQuery.ascent()) / 2, pQuery)
-            U.fill.color = U.WHITE
-            c.drawRect(tx + tw + 0.15f * em, cy - 0.9f * em, tx + tw + 0.3f * em, cy + 0.9f * em, U.fill)
-            c.restoreToCount(save)
+            // курсор: держим его в видимой части поля, при длинном запросе сдвигаем текст
+            val caretX = pQuery.measureText(query, 0, caret)
+            val tx = if (caretX > w) x + w - caretX else x
+            c.withClip(x, t, x + w + 0.5f * em, t + fieldH) {
+                c.drawText(
+                    query,
+                    0,
+                    query.length,
+                    tx,
+                    cy - (pQuery.descent() + pQuery.ascent()) / 2,
+                    pQuery
+                )
+                U.fill.color = U.WHITE
+                val cx = tx + caretX
+                c.drawRect(cx, cy - 0.9f * em, cx + 0.15f * em, cy + 0.9f * em, U.fill)
+            }
         }
 
         private fun stroke(color: Int, w: Float) {
@@ -414,8 +543,6 @@ class SearchLayer(
             U.fill.strokeWidth = w
             U.fill.color = color
         }
-
-        private val keysTop get() = padY + fieldH + 1.2f * em
 
         private fun drawKeys(c: Canvas) {
             var y = keysTop
@@ -434,12 +561,19 @@ class SearchLayer(
                     }
                     val fg = if (focus) U.BLACK else U.WHITE
                     val cy = y + keyH / 2
-                    if (k.action == DEL) drawDel(c, x + w / 2, cy, fg)
-                    else if (k.action == VOICE) drawMic(c, x + w / 2, cy, fg)
-                    else {
-                        val p = if (k.label.length > 1) pFn else pKey
-                        p.color = fg
-                        c.drawText(k.label, x + (w - p.measureText(k.label)) / 2, cy - (p.descent() + p.ascent()) / 2, p)
+                    when (k.action) {
+                        DEL -> drawDel(c, x + w / 2, cy, fg)
+                        VOICE -> drawMic(c, x + w / 2, cy, fg)
+                        else -> {
+                            val p = if (k.label.length > 1) pFn else pKey
+                            p.color = fg
+                            c.drawText(
+                                k.label,
+                                x + (w - p.measureText(k.label)) / 2,
+                                cy - (p.descent() + p.ascent()) / 2,
+                                p
+                            )
+                        }
                     }
                 }
                 y += keyH + gap
@@ -531,11 +665,23 @@ class SearchLayer(
                 if (i == ri) { fy = total; fh = h(items[i]) }
                 total += h(items[i])
             }
-            target = if (zone == Zone.RESULTS) (fy - vh / 2 + fh / 2).coerceIn(0f, maxOf(0f, total - vh)) else 0f
-            if (Anim.on && Math.abs(target - scroll) > 0.5f) {
-                scroll += (target - scroll) * 0.35f
-                postInvalidateOnAnimation()
-            } else scroll = target
+            if (autoScroll && zone == Zone.RESULTS) {
+                target = (fy - vh / 2 + fh / 2).coerceIn(0f, maxOf(0f, total - vh))
+                if (Anim.on && abs(target - scroll) > 0.5f) {
+                    scroll += (target - scroll) * 0.35f
+                    postInvalidateOnAnimation()
+                } else scroll = target
+            } else if (autoScroll) {
+                // не в результатах — возвращаем к началу
+                target = 0f
+                if (Anim.on && abs(target - scroll) > 0.5f) {
+                    scroll += (target - scroll) * 0.35f
+                    postInvalidateOnAnimation()
+                } else scroll = target
+            } else {
+                // ручной скролл — держим scroll в допустимых пределах
+                scroll = scroll.coerceIn(0f, maxScroll())
+            }
             val save = Fade.begin(c, l, top, r, bottom)
             var y = top - scroll
             for (i in items.indices) {
@@ -593,13 +739,13 @@ class SearchLayer(
             if (hintsH == 0f) return
             if (hintZone != zone) {
                 hintZone = zone
-                val ok = "OK"
+                val ok = str(R.string.key_ok)
                 hintList = when (zone) {
-                    Zone.KEYS -> listOf(ok to str(R.string.hint_type), "→" to str(R.string.hint_results), "↓" to str(R.string.queries),
+                    Zone.KEYS -> listOf(ok to str(R.string.hint_type), "▶︎" to str(R.string.hint_results), "▼" to str(R.string.queries),
                         str(R.string.key_hold_ok) to str(R.string.hint_clear_field))
-                    Zone.MIC -> listOf(ok to str(R.string.hint_voice), "↓" to str(R.string.hint_keyboard))
-                    Zone.QUERIES -> listOf(ok to str(R.string.hint_use_query), str(R.string.key_hold_ok) to str(R.string.hint_forget_query), "↑" to str(R.string.hint_keyboard))
-                    Zone.RESULTS -> listOf(ok to str(R.string.watch), str(R.string.key_hold_ok) to str(R.string.hint_programme), "←" to str(R.string.hint_keyboard))
+                    Zone.MIC -> listOf(ok to str(R.string.hint_voice), "▼" to str(R.string.hint_keyboard))
+                    Zone.QUERIES -> listOf(ok to str(R.string.hint_use_query), str(R.string.key_hold_ok) to str(R.string.hint_forget_query), "▲" to str(R.string.hint_keyboard))
+                    Zone.RESULTS -> listOf(ok to str(R.string.watch), str(R.string.key_hold_ok) to str(R.string.hint_programme), "◀︎" to str(R.string.hint_keyboard))
                 }
             }
             val cy = height - padY - 0.8f * em
@@ -613,6 +759,108 @@ class SearchLayer(
                 x += kw + 0.6f * em
                 c.drawText(action, x, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
                 x += pHint.measureText(action) + 1.8f * em
+            }
+        }
+
+        // ------------------------------------------------------------------ тач и жесты
+
+        private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                gestureScrolled = true
+                return true
+            }
+
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                if (gestureScrolled) return true // Свайп
+                tap(e.x, e.y)
+                return true
+            }
+
+            override fun onLongPress(e: MotionEvent) {
+                if (gestureScrolled) return
+                if (inField(e.x, e.y)) {
+                    if (query.isNotEmpty()) { query.setLength(0); caret = 0; changed() }
+                    return
+                }
+                if (focusAt(e.x, e.y)) long()
+            }
+        })
+
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = e.x; downY = e.y
+                    dragging = false
+                    gestureScrolled = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.x - downX
+                    val dy = e.y - downY
+                    if (!dragging && abs(dy) > 0.8f * em && abs(dy) > abs(dx) * 1.5f && inResults(downX, downY)) {
+                        dragging = true
+                        autoScroll = false
+                    }
+                    if (dragging) {
+                        val delta = downY - e.y
+                        scroll = (scroll + delta).coerceIn(0f, maxScroll())
+                        downY = e.y
+                        gestureScrolled = true
+                        invalidate()
+                        return true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    dragging = false
+                }
+            }
+            return gestures.onTouchEvent(e) || super.onTouchEvent(e)
+        }
+
+        /** Установить фокус по координатам; true если попал куда-то. Действие НЕ выполняет. */
+        private fun focusAt(x: Float, y: Float): Boolean {
+            // поле ввода — поставить курсор
+            if (inField(x, y)) {
+                caret = caretAt(x)
+                invalidate()
+                return true
+            }
+            // микрофон слева от поля
+            if (inMic(x, y)) { zone = Zone.MIC; invalidate(); return true }
+            // клавиатура
+            keyAtPoint(x, y)?.let { (r, i) ->
+                kr = r; kc = i; zone = Zone.KEYS
+                invalidate()
+                return true
+            }
+            // подсказки запросов
+            val siHit = sugAtPoint(x, y)
+            if (siHit >= 0) { si = siHit; zone = Zone.QUERIES; invalidate(); return true }
+            // результаты
+            val riHit = resultAtPoint(x, y)
+            if (riHit >= 0) { ri = riHit; zone = Zone.RESULTS; autoScroll = true; invalidate(); return true }
+            return false
+        }
+
+        /** Полный тап: фокус + действие (как enter()) */
+        private fun tap(x: Float, y: Float) {
+            if (!focusAt(x, y)) return
+            when (zone) {
+                Zone.MIC -> voice()
+                Zone.KEYS -> press(rows[kr][kc])
+                Zone.QUERIES -> sugs.getOrNull(si)?.let {
+                    query.setLength(0)
+                    query.append(it.text.take(MAX_QUERY))
+                    caret = query.length
+                    zone = Zone.KEYS
+                    changed()
+                }
+                Zone.RESULTS -> items.getOrNull(ri)?.let { it0 ->
+                    val ch = it0.channel ?: return@let
+                    remember()
+                    if (it0.kind == CHANNEL) onChannel(ch) else onProgramme(ch, it0.start, it0.stop)
+                }
             }
         }
     }

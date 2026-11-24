@@ -52,7 +52,8 @@ class SettingsActivity : Activity() {
         section = intent.getIntExtra(EXTRA_SECTION, 0)
         buildNav()
         buildHints()
-        if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null) else showMain()
+        if (intent.getBooleanExtra(EXTRA_FIRST, false) && repo.playlists().isEmpty()) showEdit(null)
+        else showSection(false) // фокус на первом (или EXTRA_SECTION) разделе // showMain()
         Bus.on(onData)
     }
 
@@ -103,7 +104,7 @@ class SettingsActivity : Activity() {
         val box = findViewById<LinearLayout>(R.id.settings_hints)
         if (!Prefs.keyHints || U.touch) return
         box.visibility = View.VISIBLE
-        for ((k, action) in listOf("←  →" to str(R.string.hint_change), "OK" to str(R.string.hint_select), str(R.string.key_back) to str(R.string.hint_sections))) {
+        for ((k, action) in listOf("◀︎  ▶︎" to str(R.string.hint_change), str(R.string.key_ok) to str(R.string.hint_select), str(R.string.key_back) to str(R.string.hint_sections))) {
             val v = layoutInflater.inflate(R.layout.hint_item, box, false)
             v.findViewById<TextView>(R.id.hint_key).text = Keycap.text(k)
             v.findViewById<TextView>(R.id.hint_action).text = action

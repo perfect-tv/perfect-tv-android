@@ -481,6 +481,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         // из закрытого канала, открытого по PIN, в другой закрытый — PIN уже вводили, не спрашиваем
         // PIN-состояние (сессия, «PIN действует») относится к играющему плейлисту: при выборе канала
         // из просматриваемого другого плейлиста оно не переносится
+        closeSearch()
         val foreign = previewOrigin != null
         if (!unlocked && ch !== state.channel && catalog?.isLocked(ch) == true && (foreign || (!sessionUnlocked(ch) && !pinPassed))) {
             main.removeCallbacks(switchRun)
@@ -638,6 +639,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     }
 
     fun playArchive(ch: Channel, start0: Long, programEnd: Long = 0) {
+        closeSearch()
         if (!ch.hasArchive) return toast.show(str(R.string.the_channel_has_no_archive))
         val start = maxOf(start0, Clock.now() - ch.archiveDays * 86400L)
         val gk = if (state.channel === ch) state.groupKey else null
@@ -1099,13 +1101,16 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             onProgramme = { ch, start, stop ->
                 val now = Clock.now()
                 when {
-                    start <= now && now < stop -> { leave(); playChannel(ch) }
+                    now in start..<stop -> { leave(); playChannel(ch) }
                     stop <= now && ch.hasArchive -> { leave(); playArchive(ch, start, stop) }
                     // будущая — карточка с кнопкой «Напомнить»
                     else -> openDetails(ch, Cell(start, stop, repo.at(ch, start)))
                 }
             },
-            onLong = { ch -> openSchedule(ch, 0) },
+            onLong = { ch ->
+                // closeSearch()
+                openSchedule(ch, 0)
+            },
             onVoice = if (!canSpeak) null else { tag ->
                 // язык — явно и дважды (часть распознавателей читает только предпочтение), иначе берётся английский
                 val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -1122,6 +1127,10 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     /** Результат голосового ввода (TvActivity.onActivityResult) — в открытый поиск */
     fun onVoiceResult(text: String) {
         (layers.lastOrNull { it is SearchLayer } as SearchLayer?)?.setQuery(text)
+    }
+
+    fun closeSearch() {
+        layers.firstOrNull { it is SearchLayer }?.let { remove(it) }
     }
 
     fun openHistory() {
