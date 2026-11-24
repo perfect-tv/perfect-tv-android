@@ -613,7 +613,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var shift2 = 0f          // колонка плейлистов левее категорий
         private var rv = 1f              // программа канала: 0 — скрыта, 1 — выехала (виды 2 и 3)
         private val catW get() = 19f * em
-        private val catRowH get() = 3.2f * em
+        private val catRowH get() = 3.3f * em // как у каналов
 
         /** Колонки категорий и плейлистов выдвинуты сразу, без анимации */
         fun showPlaylists() { shift = 1f; shift2 = 1f }
@@ -638,7 +638,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private val topH get() = 7.6f * em
         private val top1H get() = 4.8f * em
         private val headH get() = 2.6f * em
-        private val rowH get() = 3.4f * em
+        private val rowH get() = 3.3f * em // как у категорий
         private val gap get() = 0.25f * em
 
         // шапка гида (настройка): 0 — канал и передача, 1 — только канал, 2 — скрыть. При выезде панели описания
@@ -824,8 +824,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             val l = padX - (1f - shift2) * (padX + catW)
             val r = l + catW
             val headY = padTop + topBlockNow
+            val shift = 0.3f * em
             pCat.color = U.wa(0.85f)
-            U.drawText(c, str(R.string.playlists_title), l + em, headY + headH / 2 - 0.3f * em, catW - 2 * em, pCat)
+            U.drawText(c, str(R.string.playlists_title), l + em, headY + headH / 2 - shift, catW - 2 * em, pCat)
             val rows = catRows()
             val n = pls.size
             val first = (plsIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
@@ -857,8 +858,11 @@ class GuideLayer(private val tv: Tv) : Layer {
             val headY = padTop + topBlockNow
             // вместо заголовка — строка «Поиск» (↑ с первой категории)
             val sf = catSearch && zone == Zone.CATS
-            U.roundRect(c, l, headY - 0.3f * em, r, headY + headH - 0.3f * em, U.px(U.RADIUS_S), if (sf) U.WHITE else U.FILL)
-            val scy = headY + headH / 2 - 0.3f * em
+            val boxH = headH - 0.1f * em
+            val shift = 0.3f * em
+            val boxTop = headY + (headH - boxH) / 2 - shift
+            U.roundRect(c, l, boxTop, r, boxTop + boxH, U.px(U.RADIUS_S), if (sf) U.WHITE else U.FILL)
+            val scy = headY + headH / 2 - shift
             val sc = if (sf) U.BLACK else U.wa(0.7f)
             U.fill.style = Paint.Style.STROKE
             U.fill.strokeWidth = 0.15f * em
@@ -1082,9 +1086,10 @@ class GuideLayer(private val tv: Tv) : Layer {
         private fun drawHead(c: Canvas, now: Long) {
             if (rail > 0.5f) return   // каналы сжаты до логотипов — заголовка категории нет
             val y = padTop + topBlockNow
-            val cy = y + headH / 2
+            val shift = 0.3f * em
+            val cy = y + headH / 2 - shift
             val g = group
-            val arrowW = 1.6f * em
+            val arrowW = 1.25f * em
             val l = padX
             val r = padX + chW - em
             // «‹ Эфирные 20»: стрелка напоминает, что категории — слева (←)
