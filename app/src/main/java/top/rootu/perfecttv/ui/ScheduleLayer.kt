@@ -276,7 +276,7 @@ class ScheduleLayer(
 
     override fun back() {
         when (zone) {
-            Zone.VIEWS -> if (rows.any { !it.separator }) enterList() else onBack() // или всегда enterList()
+            Zone.VIEWS -> if (rows.any { !it.separator }) enterList() else onBack()
             Zone.TABS -> toList()
             Zone.LIST -> onBack()
         }
@@ -531,10 +531,8 @@ class ScheduleLayer(
                 return
             }
             if (!focus && r.playing) {
-                // фон
-                U.roundRect(c, l, y, rr, y + rh, 0.5f * em, U.FILL_PLAYING)
-                // рамка
-                outline(c, l, y, rr, y + rh,0.5f * em ) // U.px(U.RADIUS_S)
+                U.roundRect(c, l, y, rr, y + rh, U.px(U.RADIUS_S), U.FILL_PLAYING)
+                outline(c, l, y, rr, y + rh)
             }
             val fg = if (focus) U.BLACK else U.WHITE
             val cy = y + rh / 2
@@ -561,7 +559,7 @@ class ScheduleLayer(
                 x += 1.1f * em
             }
             val isz = 1.7f * em
-            val liveText = context.getString(R.string.live) // .uppercase(getDefault())
+            val liveText = context.getString(R.string.live)
             val pad = LIVE_PAD * em
             val lw = if (r.live) pLive.measureText(liveText) else 0f
             // что реально рисуется справа, слева направо (как считаем ширину)
@@ -571,8 +569,8 @@ class ScheduleLayer(
             // суммарная ширина блока значков/бейджа + межэлементные отступы
             var iw = 0f
             if (showPlay) iw += isz
-            if (showRemind) iw += isz // + 0.5f * em
-            if (showArchive) iw += isz // + 0.5f * em
+            if (showRemind) iw += isz + 0.5f * em
+            if (showArchive) iw += isz + 0.5f * em
             if (r.live) {
                 if (iw > 0f) iw += 0.4f * em // отступ между бейджем и значками
                 iw += lw + 2f * pad
@@ -594,7 +592,6 @@ class ScheduleLayer(
                 U.roundRect(c, x, by, x + avail, by + 0.2f * em, 0.1f * em, if (focus) 0x33000000 else U.FILL_MARKED)
                 U.roundRect(c, x, by, x + avail * r.progress, by + 0.2f * em, 0.1f * em, if (focus) U.BLACK else U.WHITE)
             }
-            // draw
             var ix = rr - 0.8f * em
             if (r.live) {
                 pLive.color = if (r.playing) U.LIVE else fg
@@ -681,11 +678,10 @@ class ScheduleLayer(
                 val bg = when {
                     focus -> U.WHITE
                     active -> U.FILL_ACTIVE
-                    // t.day == playing -> U.FILL_PLAYING
                     else -> 0
                 }
                 if (bg != 0) U.roundRect(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S), bg)
-                if (t.day == playing) { // active
+                if (t.day == playing) {
                     outline(c, l + 0.5f * em, y, w - 0.6f * em, y + th, U.px(U.RADIUS_S))
                 }
                 val p = if (focus || active) pTabBold else pTab

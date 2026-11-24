@@ -368,7 +368,7 @@
     <string name="layout_standard">ЙЦУКЕН / QWERTY</string>
     <string name="layout_abc">По алфавиту</string>
     <string name="help_search">Поиск</string>
-    <string name="help_search_keys">Кнопка поиска</string>
+    <string name="help_search_keys">Кнопка поиска, меню → «Поиск»</string>
     <string name="help_search_open">открыть поиск по каналам и программе</string>
     <string name="help_search_nav">с клавиатуры: ▶︎ — результаты, ▼ — запросы; из результатов ◀︎ — обратно</string>
     <string name="help_search_ok">канал или эфир — смотреть, архив — с начала, будущее — карточка с напоминанием</string>

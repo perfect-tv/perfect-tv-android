@@ -377,7 +377,7 @@ class SearchLayer(
         private var target = 0f
         private var autoScroll = true
 
-        // drag state for swipe-to-scroll results
+        // состояние перетаскивания для прокрутки результатов
         private var downX = 0f
         private var downY = 0f
         private var dragging = false
@@ -403,6 +403,10 @@ class SearchLayer(
         private fun fieldWidth() = leftW - (if (micLeft) fieldH + gap else 0f)
         private fun fieldTextX() = fieldLeft() + 3.6f * em
         private fun fieldTextW() = fieldWidth() - 4.8f * em
+        private fun fieldTextOffset(): Float {
+            val caretX = pQuery.measureText(query, 0, caret)
+            return if (caretX > fieldTextW()) fieldTextW() - caretX else 0f
+        }
 
         private fun inField(x: Float, y: Float): Boolean =
             x in fieldLeft()..(fieldLeft() + fieldWidth()) && y in padY..(padY + fieldH)
@@ -460,7 +464,7 @@ class SearchLayer(
 
         /** Индекс курсора по x-координате в поле ввода */
         private fun caretAt(tapX: Float): Int {
-            val rel = tapX - fieldTextX()
+            val rel = tapX - fieldTextX() - fieldTextOffset()
             var best = 0
             var bestDist = Float.MAX_VALUE
             for (i in 0..query.length) {
@@ -522,7 +526,7 @@ class SearchLayer(
             }
             // курсор: держим его в видимой части поля, при длинном запросе сдвигаем текст
             val caretX = pQuery.measureText(query, 0, caret)
-            val tx = if (caretX > w) x + w - caretX else x
+            val tx = x + fieldTextOffset()
             c.withClip(x, t, x + w + 0.5f * em, t + fieldH) {
                 c.drawText(
                     query,

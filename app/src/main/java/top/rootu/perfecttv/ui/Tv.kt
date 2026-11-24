@@ -1107,10 +1107,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                     else -> openDetails(ch, Cell(start, stop, repo.at(ch, start)))
                 }
             },
-            onLong = { ch ->
-                // closeSearch()
-                openSchedule(ch, 0)
-            },
+            onLong = { ch -> openSchedule(ch, 0) },
             onVoice = if (!canSpeak) null else { tag ->
                 // язык — явно и дважды (часть распознавателей читает только предпочтение), иначе берётся английский
                 val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)

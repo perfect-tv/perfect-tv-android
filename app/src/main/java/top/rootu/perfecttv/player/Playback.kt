@@ -376,6 +376,7 @@ class Playback(context: Context) {
             for (i in 0 until g.length) {
                 if (!g.isTrackSupported(i)) continue
                 val f = g.getTrackFormat(i)
+                if (type == C.TRACK_TYPE_VIDEO && (f.roleFlags and C.ROLE_FLAG_TRICK_PLAY) != 0) continue
                 val lang = f.language?.takeIf { it != C.LANGUAGE_UNDETERMINED } ?: ""
                 val name = lang.takeIf { it.isNotEmpty() }?.let { java.util.Locale.forLanguageTag(it).getDisplayLanguage(top.rootu.perfecttv.core.Lang.locale).replaceFirstChar { c -> c.uppercase() } } ?: ""
                 var label = listOf(name, f.label ?: "").filter { it.isNotEmpty() }.distinct().joinToString(" · ")

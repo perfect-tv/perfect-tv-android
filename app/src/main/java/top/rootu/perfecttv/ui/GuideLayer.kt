@@ -630,7 +630,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         // строка подсказок под списком (настройка «Подсказки клавиш»)
         private val hintsH get() = if (Prefs.keyHints && !U.touch) 1.9f * em else 0f
-        private val hintsCy get() = height - padBottom - 0.8f * em // hintsBase
+        private val hintsCy get() = height - padBottom - 0.8f * em
 
         private val padX get() = 4f * em
         private val padTop get() = 2.4f * em
@@ -925,7 +925,6 @@ class GuideLayer(private val tv: Tv) : Layer {
                 "◀︎" to str(R.string.hint_to_channels),
                 "▲ ▼" to str(R.string.hint_programme_pick),
                 "▶︎" to str(R.string.hint_dates),
-                // str(R.string.key_hold_ok) to str(R.string.about)
             )
             Zone.DATES -> listOf(
                 "▲ ▼" to str(R.string.hint_date),
@@ -1291,7 +1290,6 @@ class GuideLayer(private val tv: Tv) : Layer {
                 else -> 0
             }
             if (bg != 0) U.roundRect(c, l, y, r, y + h, U.px(U.RADIUS_S), bg)
-            // if (ghost) outline(c, l, y, r, y + h)
             // рамка на играющей передаче
             if (playingLive || playingArchive) outline(c, l, y, r, y + h)
             val fg = if (pf) U.BLACK else if (past) U.wa(0.62f) else U.WHITE
@@ -1304,7 +1302,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val isz = 1.7f * em
             var ix = r - 0.8f * em
             if (live) {
-                val liveText = context.getString(R.string.live) // .uppercase(getDefault())
+                val liveText = context.getString(R.string.live)
                 // играющий эфир — цветом «Эфир», остальные — как значки
                 val lc = if (playingLive) U.LIVE else ic
                 pLive.color = lc
@@ -1390,7 +1388,7 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         /** Строк описания, что помещаются под картинкой, временем и названием (две строки) и над подсказкой OK */
         private fun panelDescLines(top: Float, bottom: Float, ih: Float): Int {
-            // if the OK row is hidden, description may run down to the layer bottom
+            // Если подсказки скрыты, описание может занимать место до нижнего края панели
             val descBottom = if (hintsH > 0f) hintsCy - 0.85f * em else bottom - 0.3f * em
             val used = ih + 1.2f * em + 1.9f * em + pPanelTitle.fontSpacing * 1.12f * 2 + 0.7f * em
             return maxOf(1, ((descBottom - top - used) / (pPanelDesc.fontSpacing * 1.12f)).toInt())
@@ -1412,7 +1410,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val layerBottom = if (hintsH > 0f) maxOf(height - padBottom, hintsCy + 0.85f * em + 0.05f * em)
             else height - padBottom
             val strokePad = 0.1f * em
-            c.saveLayerAlpha(l - strokePad, top, l + pw  + strokePad, layerBottom, (255 * rail).roundToInt())
+            val s = c.saveLayerAlpha(l - strokePad, top, l + pw + strokePad, layerBottom, (255 * rail).roundToInt())
             val ih = minOf(pw * 9f / 16f, (bottom - top) * 0.4f)
             val bm = if (p.icon.isNotEmpty()) Logos.bitmapUrl(context, p.icon, 512, 288) { invalidate() } else null
             if (bm != null) {
@@ -1468,6 +1466,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 c.drawText(ok, l + (kw - pHintKey.measureText(ok)) / 2, cy - (pHintKey.descent() + pHintKey.ascent()) / 2, pHintKey)
                 c.drawText(action, l + kw + 0.6f * em, cy - (pHint.descent() + pHint.ascent()) / 2, pHint)
             }
+            c.restoreToCount(s)
         }
 
         // ---------------------------------------------------------- тач и мышь

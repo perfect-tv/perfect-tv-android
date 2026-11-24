@@ -19,7 +19,6 @@ import top.rootu.perfecttv.core.Clock
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Channel
 import top.rootu.perfecttv.data.Programme
-import kotlin.math.roundToInt
 import androidx.core.view.isNotEmpty
 import androidx.core.view.isVisible
 import kotlin.math.abs

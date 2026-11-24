@@ -29,7 +29,7 @@ plugins {
 
 android {
     namespace = "top.rootu.perfecttv"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "top.rootu.perfecttv"

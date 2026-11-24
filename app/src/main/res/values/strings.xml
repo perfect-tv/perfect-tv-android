@@ -54,7 +54,7 @@
     <string name="parental_lock">Parental lock</string>
     <string name="lock_channel_category_by_pin_the_pin">“Lock channel / category” — by PIN (the PIN is set on the first lock)</string>
     <string name="pin_window">PIN window</string>
-    <string name="remote_digits_or_the_method_from">Remote digits or the method from settings: ring — ▲ ▶ ︎▼ ◀︎ = 1–4, “OK” = 0, “Menu” / hold “OK” — 5–9; rows — ◀︎/“OK”/▶︎ in the row, ▲/▼ — row, on 7·8·9 ▼ = 0; keypad: “Back” — delete</string>
+    <string name="remote_digits_or_the_method_from">Remote digits or the method from settings: ring — ▲ ▶︎ ▼ ◀︎ = 1–4, “OK” = 0, “Menu” / hold “OK” — 5–9; rows — ◀︎/“OK”/▶︎ in the row, ▲/▼ — row, on 7·8·9 ▼ = 0; keypad: “Back” — delete</string>
     <string name="n4_6_digits_only_entered_dots_are">4–6 digits, only entered dots are shown; change or remove in settings</string>
     <string name="remind">“Remind”</string>
     <string name="in_the_card_of_an_upcoming_programme">In the card of an upcoming programme</string>
@@ -368,7 +368,7 @@
     <string name="layout_standard">ЙЦУКЕН / QWERTY</string>
     <string name="layout_abc">Alphabetical</string>
     <string name="help_search">Search</string>
-    <string name="help_search_keys">“Search” button</string>
+    <string name="help_search_keys">“Search” button, menu → “Search”</string>
     <string name="help_search_open">open search over channels and the programme guide</string>
     <string name="help_search_nav">from the keyboard: ▶︎ — results, ▼ — queries; from the results ◀︎ — back</string>
     <string name="help_search_ok">channel or live — watch, archive — from the start, upcoming — card with a reminder</string>
