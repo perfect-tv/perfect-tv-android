@@ -77,6 +77,8 @@ class ScheduleLayer(
     private companion object {
         /** Поля между текстом «LIVE» и его рамкой, em */
         const val LIVE_PAD = 0.8f
+        /** TABS_AUTO — свободной прокрутки нет, колонка центрируется по фокусу */
+        const val TABS_AUTO = -1f
     }
 
     private lateinit var content: Content
@@ -152,6 +154,7 @@ class ScheduleLayer(
         // остаться на выбранном дне, а не уехать к строке, с которой ушли на даты
         if (zone == Zone.TABS && tabs.isNotEmpty()) {
             tabIndex = tabIndex.coerceIn(0, tabs.size - 1)
+            list.resetTabsScroll()   // автоцентрирование по фокусу
             scrollToTab(tabIndex, true)
         } else list.scrollToFocus(true)
         list.invalidate()
@@ -193,6 +196,7 @@ class ScheduleLayer(
         if (tabs.isEmpty()) return
         val d = rows.getOrNull(index)?.day
         tabIndex = tabs.indexOfFirst { it.day == d }.coerceAtLeast(0)
+        list.resetTabsScroll()   // автоцентрирование по фокусу
         zone = Zone.TABS
         list.invalidate()
     }
@@ -200,6 +204,7 @@ class ScheduleLayer(
     private fun toList() {
         zone = Zone.LIST
         tabs.getOrNull(tabIndex)?.let { t -> dayTarget(t.day).takeIf { it >= 0 }?.let { index = it } }
+        list.resetTabsScroll()   // автоцентрирование по активной дате
         list.scrollToFocus(false)
         list.invalidate()
     }
@@ -214,10 +219,12 @@ class ScheduleLayer(
 
     /**
      * Прокрутить к выбранной дате: к передаче, на которую перейдёт фокус (она в рамке), а если это
-     * первая передача дня — к заголовку дня, чтобы был виден и он
+     * первая передача дня — к заголовку дня, чтобы был виден и он. Сбрасывает свободную прокрутку
+     * колонки дат — автоцентрирование по фокусу.
      */
     private fun scrollToTab(k: Int, jump: Boolean) {
         val day = tabs.getOrNull(k)?.day ?: return
+        list.resetTabsScroll()
         val t = dayTarget(day)
         val sep = rows.indexOfFirst { it.separator && it.day == day }
         if (t >= 0 && rows[t].playing) list.scrollToRow(t, jump) else if (sep >= 0) list.scrollToRow(sep, jump)
@@ -322,6 +329,15 @@ class ScheduleLayer(
         private var focusH = 0f
         private var focusSet = false
 
+        // геометрия вкладок дат (общая для отрисовки и попадания пальцем)
+        private val tabH = 3.9f * em
+        private val tabGap = 0.3f * em
+        private val tabLead = 0.4f * em
+
+        // свободная прокрутка колонки дат (пальцем/колесом); TABS_AUTO = автоцентрирование по фокусу
+        private var tabsScroll = TABS_AUTO
+        private var tabsScrollTarget = TABS_AUTO
+
         private fun h(r: Row) = if (r.separator) sepH else if (r.channel != null || r.sub.isNotEmpty()) richH else rowH
 
         private fun top(i: Int): Float {
@@ -355,12 +371,25 @@ class ScheduleLayer(
             if (height == 0) post { scrollToRow(index, true) } else scrollToRow(index, jump)
         }
 
+        /** Вернуть колонку дат к автоцентрированию по фокусу (сбросить свободную прокрутку) */
+        fun resetTabsScroll() {
+            tabsScroll = TABS_AUTO
+            tabsScrollTarget = TABS_AUTO
+        }
+
         override fun onDraw(c: Canvas) {
             // плавная прокрутка к цели
             if (abs(target - scrollY0) > 0.5f) {
                 scrollY0 += (target - scrollY0) * 0.35f
                 postInvalidateOnAnimation()
             } else scrollY0 = target
+            // плавная прокрутка колонки дат
+            if (tabsScrollTarget >= 0f && tabsScroll >= 0f) {
+                if (abs(tabsScrollTarget - tabsScroll) > 0.5f) {
+                    tabsScroll += (tabsScrollTarget - tabsScroll) * 0.35f
+                    postInvalidateOnAnimation()
+                } else tabsScroll = tabsScrollTarget
+            }
             // трекинг фокуса — к своей строке тем же шагом, что и прокрутка
             val fi = if (zone == Zone.LIST && index in rows.indices && !rows[index].separator) index else -1
             if (fi >= 0) {
@@ -588,6 +617,46 @@ class ScheduleLayer(
             }
         }
 
+        /** Общая геометрия колонки дат: полная высота (одинаково для отрисовки и тапов) */
+        private fun tabsTotalH(): Float = tabs.size * (tabH + tabGap) + 0.8f * em
+
+        /** Автоцентрирование: смещение колонки по фокусу (дата/строка/зона) */
+        private fun tabsAutoOffset(): Float {
+            if (tabs.isEmpty()) return 0f
+            val rowDay = rows.getOrNull(index)?.day
+            val center = if (zone == Zone.TABS) tabIndex
+            else tabs.indexOfFirst { it.day == rowDay }.coerceAtLeast(0)
+            return (center * (tabH + tabGap) - height / 2f + tabH / 2)
+                .coerceIn(0f, maxOf(0f, tabsTotalH() - height))
+        }
+
+        /** Эффективное смещение колонки: свободная прокрутка, если задана, иначе автоцентрирование */
+        private fun tabsOffset(): Float =
+            if (tabsScroll >= 0f) tabsScroll else tabsAutoOffset()
+
+        /** Индекс вкладки даты под точкой (x, y), или -1 */
+        private fun tabAt(x: Float, y: Float): Int {
+            if (x >= tabsW) return -1
+            val off = tabsOffset()
+            val top = y + off - tabLead
+            if (top < 0f) return -1
+            val k = (top / (tabH + tabGap)).toInt()
+            if (k !in tabs.indices) return -1
+            val yInTab = top - k * (tabH + tabGap)
+            return if (yInTab <= tabH) k else -1    // промах между вкладками — игнор
+        }
+
+        /** Свободная прокрутка колонки дат (пальцем/колесом) */
+        private fun scrollTabsBy(dy: Float) {
+            if (tabs.isEmpty()) return
+            val maxOff = maxOf(0f, tabsTotalH() - height)
+            if (maxOff <= 0f) return                       // всё умещается — прокручивать нечего
+            val base = if (tabsScroll >= 0f) tabsScroll else tabsAutoOffset()
+            tabsScroll = (base + dy).coerceIn(0f, maxOff)
+            tabsScrollTarget = tabsScroll
+            invalidate()
+        }
+
         /** Вкладки дат — колонка слева */
         private fun drawTabs(c: Canvas) {
             val l = 0f
@@ -595,18 +664,16 @@ class ScheduleLayer(
             U.fill.color = U.LINE
             c.drawRect(w - 0.1f * em, 0f, w, height.toFloat(), U.fill)
             if (tabs.isEmpty()) return
-            val th = 3.9f * em
+            val th = tabH
+            val gap = tabGap
             val playing = playingDay()
             val activeDay = if (zone == Zone.LIST) rows.getOrNull(index)?.day else null
-            // вкладка в фокусе (или активная) — ближе к середине колонки
-            // (день строки в фокусе берём и когда фокус на кнопках видов — иначе колонка прыгала бы вверх)
-            val rowDay = rows.getOrNull(index)?.day
-            val center = if (zone == Zone.TABS) tabIndex else tabs.indexOfFirst { it.day == rowDay }.coerceAtLeast(0)
-            val totalH = tabs.size * (th + 0.3f * em) + 0.8f * em
-            val off = (center * (th + 0.3f * em) - height / 2f + th / 2).coerceIn(0f, maxOf(0f, totalH - height))
+            // смещение колонки — из общей функции (та же логика, что и для тапов)
+            val off = tabsOffset()
+            val totalH = tabsTotalH()
             val save = Fade.begin(c, l, 0f, w, height.toFloat())
             for ((k, t) in tabs.withIndex()) {
-                val y = 0.4f * em + k * (th + 0.3f * em) - off
+                val y = tabLead + k * (th + gap) - off
                 if (y + th < 0 || y > height) continue
                 val focus = zone == Zone.TABS && k == tabIndex
                 val active = t.day == activeDay
@@ -634,7 +701,21 @@ class ScheduleLayer(
         }
 
         private fun tap(ex: Float, ey: Float) {
-            if (ex < tabsW || ex > width - viewsW - detailW) return
+            // ---- колонка дат ----
+            if (ex < tabsW) {
+                val k = tabAt(ex, ey)
+                if (k >= 0) {
+                    tabIndex = k
+                    // как нажатие → из зоны дат: фокус уезжает на передачу этого дня
+                    zone = Zone.TABS
+                    toList()
+                    applyPills()
+                }
+                return
+            }
+            // ---- панель передачи / колонка видов ----
+            if (ex > width - viewsW - detailW) return
+            // ---- строки списка (как раньше) ----
             var y = -scrollY0
             for (i in rows.indices) {
                 val rh = h(rows[i])
@@ -651,12 +732,13 @@ class ScheduleLayer(
             }
         }
 
-        // тап — выбрать, перетаскивание и колесо — прокрутка списка (фокус не двигается)
+        // тап — выбрать, перетаскивание — прокрутка (список или колонка дат), колесо — тоже
         private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapUp(e: MotionEvent): Boolean { tap(e.x, e.y); return true }
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-                scrollBy(dy)
+                // жест начался на колонке дат — прокручиваем даты, а не список
+                if ((e1?.x ?: e2.x) < tabsW) scrollTabsBy(dy) else scrollBy(dy)
                 return true
             }
         })
@@ -682,7 +764,9 @@ class ScheduleLayer(
 
         override fun onGenericMotionEvent(e: MotionEvent): Boolean {
             if (e.action != MotionEvent.ACTION_SCROLL) return super.onGenericMotionEvent(e)
-            scrollBy(-e.getAxisValue(MotionEvent.AXIS_VSCROLL) * rowH * 2)
+            val step = -e.getAxisValue(MotionEvent.AXIS_VSCROLL) * rowH * 2
+            // колесо над колонкой дат — прокручиваем даты
+            if (e.x < tabsW) scrollTabsBy(step) else scrollBy(step)
             return true
         }
     }
