@@ -307,15 +307,15 @@ class InfoPanel(val view: View) {
             var tx = x + padH
             when (icon) {
                 PAUSE -> {
-                    val bar = cap * 0.3f
+                    val bar = cap * 0.25f
                     val r = bar / 3
-                    c.drawRoundRect(tx, capMid - cap / 2, tx + bar, capMid + cap / 2, r, r, paint)
-                    c.drawRoundRect(tx + iw - bar, capMid - cap / 2, tx + iw, capMid + cap / 2, r, r, paint)
+                    c.drawRoundRect(tx, capMid - cap / 2 + 2.0f, tx + bar, capMid + cap / 2, r, r, paint)
+                    c.drawRoundRect(tx + iw - bar, capMid - cap / 2 + 2.0f, tx + iw, capMid + cap / 2, r, r, paint)
                 }
                 HISTORY -> {
                     // значок занимает ~3/4 поля 24×24, поэтому поле — на треть больше высоты цифр
-                    val size = cap * 1.33f
-                    Icons.draw(c, Icons.Kind.ARCHIVE, tx + iw / 2 - size / 2, capMid - size / 2, size, fg)
+                    val size = cap * 1.45f
+                    Icons.draw(c, Icons.Kind.ARCHIVE, tx + iw / 2 - size / 2, capMid - size / 2 + 1.4f, size, fg)
                     tx += iw + cap * 0.4f
                 }
             }
