@@ -19,7 +19,7 @@ import javax.net.ssl.X509TrustManager
  * у провайдеров IPTV это обычное дело.
  */
 object Net {
-    const val USER_AGENT = "PerfectTV/1.0 (Linux; Android) ExoPlayer"
+    const val DEFAULT_USER_AGENT = "PerfectTV/1.0 (Linux; Android) ExoPlayer"
 
     lateinit var client: OkHttpClient
         private set
@@ -47,6 +47,11 @@ object Net {
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
             .cache(Cache(File(context.cacheDir, "http"), 20L * 1024 * 1024))
+            // стандартный User-Agent для запросов без своего агента (логотипы, TMDB и т.п.)
+            .addInterceptor { chain ->
+                val r = chain.request()
+                chain.proceed(if (r.header("User-Agent") != null) r else r.newBuilder().header("User-Agent", DEFAULT_USER_AGENT).build())
+            }
             .addNetworkInterceptor { chain ->
                 val r = chain.proceed(chain.request())
                 Clock.syncWith(r.headers.getDate("Date"))
@@ -61,7 +66,7 @@ object Net {
      * GET с условными заголовками. 304 возвращается как есть (тело пустое),
      * прочие не-2xx — [HttpError]. Ответ нужно закрыть.
      */
-    fun get(url: String, etag: String = "", lastModified: String = "", userAgent: String = USER_AGENT): Response {
+    fun get(url: String, etag: String = "", lastModified: String = "", userAgent: String = DEFAULT_USER_AGENT): Response {
         val b = Request.Builder().url(url).header("User-Agent", userAgent)
         if (etag.isNotEmpty()) b.header("If-None-Match", etag)
         if (lastModified.isNotEmpty()) b.header("If-Modified-Since", lastModified)

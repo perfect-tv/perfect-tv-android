@@ -46,13 +46,13 @@ class Playback(context: Context) {
     }
 
     private var headers: Map<String, String> = emptyMap()
-    private var userAgent = Net.USER_AGENT
+    private var userAgent = Net.DEFAULT_USER_AGENT
     var listener: Listener? = null
 
     /** Cookie провайдера на время одного запуска канала (см. [Cookies]) */
     private val cookies = Cookies()
     private val http = OkHttpDataSource.Factory(Net.client.newBuilder().cookieJar(cookies).build())
-        .setUserAgent(Net.USER_AGENT)
+        .setUserAgent(Net.DEFAULT_USER_AGENT)
     private val dataSource = http
 
     /** Источники данных: http(s) — OkHttp, udp / rtp — [UdpSources] */
@@ -260,7 +260,7 @@ class Playback(context: Context) {
         applyFix()
         stallCount = -1L
         stallTicks = 0
-        userAgent = ch.userAgent.ifEmpty { Net.USER_AGENT }
+        userAgent = ch.effectiveUserAgent()
         val h = HashMap<String, String>()
         if (ch.referrer.isNotEmpty()) h["Referer"] = ch.referrer
         if (ch.headersJson.isNotEmpty()) {

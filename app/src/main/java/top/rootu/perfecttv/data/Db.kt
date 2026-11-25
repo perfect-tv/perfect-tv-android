@@ -32,6 +32,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             epg_mode INTEGER NOT NULL DEFAULT 0,      -- 0 из плейлиста, 1 плейлист + свои, 2 только свои
             user_epg TEXT NOT NULL DEFAULT '',        -- свои URL через \n
             header_epg TEXT NOT NULL DEFAULT '',      -- URL из #EXTM3U через \n
+            user_agent TEXT NOT NULL DEFAULT '',      -- User-Agent для запросов плейлиста и его каналов
             loaded_at INTEGER NOT NULL DEFAULT 0,
             etag TEXT NOT NULL DEFAULT '',
             last_modified TEXT NOT NULL DEFAULT '',
@@ -142,6 +143,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
             needVacuum = true
         }
         if (oldVersion < 4) createLocked(db)
+        if (oldVersion < 5) db.execSQL("ALTER TABLE playlist ADD COLUMN user_agent TEXT NOT NULL DEFAULT ''")
     }
 
     /** Источник EPG по URL (создаёт при первом обращении) */
@@ -155,7 +157,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, "perfecttv.db", null, VER
     @Volatile var needVacuum = false
 
     companion object {
-        const val VERSION = 4
+        const val VERSION = 5
     }
 }
 

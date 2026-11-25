@@ -8,6 +8,7 @@ data class Playlist(
     val epgMode: Int,
     val userEpg: List<String>,
     val headerEpg: List<String>,
+    val userAgent: String,
     val loadedAt: Long,
     val channelsCount: Int,
     val error: String
@@ -49,8 +50,13 @@ class Channel(
     val archiveDays: Int,
     val userAgent: String,
     val referrer: String,
-    val headersJson: String
+    val headersJson: String,
+    /** User-Agent плейлиста: применяется к каналу, если у канала нет своего */
+    val playlistUserAgent: String = ""
 ) {
+    /** Эффективный User-Agent канала: свой, иначе плейлиста, иначе стандартный приложения */
+    fun effectiveUserAgent(): String = userAgent.ifEmpty { playlistUserAgent.ifEmpty { top.rootu.perfecttv.core.Net.DEFAULT_USER_AGENT } }
+
     /** Категория для навигации (с учётом разбиения на страницы «#2») */
     var groupKey: String = group
 

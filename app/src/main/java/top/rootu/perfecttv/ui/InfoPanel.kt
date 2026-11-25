@@ -352,7 +352,7 @@ class InfoPanel(val view: View) {
                 bannerUrl = image
                 banner.scaleType = ImageView.ScaleType.CENTER_CROP
                 banner.setBackgroundResource(R.drawable.bg_soft)
-                Logos.banner(banner, image) { if (bannerUrl == image && ch != null) logoBanner(ch) }
+                Logos.banner(banner, image, ch?.effectiveUserAgent() ?: top.rootu.perfecttv.core.Net.DEFAULT_USER_AGENT) { if (bannerUrl == image && ch != null) logoBanner(ch) }
             }
         } else if (ch != null) logoBanner(ch)
         // «Далее на канале»: первая строка блока — заголовок из разметки

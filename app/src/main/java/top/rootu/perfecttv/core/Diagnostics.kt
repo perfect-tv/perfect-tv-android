@@ -137,7 +137,7 @@ object Diagnostics {
 
     private fun settings() = listOf(
         "videoDecoder=${Prefs.videoDecoder} deinterlace=${Prefs.deinterlace} anyCert=${Prefs.anyCert} animations=${Prefs.animations}",
-        "archiveDays=${Prefs.archiveDays} epgRefreshHours=${Prefs.epgRefreshHours} guideMode=${Prefs.guideMode} numberMode=${Prefs.numberMode}",
+        "archiveDays=${Prefs.archiveDays} playlistRefreshHours=${Prefs.playlistRefreshHours} epgRefreshHours=${Prefs.epgRefreshHours} guideMode=${Prefs.guideMode} numberMode=${Prefs.numberMode}",
         "subtitles: size=${Prefs.subSize} color=${Prefs.subColor} bg=${Prefs.subBg} edge=${Prefs.subEdge} bottom=${Prefs.subBottom}"
     )
 

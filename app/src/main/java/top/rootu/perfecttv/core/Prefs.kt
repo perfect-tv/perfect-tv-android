@@ -224,7 +224,7 @@ object Prefs {
         get() = int("epg_refresh", 12)
         set(v) = sp.edit().putInt("epg_refresh", v).apply()
 
-    /** Перекачивать плейлист при запуске, если ему больше N часов */
+    /** Перекачивать плейлист при запуске, если ему больше N часов; 0 — не обновлять автоматически */
     var playlistRefreshHours: Int
         get() = int("playlist_refresh", 24)
         set(v) = sp.edit().putInt("playlist_refresh", v).apply()

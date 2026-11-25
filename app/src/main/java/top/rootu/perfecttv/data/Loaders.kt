@@ -21,7 +21,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
     private class Source(val input: InputStream, val length: Long, val etag: String, val lastModified: String, val notModified: Boolean, val close: () -> Unit)
 
     /** URL, файл из системного выбора (content://) или локальный файл (file://, абсолютный путь) */
-    private fun open(url: String, etag: String, lastModified: String): Source {
+    private fun open(url: String, etag: String, lastModified: String, userAgent: String): Source {
         if (url.startsWith("content://")) {
             val input = try {
                 resolver.openInputStream(android.net.Uri.parse(url))
@@ -38,7 +38,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
         }
         if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) throw LoadError("no_url", "неверный адрес")
         val r = try {
-            Net.get(url, etag, lastModified)
+            Net.get(url, etag, lastModified, userAgent)
         } catch (e: Net.HttpError) {
             throw LoadError("http_${e.code}", e.message ?: "")
         } catch (e: IOException) {
@@ -67,7 +67,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
         w.rawQuery("SELECT etag, last_modified FROM playlist WHERE id=?", arrayOf(p.id.toString())).use {
             if (it.moveToFirst() && !force && p.channelsCount > 0) { etag = it.getString(0); lm = it.getString(1) }
         }
-        val src = open(p.url, etag, lm)
+        val src = open(p.url, etag, lm, p.userAgent.ifBlank { Net.DEFAULT_USER_AGENT })
         try {
             if (src.notModified) {
                 w.execSQL("UPDATE playlist SET loaded_at=?, error='' WHERE id=?", arrayOf<Any>(Clock.now(), p.id))
@@ -152,7 +152,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
      * устаревшее по глубине архива; прошлое, которого в новой выгрузке нет, остаётся — оно нужно архиву.
      * Обрыв посередине ничего не теряет.
      */
-    fun loadEpg(sourceId: Long, url: String, channels: List<Wanted>, force: Boolean, langs: List<String>) {
+    fun loadEpg(sourceId: Long, url: String, channels: List<Wanted>, force: Boolean, langs: List<String>, userAgent: String) {
         // большой XMLTV сканируется почти минуту: не догонять интерфейс и playback-поток плеера
         Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
         val w = db.writableDatabase
@@ -168,7 +168,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
         w.execSQL("UPDATE epg_source SET status=?, error='' WHERE id=?", arrayOf<Any>(STATUS_LOADING, sourceId))
         val t0 = System.currentTimeMillis()
         val src = try {
-            open(url, etag, lm)
+            open(url, etag, lm, userAgent.ifBlank { Net.DEFAULT_USER_AGENT })
         } catch (e: LoadError) {
             fail(sourceId, url, e.code)
             throw e

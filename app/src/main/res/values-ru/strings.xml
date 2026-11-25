@@ -129,8 +129,11 @@
     <string name="hidden_categories_and_channels">Скрытые категории и каналы</string>
     <string name="none">нет</string>
     <string name="all_playlists_ok_restore">все плейлисты; «OK» — вернуть</string>
+    <string name="reload_playlist_every">Обновлять плейлист каждые</string>
     <string name="reload_programme_every">Обновлять программу каждые</string>
     <string name="x_h">%1$s ч</string>
+    <string name="user_agent">User-Agent</string>
+    <string name="user_agent_sub">для этого плейлиста, его программы и каналов; пусто — как раньше. Параметры канала из плейлиста имеют приоритет.</string>
     <string name="programme_descriptions_tmdb">Описания передач (TMDB)</string>
     <string name="tmdb_key">Ключ TMDB</string>
     <string name="not_set">не задан</string>

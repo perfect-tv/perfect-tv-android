@@ -49,11 +49,11 @@ class Repo(context: Context) {
 
     fun playlists(): List<Playlist> {
         val out = ArrayList<Playlist>()
-        db.readableDatabase.rawQuery("SELECT id,name,url,epg_mode,user_epg,header_epg,loaded_at,channels_count,error FROM playlist ORDER BY sort,id", null).use { c ->
+        db.readableDatabase.rawQuery("SELECT id,name,url,epg_mode,user_epg,header_epg,user_agent,loaded_at,channels_count,error FROM playlist ORDER BY sort,id", null).use { c ->
             while (c.moveToNext()) out.add(Playlist(
                 c.getLong(0), c.getString(1), c.getString(2), c.getInt(3),
                 c.getString(4).lines().filter { it.isNotBlank() }, c.getString(5).lines().filter { it.isNotBlank() },
-                c.getLong(6), c.getInt(7), c.getString(8)
+                c.getString(6), c.getLong(7), c.getInt(8), c.getString(9)
             ))
         }
         return out
@@ -64,9 +64,10 @@ class Repo(context: Context) {
     fun addPlaylist(name: String, url: String): Long =
         db.writableDatabase.insert("playlist", null, ContentValues().apply { put("name", name); put("url", url.trim()) })
 
-    fun updatePlaylist(id: Long, name: String, url: String, epgMode: Int, userEpg: List<String>) {
+    fun updatePlaylist(id: Long, name: String, url: String, epgMode: Int, userEpg: List<String>, userAgent: String) {
         db.writableDatabase.update("playlist", ContentValues().apply {
             put("name", name); put("url", url.trim()); put("epg_mode", epgMode); put("user_epg", userEpg.joinToString("\n"))
+            put("user_agent", userAgent.trim())
         }, "id=?", arrayOf(id.toString()))
     }
 
@@ -118,7 +119,7 @@ class Repo(context: Context) {
                     url = c.getString(3), group = c.getString(4).ifEmpty { "—" }, logo = c.getString(5), tvgId = c.getString(6),
                     tvgName = c.getString(7), tvgShift = c.getFloat(8), catchupType = type, catchupSource = c.getString(10),
                     archiveDays = if (type == null) 0 else c.getInt(11).takeIf { it > 0 } ?: def,
-                    userAgent = c.getString(12), referrer = c.getString(13), headersJson = c.getString(14)
+                    userAgent = c.getString(12), referrer = c.getString(13), headersJson = c.getString(14), playlistUserAgent = p.userAgent
                 ))
             }
         }
@@ -168,7 +169,7 @@ class Repo(context: Context) {
             queued.add(id)
             worker.execute {
                 try {
-                    loaders.loadEpg(id, url, wantedFor(url), force, langs())
+                    loaders.loadEpg(id, url, wantedFor(url), force, langs(), p.userAgent.ifBlank { top.rootu.perfecttv.core.Net.DEFAULT_USER_AGENT })
                 } catch (_: Loaders.LoadError) {
                 } finally {
                     queued.remove(id)
@@ -200,8 +201,9 @@ class Repo(context: Context) {
 
     private fun langs(): List<String> = listOf(Locale.getDefault().language.lowercase(), "ru", "en").distinct()
 
-    /** Устарел ли плейлист (перекачать при запуске) */
-    fun isStale(p: Playlist) = p.channelsCount == 0 || Clock.now() - p.loadedAt > Prefs.playlistRefreshHours * 3600L
+    /** Устарел ли плейлист (перекачать при запуске); 0 в настройке — автоматически не обновлять */
+    fun isStale(p: Playlist) = p.channelsCount == 0 ||
+        (Prefs.playlistRefreshHours > 0 && Clock.now() - p.loadedAt > Prefs.playlistRefreshHours * 3600L)
 
     // ================================================================== программа
 

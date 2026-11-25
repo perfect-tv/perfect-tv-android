@@ -320,6 +320,8 @@ class SettingsActivity : Activity() {
             if (!it) Thread { top.rootu.perfecttv.data.Home.remove(applicationContext) }.start()
             showMain()
         }
+        number(col, str(R.string.reload_playlist_every), listOf(0, 1, 6, 12, 24, 72, 168), Prefs.playlistRefreshHours,
+            label = { if (it == 0) str(R.string.off) else str(R.string.x_h, it) }) { Prefs.playlistRefreshHours = it; showMain() }
         number(col, str(R.string.reload_programme_every), listOf(6, 12, 24), Prefs.epgRefreshHours, label = { str(R.string.x_h, it) }) { Prefs.epgRefreshHours = it; showMain() }
         return first
     }
@@ -788,9 +790,10 @@ class SettingsActivity : Activity() {
 
         var mode = p?.epgMode ?: Playlist.EPG_PLAYLIST
         val userEpg = form.field(str(R.string.own_programme_sources_xmltv_comma), p?.userEpg?.joinToString(", ") ?: "", url = true)
+        val userAgent = form.field(str(R.string.user_agent), p?.userAgent ?: "")
         lateinit var modeBtn: TextView
         val modeText = { m: Int -> when (m) { Playlist.EPG_BOTH -> str(R.string.programme_playlist_plus_own); Playlist.EPG_USER_ONLY -> str(R.string.programme_own_only); else -> str(R.string.programme_from_playlist) } }
-        form.button(str(R.string.save)) { save(p, name, url, userEpg, mode) }
+        form.button(str(R.string.save)) { save(p, name, url, userEpg, userAgent, mode) }
         modeBtn = form.button(modeText(mode)) {
             mode = (mode + 1) % 3
             modeBtn.text = modeText(mode)
@@ -798,7 +801,7 @@ class SettingsActivity : Activity() {
             // переключатель выглядит как настройка, «Сохранить» после него не ждут
             if (p != null) {
                 val epg = userEpg.text.toString().split(',', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }
-                repo.playlist(p.id)?.let { cur -> repo.updatePlaylist(p.id, cur.name, cur.url, mode, epg) }
+                repo.playlist(p.id)?.let { cur -> repo.updatePlaylist(p.id, cur.name, cur.url, mode, epg, userAgent.text.toString()) }
                 repo.playlist(p.id)?.let { repo.refreshEpg(it, false) }
                 android.widget.Toast.makeText(this, str(R.string.saved), android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -812,14 +815,15 @@ class SettingsActivity : Activity() {
             phoneInput(listOf(
                 PhoneInput.Field("name", str(R.string.name), name.text.toString()),
                 PhoneInput.Field("url", str(R.string.playlist_address), url.text.toString(), url = true),
-                PhoneInput.Field("epg", str(R.string.own_programme_sources_xmltv_comma), userEpg.text.toString(), url = true)),
-                mapOf("name" to name, "url" to url, "epg" to userEpg))
+                PhoneInput.Field("epg", str(R.string.own_programme_sources_xmltv_comma), userEpg.text.toString(), url = true),
+                PhoneInput.Field("ua", str(R.string.user_agent), userAgent.text.toString())),
+                mapOf("name" to name, "url" to url, "epg" to userEpg, "ua" to userAgent))
         }
         if (p != null) {
             form.button(str(R.string.up)) { repo.movePlaylist(p.id, -1); android.widget.Toast.makeText(this, str(R.string.playlist_moved_up), android.widget.Toast.LENGTH_SHORT).show() }
             form.button(str(R.string.down)) { repo.movePlaylist(p.id, 1); android.widget.Toast.makeText(this, str(R.string.playlist_moved_down), android.widget.Toast.LENGTH_SHORT).show() }
             form.button(str(R.string.reload)) {
-                save(p, name, url, userEpg, mode, back = false)
+                save(p, name, url, userEpg, userAgent, mode, back = false)
                 repo.playlist(p.id)?.let { fresh -> repo.refresh(fresh, true) { showEdit(repo.playlist(p.id)) } }
             }
             form.newRow()
@@ -870,7 +874,7 @@ class SettingsActivity : Activity() {
         item(col, url, "", "$kind · $status") {}
     }
 
-    private fun save(p: Playlist?, name: EditText, url: EditText, userEpg: EditText, mode: Int, back: Boolean = true) {
+    private fun save(p: Playlist?, name: EditText, url: EditText, userEpg: EditText, userAgent: EditText, mode: Int, back: Boolean = true) {
         val u = url.text.toString().trim()
         if (u.isEmpty()) {
             url.error = str(R.string.enter_the_address)
@@ -885,7 +889,7 @@ class SettingsActivity : Activity() {
         val n = name.text.toString().trim().ifEmpty { str(R.string.tv) }
         val epg = userEpg.text.toString().split(',', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }
         val id = if (p == null) repo.addPlaylist(n, u) else p.id
-        repo.updatePlaylist(id, n, u, mode, epg)
+        repo.updatePlaylist(id, n, u, mode, epg, userAgent.text.toString())
         // смена адреса — перекачать
         if (p != null && p.url != u) repo.playlist(id)?.let { repo.refresh(it, true) {} }
         if (p == null) {

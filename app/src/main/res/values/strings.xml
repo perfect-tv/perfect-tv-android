@@ -133,8 +133,11 @@
     <string name="hidden_categories_and_channels">Hidden categories and channels</string>
     <string name="none">none</string>
     <string name="all_playlists_ok_restore">all playlists; “OK” — restore</string>
+    <string name="reload_playlist_every">Reload playlist every</string>
     <string name="reload_programme_every">Reload programme every</string>
     <string name="x_h">%1$s h</string>
+    <string name="user_agent">User-Agent</string>
+    <string name="user_agent_sub">for this playlist, its programme and channels; empty — default. Channel options from the playlist still take precedence.</string>
     <string name="programme_descriptions_tmdb">Programme descriptions (TMDB)</string>
     <string name="tmdb_key">TMDB key</string>
     <string name="not_set">not set</string>

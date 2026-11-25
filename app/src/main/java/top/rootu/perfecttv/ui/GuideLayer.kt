@@ -1412,7 +1412,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val strokePad = 0.1f * em
             val s = c.saveLayerAlpha(l - strokePad, top, l + pw + strokePad, layerBottom, (255 * rail).roundToInt())
             val ih = minOf(pw * 9f / 16f, (bottom - top) * 0.4f)
-            val bm = if (p.icon.isNotEmpty()) Logos.bitmapUrl(context, p.icon, 512, 288) { invalidate() } else null
+            val bm = if (p.icon.isNotEmpty()) Logos.bitmapUrl(context, p.icon, 512, 288, ch.effectiveUserAgent()) { invalidate() } else null
             if (bm != null) {
                 // кадр передачи — по центру, обрезка под рамку
                 val k = maxOf(pw / bm.width, ih / bm.height)

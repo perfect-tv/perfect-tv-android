@@ -10,6 +10,7 @@ import android.util.LruCache
 import android.widget.ImageView
 import coil.ImageLoader
 import coil.request.ImageRequest
+import top.rootu.perfecttv.core.Net
 import top.rootu.perfecttv.core.Prefs
 import top.rootu.perfecttv.data.Channel
 
@@ -73,11 +74,12 @@ object Logos {
      * Картинка целиком в битмап для фонового потока (баннеры главного экрана): через тот же
      * загрузчик и дисковый кэш. null — нет адреса, не загрузилась или загрузчик не готов.
      */
-    fun fetchBlocking(context: Context, url: String, w: Int, h: Int): Bitmap? {
+    fun fetchBlocking(context: Context, url: String, w: Int, h: Int, userAgent: String = Net.DEFAULT_USER_AGENT): Bitmap? {
         if (!::loader.isInitialized || url.isEmpty()) return null
         return try {
             kotlinx.coroutines.runBlocking {
-                val r = loader.execute(ImageRequest.Builder(context).data(url).size(w, h).allowHardware(false).build())
+                val r = loader.execute(ImageRequest.Builder(context).data(url).size(w, h).allowHardware(false)
+                    .headers(okhttp3.Headers.Builder().set("User-Agent", userAgent).build()).build())
                 val bm = (r.drawable as? BitmapDrawable)?.bitmap
                 if (bm == null) markFailed(url, (r as? coil.request.ErrorResult)?.throwable)
                 bm
@@ -135,7 +137,7 @@ object Logos {
     fun fetchLogoBlocking(context: Context, ch: Channel): Bitmap? {
         for (u in ch.logoUrls()) {
             if (isFailed(u)) continue
-            fetchBlocking(context, u, 400, 250)?.let { return it }
+            fetchBlocking(context, u, 400, 250, ch.effectiveUserAgent())?.let { return it }
         }
         return null
     }
@@ -157,10 +159,18 @@ object Logos {
     private const val MAX_WAITERS = 16
 
     /** Битмап логотипа или null (ещё грузится / нет). [ready] — вызвать, когда загрузится */
-    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? = bitmapUrl(context, urlFor(ch), 256, 160, ready)
+    fun bitmap(context: Context, ch: Channel, ready: () -> Unit): Bitmap? =
+        bitmapUrlWithAgent(context, urlFor(ch), 256, 160, ch.effectiveUserAgent(), ready)
 
     /** То же по адресу картинки (панель передачи в гиде): размер загрузки — [w] × [h] */
-    fun bitmapUrl(context: Context, url: String, w: Int, h: Int, ready: () -> Unit): Bitmap? {
+    fun bitmapUrl(context: Context, url: String, w: Int, h: Int, ready: () -> Unit): Bitmap? =
+        bitmapUrlWithAgent(context, url, w, h, Net.DEFAULT_USER_AGENT, ready)
+
+    /** [bitmapUrl] с User-Agent владельца картинки (например, агент плейлиста для иконок программы) */
+    fun bitmapUrl(context: Context, url: String, w: Int, h: Int, userAgent: String, ready: () -> Unit): Bitmap? =
+        bitmapUrlWithAgent(context, url, w, h, userAgent, ready)
+
+    private fun bitmapUrlWithAgent(context: Context, url: String, w: Int, h: Int, userAgent: String, ready: () -> Unit): Bitmap? {
         if (url.isEmpty() || isFailed(url)) return null
         bitmaps.get(url)?.let { return it }
         // каждый кадр, пока логотип грузится, приносит новый ready: без предела список растёт, а потом все
@@ -169,6 +179,7 @@ object Logos {
         if (pending.add(url)) {
             loader.enqueue(ImageRequest.Builder(context).data(url).size(w, h)
                 .allowHardware(false)
+                .headers(okhttp3.Headers.Builder().set("User-Agent", userAgent).build())
                 .listener(onError = { _, r ->
                     android.util.Log.w("IPTV", "logo $url: ${r.throwable}")
                     markFailed(url, r.throwable)
@@ -203,9 +214,11 @@ object Logos {
      * Картинка передачи (EPG, TMDB) в ImageView: без кэша битмапов для Canvas, только дисковый
      * кэш Coil. Не загрузилась — [onError] (картинки в EPG часто битые).
      */
-    fun banner(view: ImageView, url: String, onError: () -> Unit = {}) {
+    fun banner(view: ImageView, url: String, userAgent: String = Net.DEFAULT_USER_AGENT, onError: () -> Unit = {}) {
         view.setImageDrawable(null)
-        loader.enqueue(ImageRequest.Builder(view.context).data(url).target(view).listener(onError = { _, _ -> onError() }).build())
+        loader.enqueue(ImageRequest.Builder(view.context).data(url).target(view)
+            .headers(okhttp3.Headers.Builder().set("User-Agent", userAgent).build())
+            .listener(onError = { _, _ -> onError() }).build())
     }
 
     private val dst = RectF()
