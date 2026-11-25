@@ -6,7 +6,6 @@ import top.rootu.perfecttv.core.plural
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
@@ -28,6 +27,7 @@ import top.rootu.perfecttv.core.Alarms
 import top.rootu.perfecttv.core.Tmdb
 import top.rootu.perfecttv.player.CatchupUrl
 import top.rootu.perfecttv.player.Playback
+import kotlin.math.abs
 
 /**
  * Оркестратор полноэкранного ТВ: состояние воспроизведения,
@@ -48,7 +48,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     var playlist: Playlist? = null
         private set
 
-    class Archive(val start: Long, var base: Long? = null, val timeshift: Boolean = false) {
+    class Archive(val start: Long, var base: Long? = null, val timeshift: Boolean = false, val requested: Long = start) {
         var continued = false
         /** Время кадра берётся из PROGRAM-DATE-TIME плейлиста (а не от base) */
         var pdt = false
@@ -476,7 +476,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
      * Включить канал.
      * @param archive unix-сек начала архива (null — эфир); program — передача (её конец задаёт длительность)
      */
-    fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false, unlocked: Boolean = false) {
+    fun playChannel(ch: Channel, groupKey: String? = null, archive: Long? = null, programEnd: Long = 0, reload: Boolean = false, unlocked: Boolean = false, startAt: Long = 0) {
         // блокировка: заблокированный канал или категория — только с PIN; играющий повторно не спрашиваем
         // из закрытого канала, открытого по PIN, в другой закрытый — PIN уже вводили, не спрашиваем
         // PIN-состояние (сессия, «PIN действует») относится к играющему плейлисту: при выборе канала
@@ -489,7 +489,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val dir = switchDirection
             return askPin(ch.title(), {
                 if (!Prefs.pinEveryTime) { unlockedKeys.add(ch.key); unlockedKeys.add("g:" + ch.groupKey) }
-                playChannel(ch, groupKey, archive, programEnd, reload, unlocked = true)
+                playChannel(ch, groupKey, archive, programEnd, reload, unlocked = true, startAt = startAt)
             }) {
                 // листали ←/→ — следующий в ту же сторону канал без PIN (закрытые пропускаем)
                 val skip = if (dir != 0) nextOpen(ch, groupKey, dir) else null
@@ -546,18 +546,17 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 return
             }
             val now = Clock.now()
-            val start = archive
-            var dur = (now - start).coerceIn(60, 6 * 3600)
-            if (programEnd > start) dur = maxOf(dur, minOf(programEnd, now) - start)
+            var dur = (now - archive).coerceIn(60, 6 * 3600)
+            if (programEnd > archive) dur = maxOf(dur, minOf(programEnd, now) - archive)
             // Flussonic HLS, передача моложе 6 ч: archive-START-now.m3u8 — EVENT-плейлист от начала
             // до «сейчас», дописывается; недавнюю передачу можно смотреть до края эфира без
             // переподключений. С окном фиксированной длины (конец — «сейчас») ссылка кончалась бы
             // через время, равное отставанию, и менялась бы по кругу. «?event=true» из документации
             // не годится: балансировщики провайдеров отбрасывают параметры и отдают VOD.
             // Плеер начинает EVENT-плейлист у края эфира — onReady ставит его на начало передачи.
-            val ready = if (CatchupUrl.flussonicHls(ch.catchupType ?: "", tpl) && now - start < 6 * 3600) tpl.replace("\${duration}", "now") else tpl
-            url = CatchupUrl.prepare(ready, start, dur, now)
-            a = Archive(start)
+            val ready = if (CatchupUrl.flussonicHls(ch.catchupType ?: "", tpl) && now - archive < 6 * 3600) tpl.replace("\${duration}", "now") else tpl
+            url = CatchupUrl.prepare(ready, archive, dur, now)
+            a = Archive(archive, requested = if (startAt > 0) startAt else archive)
             Log.i(TAG, "archive ${ch.name} $url")
         } else url = CatchupUrl.prepare(ch.url, null, 0, Clock.now())
 
@@ -644,7 +643,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         val start = maxOf(start0, Clock.now() - ch.archiveDays * 86400L)
         val gk = if (state.channel === ch) state.groupKey else null
         if (start >= Clock.now() - 30) return playChannel(ch, gk)
-        playChannel(ch, gk, start, programEnd)
+        playChannel(ch, gk, start - ARCHIVE_LEAD, programEnd, startAt = start)
     }
 
     /** Первые данные: привязать позицию плеера к началу ссылки архива */
@@ -653,9 +652,6 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         if (a.base != null) return
         a.base = playback.periodPositionMs
         if (a.timeshift) return
-        // HLS с PROGRAM-DATE-TIME: время кадра — из плейлиста. Правдоподобно (окно архива
-        // в пределах суток до «сейчас») — пользуемся им и, если плеер начал не с нужного места
-        // (растущий EVENT-плейлист плеер начинает ближе к краю эфира), ставим его на начало.
         val now = Clock.now()
         val w = playback.wallClockMs?.takeIf { it / 1000 in (a.start - 86400)..(now + 120) }
         if (w == null) {
@@ -669,12 +665,43 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             }
             return
         }
+        // HLS с PROGRAM-DATE-TIME: время кадра — из плейлиста.
+        // Ищем со смещением окна.
         a.pdt = true
-        val target = a.start * 1000 - playback.windowStartTimeMs
-        if (Math.abs(w / 1000 - a.start) > 8 && target >= 0 && target < playback.windowDurationMs - 5000) {
-            Log.i(TAG, "archive: start ${w / 1000 - a.start} s off, seek to start")
-            watch = null
-            playback.seekTo(target)
+        val dur = playback.windowDurationMs
+        val windowStartSec = playback.windowStartTimeMs / 1000
+        val target = a.requested - windowStartSec  // in seconds
+        val targetMs = target * 1000
+        Log.d(TAG, "archive onReady: requested=${a.requested} windowStart=$windowStartSec wallClock=${w/1000} " +
+                "target=${target}s dur=${dur}ms periodPos=${playback.periodPositionMs}")
+        when {
+            targetMs < 0 -> {
+                Log.i(TAG, "archive: target=$targetMs < 0, seek to 0")
+                watch = null
+                playback.seekTo(0)
+            }
+            dur > 0 && targetMs > dur - 3000 -> {
+                // запрошенное вне окна: сдвигаем окно, используя наблюдённую дельту
+                val ch = state.channel
+                val delta = a.start - windowStartSec
+                Log.w(TAG, "archive: target=${targetMs}ms past dur=${dur}ms delta=${delta}s")
+                if (ch != null && a.requested > windowStartSec + 10) {
+                    val newStart = a.requested - 30 + delta
+                    Log.w(TAG, "archive: rebuild start=$newStart (was ${a.start})")
+                    watch = null
+                    a.continued = true
+                    playChannel(ch, state.groupKey, newStart, startAt = a.requested)
+                    return
+                }
+                Log.w(TAG, "archive: cannot rebuild, seek to end")
+                watch = null
+                playback.seekTo((dur - 5000).coerceAtLeast(0))
+            }
+            abs(w / 1000 - a.requested) > 3 -> {
+                Log.i(TAG, "archive: start ${w/1000 - a.requested}s off, seek to target=${targetMs}ms")
+                watch = null
+                playback.seekTo(targetMs)
+            }
         }
     }
 
@@ -1871,6 +1898,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         const val SEEK_GROW = 120f
         const val SEEK_MAX = 600f
         const val SEEK_GAP = 700L
+        /** Количество секунд перед запрашиваемым фрагментом */
+        const val ARCHIVE_LEAD = 1L
         val RETRY = listOf(2000L, 5000L, 10000L)
     }
 }
