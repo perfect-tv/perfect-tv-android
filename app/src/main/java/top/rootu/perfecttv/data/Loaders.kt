@@ -153,7 +153,8 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
      * Обрыв посередине ничего не теряет.
      */
     fun loadEpg(sourceId: Long, url: String, channels: List<Wanted>, force: Boolean, langs: List<String>) {
-        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+        // большой XMLTV сканируется почти минуту: не догонять интерфейс и playback-поток плеера
+        Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
         val w = db.writableDatabase
         var etag = ""
         var lm = ""

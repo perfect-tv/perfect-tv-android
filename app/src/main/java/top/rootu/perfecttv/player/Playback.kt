@@ -97,11 +97,16 @@ class Playback(context: Context) {
         .setTsExtractorFlags(tsFlags)
         .setTsExtractorTimestampSearchBytes(5000 * androidx.media3.extractor.ts.TsExtractor.TS_PACKET_SIZE)
 
+    // внутренний поток плеера — отдельно от main: по документации ExoPlayer его приоритет — аудио,
+    // иначе во время тяжёлого фонового разбора (EPG, плейлисты) видео дожидается интерфейса
+    private val playbackThread = android.os.HandlerThread("playback", android.os.Process.THREAD_PRIORITY_AUDIO).apply { start() }
+
     val player: ExoPlayer = ExoPlayer.Builder(context, DefaultRenderersFactory(context)
         // FFmpeg-декодер звука из AAR — после системных (MP2, AC-3, DTS без своего кодека на приставке)
         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         .setEnableDecoderFallback(true)
         .setMediaCodecSelector(codecSelector))
+        .setPlaybackLooper(playbackThread.looper)
         .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractors).setDataSourceFactory { source() }.setLoadErrorHandlingPolicy(loadPolicy))
         .setLoadControl(DefaultLoadControl.Builder()
             // быстрый старт после переключения канала; дальше буфер растёт как обычно
@@ -491,6 +496,7 @@ class Playback(context: Context) {
         main.removeCallbacksAndMessages(null)
         multicast(false)
         player.release()
+        playbackThread.quitSafely()
     }
 
     companion object {

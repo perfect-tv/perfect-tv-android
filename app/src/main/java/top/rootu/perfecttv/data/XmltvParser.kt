@@ -62,7 +62,16 @@ class XmltvParser(
         val s = Scanner(input)
         var programmesStarted = false
         var channelsDirty = false
+        var sinceYield = 0
+        fun pace() {
+            // у большого XMLTV этот цикл на минуты занимает ядро: регулярно уступаем квант интерфейсу и видео
+            if (++sinceYield >= 128) {
+                sinceYield = 0
+                Thread.yield()
+            }
+        }
         while (s.skipTo('<'.code.toByte())) {
+            pace()
             val b = s.peek()
             if (b < 0) break
             when (b) {
