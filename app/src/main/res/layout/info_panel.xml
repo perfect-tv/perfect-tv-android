@@ -181,7 +181,7 @@
                 android:visibility="gone">
 
                 <TextView style="@style/Text.InfoButton" android:tag="prev" android:text="◀" />
-                <TextView style="@style/Text.InfoButton" android:tag="pause" android:text="❚❚" />
+                <TextView style="@style/Text.InfoButton" android:tag="pause" android:text="⏯" />
                 <TextView style="@style/Text.InfoButton" android:tag="next" android:text="▶" />
                 <TextView style="@style/Text.InfoButton" android:tag="more" android:text="@string/about" />
                 <TextView style="@style/Text.InfoButton" android:tag="guide" android:text="@string/guide" />
@@ -252,7 +252,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:lineSpacingMultiplier="1.12"
+                    android:lineSpacingMultiplier="1.14"
                     android:maxLines="6"
                     android:textColor="@color/text_85"
                     android:textSize="13sp" />
