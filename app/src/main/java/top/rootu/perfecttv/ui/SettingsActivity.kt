@@ -63,9 +63,11 @@ class SettingsActivity : Activity() {
     }
 
     // та же страница перестраивается (изменили настройку, восстановили скрытое) — фокус и прокрутка
-    // остаются на месте: номер пункта в списке и прокрутка старой страницы
+    // остаются на месте: номер пункта в списке и прокрутка старой страницы. На тач-устройствах фокуса
+    // у тапнутого пункта нет — его номер запоминаем по клику.
     private var keepIndex = -1
     private var keepScroll = 0
+    private var touchIndex = -1
 
     // ------------------------------------------------------------------ разделы
 
@@ -124,8 +126,10 @@ class SettingsActivity : Activity() {
             var v: View? = list.findFocus()
             while (v != null && v.parent !== list) v = v.parent as? View
             if (v != null) keepIndex = list.indexOfChild(v)
+            else if (touchIndex >= 0) keepIndex = touchIndex
             keepScroll = old.scrollY
         }
+        touchIndex = -1
         frame.removeAllViews()
         val scroll = layoutInflater.inflate(R.layout.settings_page, frame, false)
         scroll.findViewById<TextView>(R.id.settings_title).text = title
@@ -157,21 +161,47 @@ class SettingsActivity : Activity() {
         col.addView((layoutInflater.inflate(R.layout.settings_note, col, false) as TextView).apply { this.text = text })
     }
 
+    /** Следующий фокусируемый пункт списка (поиск Android на краю экрана выбирает неровно, с ним — по списку) */
+    private fun nextFocusableAfter(col: LinearLayout, row: View): View? {
+        for (i in col.indexOfChild(row) + 1 until col.childCount) {
+            val v = col.getChildAt(i)
+            if (v.isFocusable) return v
+        }
+        return null
+    }
+
+    /** «Вниз» с последнего пункта: сначала показать остаток страницы, потом вернуть фокус в текущий раздел */
+    private fun downFromLast(col: LinearLayout, row: View): Boolean {
+        if (nextFocusableAfter(col, row) != null) return false
+        val scroll = col.parent as? ScrollView ?: return false
+        if (scroll.canScrollVertically(1)) {
+            scroll.smoothScrollBy(0, scroll.height)
+            return true
+        }
+        focusNav()
+        return true
+    }
+
     /**
      * Пункт (settings_item.xml): название, значение справа, подпись снизу; OK — [onClick].
      * ← / → — [onSide] (−1 / +1): смена значения на месте; без него ← уводит к разделам.
+     * «Вниз» с последнего пункта — не к чужому разделу: листает хвост страницы и возвращает в текущий.
      */
     private fun item(col: LinearLayout, title: String, value: String, sub: String = "", onSide: ((Int) -> Unit)? = null, onClick: () -> Unit): View {
         val row = layoutInflater.inflate(R.layout.settings_item, col, false)
         row.findViewById<TextView>(R.id.item_title).text = title
         row.findViewById<TextView>(R.id.item_value).text = value
         row.findViewById<TextView>(R.id.item_sub).apply { text = sub; U.show(this, sub.isNotEmpty()) }
-        row.setOnClickListener { onClick() }
+        row.setOnClickListener {
+            touchIndex = col.indexOfChild(row)
+            onClick()
+        }
         row.setOnKeyListener { _, code, e ->
             when {
                 e.action == KeyEvent.ACTION_UP && Keys.isOk(code) -> { onClick(); true }
                 e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT -> { if (onSide != null) onSide(-1) else focusNav(); true }
                 e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_RIGHT -> { onSide?.invoke(1); true }
+                e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_DOWN -> downFromLast(col, row)
                 else -> false
             }
         }
@@ -792,11 +822,8 @@ class SettingsActivity : Activity() {
                 save(p, name, url, userEpg, mode, back = false)
                 repo.playlist(p.id)?.let { fresh -> repo.refresh(fresh, true) { showEdit(repo.playlist(p.id)) } }
             }
-            form.button(str(R.string.delete)) {
-                repo.deletePlaylist(p.id)
-                if (Prefs.lastPlaylist == p.id) Prefs.lastPlaylist = 0
-                showMain()
-            }
+            form.newRow()
+            form.button(str(R.string.delete_playlist)) { confirmDeletePlaylist(p) }
         }
         if (p != null) {
             section(col, str(R.string.programme_sources))
@@ -805,6 +832,28 @@ class SettingsActivity : Activity() {
             for (u in p.userEpg) epgRow(col, u, str(R.string.own))
         }
         (if (p == null) url else name).requestFocus()
+    }
+
+    /** Удаление плейлиста — только после подтверждения: фокус на «Отмена», удаление явное */
+    private fun confirmDeletePlaylist(p: Playlist) {
+        val v = layoutInflater.inflate(R.layout.playlist_delete_confirm, null)
+        v.findViewById<TextView>(R.id.delete_playlist_message).text = str(R.string.delete_playlist_confirm_x, p.name)
+        val d = android.app.Dialog(this)
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        d.setContentView(v)
+        d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        val cancel = v.findViewById<TextView>(R.id.delete_playlist_cancel)
+        val ok = v.findViewById<TextView>(R.id.delete_playlist_ok)
+        cancel.setOnClickListener { d.dismiss() }
+        ok.setOnClickListener {
+            d.dismiss()
+            repo.deletePlaylist(p.id)
+            if (Prefs.lastPlaylist == p.id) Prefs.lastPlaylist = 0
+            showMain()
+            android.widget.Toast.makeText(this, str(R.string.the_playlist_was_deleted), android.widget.Toast.LENGTH_SHORT).show()
+        }
+        d.show()
+        cancel.requestFocus()
     }
 
     private fun epgRow(col: LinearLayout, url: String, kind: String) {

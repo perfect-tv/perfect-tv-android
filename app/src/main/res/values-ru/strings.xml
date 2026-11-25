@@ -170,6 +170,8 @@
     <string name="does_not_match">Не совпадает</string>
     <string name="new_playlist">Новый плейлист</string>
     <string name="playlist">Плейлист</string>
+    <string name="delete_playlist">Удалить плейлист</string>
+    <string name="delete_playlist_confirm_x">Удалить плейлист «%1$s»? Его каналы и связанные с ними данные (избранное, скрытое, блокировки, очки) будут удалены.</string>
     <string name="m3u_m3u8_address_http_https_or_a">Адрес M3U/M3U8 (http, https) или путь к файлу на устройстве.</string>
     <string name="name">Название</string>
     <string name="tv">ТВ</string>
