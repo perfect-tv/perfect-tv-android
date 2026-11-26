@@ -296,7 +296,7 @@ class InfoPanel(val view: View) {
         winLive > 0 && sec > winLive + LIVE_TOL -> U.ARCHIVE     // past live - as bubble
         winLive > 0 && sec >= winLive - LIVE_TOL -> U.LIVE       // at live → red
         winArchive || winLive > 0 -> U.BLACK                     // archive / DVR → black
-        else -> U.WHITE
+        else -> U.BLACK
     }
 
     // ---------------------------------------------------------- подсказки клавиш
