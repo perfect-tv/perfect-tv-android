@@ -105,6 +105,50 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
                 "history" -> openHistory()
             }
         }
+        info.onSeek = seek@{ sec ->
+            val a = state.archive
+            val ch = state.channel
+            val edge = Clock.now()
+            // перемотка за пределы эфира - открыть эфир
+            if (a == null && sec >= edge - 2) {
+                if (ch != null) playChannel(ch, state.groupKey)
+                info.show(0)
+                return@seek
+            }
+            when {
+                a == null -> {
+                    val w = playback.wallClockMs
+                    val dvr = playback.windowDurationMs
+                    when {
+                        w != null && playback.seekable && dvr > 0 -> {
+                            val targetMs = playback.position + (sec * 1000L - w)
+                            if (targetMs in 0 until dvr - 3000) {
+                                watch = null
+                                playback.seekTo(targetMs)
+                            } else if (ch != null && ch.hasArchive) playArchive(ch, sec)
+                        }
+                        else -> if (ch != null && ch.hasArchive) playArchive(ch, sec)
+                    }
+                }
+                // near live edge — go live rather than seek
+                sec >= Clock.now() - 30 -> if (ch != null) playChannel(ch, state.groupKey) else Unit
+                // base not established yet (onReady hasn't run) — rebuild from that time
+                a.base == null -> if (ch != null) playArchive(ch, sec) else Unit
+                else -> {
+                    val target = if (a.pdt && playback.windowStartTimeMs != C.TIME_UNSET)
+                        sec * 1000 - playback.windowStartTimeMs
+                    else (sec - a.start) * 1000 + a.base!! - playback.windowOffsetMs
+                    if (target >= 0 && target < playback.windowDurationMs - 5000) {
+                        watch = null
+                        playback.seekTo(target)
+                    } else if (ch != null) {
+                        // target is outside the currently loaded window — reopen the archive at that time
+                        playArchive(ch, sec)
+                    }
+                }
+            }
+            info.show(0)
+        }
         playback.listener = object : Playback.Listener {
             override fun onState(playing: Boolean, buffering: Boolean) {
                 if (playing) {
@@ -197,11 +241,20 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val dx = e2.x - (e1?.x ?: e2.x)
             val dy = e2.y - (e1?.y ?: e2.y)
             val min = U.px(4f)
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > min) {
-                playerLayer.key(if (dx < 0) "right" else "left", false, 0)
-                // одиночный свайп — шаг; удержания нет: сразу «отпустить»
-                playerLayer.keyUp(if (dx < 0) "right" else "left")
-            } else if (Math.abs(dy) > min) {
+            if (abs(dx) > abs(dy) && abs(dx) > min) {
+                val arch = state.archive != null && state.channel?.hasArchive == true
+                if (arch) {
+                    // archive: натуральный скролл
+                    if (dx > 0) playerLayer.key("right", false, 0) else playerLayer.key("left", false, 0)
+                    // одиночный свайп — шаг; удержания нет: сразу «отпустить»
+                    playerLayer.keyUp(if (dx > 0) "right" else "left")
+                } else {
+                    // live: влево - следующий канал, вправо - предыдущий
+                    if (dx < 0) playerLayer.key("right", false, 0) else playerLayer.key("left", false, 0)
+                    // одиночный свайп — шаг; удержания нет: сразу «отпустить»
+                    playerLayer.keyUp(if (dx < 0) "right" else "left")
+                }
+            } else if (abs(dy) > min) {
                 if (dy < 0) openGuide() else openHistory()
             }
             return true
@@ -1003,7 +1056,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
         }
         // внутри окна текущей ссылки — перемотка плеера, иначе новая ссылка на этот момент
         val a = state.archive
-        if (a != null && a.base != null && playback.seekable) {
+        if (a?.base != null && playback.seekable) {
             val target = if (a.pdt && playback.windowStartTimeMs != C.TIME_UNSET) s.target * 1000 - playback.windowStartTimeMs
             else (s.target - a.start) * 1000 + a.base!! - playback.windowOffsetMs
             if (target >= 0 && target < playback.windowDurationMs - 5000) {
@@ -1053,7 +1106,8 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             audios = if (same) playback.trackCount(androidx.media3.common.C.TRACK_TYPE_AUDIO) else 0,
             subtitles = if (same) playback.trackCount(androidx.media3.common.C.TRACK_TYPE_TEXT) else 0,
             paused = same && playback.paused,
-            error = same && state.error
+            error = same && state.error,
+            seekable = same && (state.archive != null || playback.seekable)
         ))
         // передача сменилась при раскрытом описании — обновить описание
         if (info.more && same && moreKey != ch.key + ":" + (p?.start ?: 0)) expandInfo()
