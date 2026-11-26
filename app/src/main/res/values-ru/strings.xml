@@ -28,8 +28,6 @@
     <string name="category">Категория</string>
     <string name="hold_left">удерж. ◀︎</string>
     <string name="channel_programme_and_archive">Программа и архив канала (в таблице)</string>
-    <string name="hold_right">удерж. ▶︎</string>
-    <string name="go_to_the_programme_grid">Перейти в сетку программы</string>
     <string name="ok_hold_ok">OK / удерж. «OK»</string>
     <string name="watch_channel_menu">Смотреть / меню канала</string>
     <string name="in_the_grid">В сетке</string>
@@ -133,8 +131,6 @@
     <string name="reload_programme_every">Обновлять программу каждые</string>
     <string name="x_h">%1$s ч</string>
     <string name="user_agent">User-Agent</string>
-    <string name="user_agent_sub">для этого плейлиста, его программы и каналов; пусто — как раньше. Параметры канала из плейлиста имеют приоритет.</string>
-    <string name="programme_descriptions_tmdb">Описания передач (TMDB)</string>
     <string name="tmdb_key">Ключ TMDB</string>
     <string name="not_set">не задан</string>
     <string name="set">задан</string>
@@ -235,8 +231,6 @@
     <string name="i_will_remind">"Напомню "</string>
     <string name="x_min_before_the_start">за %1$s мин до начала</string>
     <string name="when_the_programme_starts">в начале передачи</string>
-    <string name="remove_from_favourites">Удалить из избранного</string>
-    <string name="add_to_favourites">Добавить в избранное</string>
     <string name="move_up">Сдвинуть вверх</string>
     <string name="move_down">Сдвинуть вниз</string>
     <string name="hide_channel">Скрыть канал</string>
@@ -248,7 +242,6 @@
     <string name="lock_category">Заблокировать категорию</string>
     <string name="hidden_2">Скрытое</string>
     <string name="view">Вид</string>
-    <string name="list">Список</string>
     <string name="reload_playlist">Обновить плейлист</string>
     <string name="reload_programme">Обновить программу</string>
     <string name="channel_hidden">Канал скрыт</string>
@@ -344,7 +337,6 @@
     <string name="backup_restore">Восстановить из копии</string>
     <string name="backup_restore_sub">заменит плейлисты и ваши данные; приложение перезапустится</string>
     <string name="backup_saved_x">Копия сохранена: %1$s</string>
-    <string name="backup_not_found_x">Файл копии не найден: %1$s</string>
     <string name="backup_failed_x">Не удалось: %1$s</string>
     <string name="backup_restored">Восстановлено, перезапуск…</string>
     <string name="hint_change">Изменить</string>

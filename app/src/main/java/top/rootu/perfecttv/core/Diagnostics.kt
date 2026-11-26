@@ -10,9 +10,11 @@ import android.media.MediaCodecList
 import android.os.Build
 import android.util.Log
 import android.view.Display
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import top.rootu.perfecttv.BuildConfig
@@ -24,6 +26,7 @@ import top.rootu.perfecttv.BuildConfig
  * Служебный текст для разработчика: не локализуется. Адреса сокращаются до хоста ([redact]) — в ссылках
  * провайдеров бывают логин и пароль.
  */
+@OptIn(UnstableApi::class)
 object Diagnostics {
     private const val TAG = "IPTV"
 
@@ -60,8 +63,10 @@ object Diagnostics {
         Section(title, listOf("Error: ${e.javaClass.simpleName}: ${e.message}"))
     }
 
+    private val RE_URL = Regex("(https?|rtmpe?|rtsp|udp|rtp|mms)://[^/\\s\"'<>?]+[^\\s\"'<>]*", RegexOption.IGNORE_CASE)
+
     /** Адреса — до хоста: `https://host/…` (логин и пароль провайдера в пути и параметрах не выгружаем) */
-    fun redact(s: String): String = Regex("(https?|rtmp|rtsp|udp)://[^/\\s\"'<>?]+[^\\s\"'<>]*").replace(s) { m ->
+    fun redact(s: String): String = RE_URL.replace(s) { m ->
         val full = m.value
         val host = full.substringAfter("://").substringBefore('/').substringBefore('?').substringAfterLast('@')
         full.substringBefore("://") + "://" + host + (if (full.length > full.indexOf(host) + host.length) "/…" else "")

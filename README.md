@@ -61,16 +61,24 @@ python3 tools/flussonic_mock.py 8471 UTC
 
 ```
 app/src/main/java/top/rootu/perfecttv/
-  App.kt                 инициализация: настройки, сеть, репозиторий
-  core/                  Clock (время с поправкой по серверу), Net (OkHttp), Prefs (настройки)
+  App.kt                 инициализация: настройки, перехват ошибок, сеть, репозиторий, логотипы
+  core/                  Clock (время с поправкой по серверу), Net (OkHttp), Prefs (настройки),
+                         Lang (язык и масштаб), Alarms (будильники напоминаний), Tmdb (поиск описаний),
+                         PhoneInput (QR и локальный HTTP-сервер), Updater (автообновление с GitHub),
+                         Crash и Diagnostics (перехват ошибок и отчёт), About (ссылки)
   data/                  Db (схема SQLite), M3uParser, XmltvParser (байтовый), Streams (gzip/zip),
                          Loaders (потоковая запись в БД), EpgMatcher и Names (сопоставление), Catalog,
-                         Repo (данные для интерфейса, кэш программы), Bus (события загрузки)
-  player/                Playback (ExoPlayer), CatchupUrl (шаблоны архива)
+                         Repo (данные для интерфейса, кэш программы), Reminders, Backup (копия *.perfecttv),
+                         Home и Posters (карточки и баннеры для главного экрана Android TV), Bus (события)
+  player/                Playback (ExoPlayer, дорожки, сторож зависания), CatchupUrl (шаблоны архива),
+                         Cookies (RFC 6265), UdpSources (udp/rtp), TeletextTs (читатель телетекста в HLS),
+                         Deinterlace (шейдер деинтерлейсинга), SubtitleStyle (оформление субтитров)
+  teletext/              Ttx (декодер DVB-телетекста, Хэмминг, уровень 1.0/1.5, раскладка 40×25, субтитры)
   ui/                    TvActivity, Tv (оркестратор: состояние, слои, клавиши, архив), Keys (долгие нажатия, удержание),
                          Layer, InfoPanel, GuideLayer (гид на Canvas), ScheduleLayer (программа по дням),
-                         SearchLayer (поиск со своей клавиатурой), MenuLayer (меню канала),
+                         SearchLayer (поиск со своей клавиатурой), MenuLayer (меню канала), PinLayer (кольцо/ряды/сетка),
+                         ReminderLayer, TeletextLayer/View/Wheel, HelpLayer, Marquee (бегущая строка), Keycap, Icons,
                          Popups (окно, список, карточка, тост), Widgets (карусель, сообщение, форма),
-                         Cells (ячейки сетки), Logos (логотипы и заглушки), U (палитра, размеры, Fmt),
-                         SettingsActivity
+                         Cells (ячейки сетки), Logos (логотипы и монограммы), U (палитра, размеры, Fmt, Fade),
+                         SettingsActivity, RestoreActivity/Dialog, UpdateDialog, CrashActivity, ReportActivity
 ```

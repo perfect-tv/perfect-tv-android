@@ -32,8 +32,6 @@
     <string name="category">Category</string>
     <string name="hold_left">hold ◀︎</string>
     <string name="channel_programme_and_archive">Channel programme &amp; archive (in the grid)</string>
-    <string name="hold_right">hold ▶︎</string>
-    <string name="go_to_the_programme_grid">Go to the programme grid</string>
     <string name="ok_hold_ok">OK / hold “OK”</string>
     <string name="watch_channel_menu">Watch / channel menu</string>
     <string name="in_the_grid">In the grid</string>
@@ -137,8 +135,6 @@
     <string name="reload_programme_every">Reload programme every</string>
     <string name="x_h">%1$s h</string>
     <string name="user_agent">User-Agent</string>
-    <string name="user_agent_sub">for this playlist, its programme and channels; empty — default. Channel options from the playlist still take precedence.</string>
-    <string name="programme_descriptions_tmdb">Programme descriptions (TMDB)</string>
     <string name="tmdb_key">TMDB key</string>
     <string name="not_set">not set</string>
     <string name="set">set</string>
@@ -239,8 +235,6 @@
     <string name="i_will_remind">"I will remind "</string>
     <string name="x_min_before_the_start">%1$s min before the start</string>
     <string name="when_the_programme_starts">when the programme starts</string>
-    <string name="remove_from_favourites">Remove from favourites</string>
-    <string name="add_to_favourites">Add to favourites</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
     <string name="hide_channel">Hide channel</string>
@@ -252,7 +246,6 @@
     <string name="lock_category">Lock category</string>
     <string name="hidden_2">Hidden</string>
     <string name="view">View</string>
-    <string name="list">List</string>
     <string name="reload_playlist">Reload playlist</string>
     <string name="reload_programme">Reload programme</string>
     <string name="channel_hidden">Channel hidden</string>
@@ -344,7 +337,6 @@
     <string name="backup_restore">Restore from a backup</string>
     <string name="backup_restore_sub">replaces playlists and your data; the app will restart</string>
     <string name="backup_saved_x">Backup saved: %1$s</string>
-    <string name="backup_not_found_x">Backup file not found: %1$s</string>
     <string name="backup_failed_x">Failed: %1$s</string>
     <string name="backup_restored">Restored, restarting…</string>
     <string name="hint_change">Change</string>

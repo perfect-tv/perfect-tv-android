@@ -87,6 +87,7 @@ class TvActivity : Activity() {
     }
 
     /** Оформление субтитров из настроек (при запуске и при возврате из настроек) */
+    @OptIn(UnstableApi::class)
     private fun applySubtitleStyle() {
         findViewById<PlayerView>(R.id.player).subtitleView?.let { top.rootu.perfecttv.player.SubtitleStyle.apply(it) }
     }

@@ -124,7 +124,7 @@ class Repo(context: Context) {
             }
         }
         maxArchiveDays = maxOf(maxArchiveDays, list.maxOfOrNull { it.archiveDays } ?: 0)
-        mapFor.remove(p.id)
+        synchronized(this) { mapFor.remove(p.id) }
         return Catalog(p, list, this, favoritesTitle, allTitle)
     }
 
@@ -215,7 +215,7 @@ class Repo(context: Context) {
 
     private class CachedEpg(val sourceId: Long, val list: List<Programme>)
 
-    private fun mapping(playlistId: Long): Map<String, Pair<Long, String>> {
+    @Synchronized private fun mapping(playlistId: Long): Map<String, Pair<Long, String>> {
         mapFor[playlistId]?.let { return it }
         val p = playlist(playlistId) ?: return emptyMap()
         val out = HashMap<String, Pair<Long, String>>()
@@ -236,9 +236,9 @@ class Repo(context: Context) {
 
     /**
      * Иконка канала из программы (XMLTV) — для логотипа, когда он не загружается из плейлиста или выбран
-     * приоритет программы. Кэшируется; сбрасывается вместе с программой. Звать из главного потока.
+     * приоритет программы. Кэшируется; сбрасывается вместе с программой.
      */
-    fun epgIcon(ch: Channel): String {
+    @Synchronized fun epgIcon(ch: Channel): String {
         if (ch.epgIcon.isNotEmpty()) return ch.epgIcon
         val m = mapping(ch.playlistId)[ch.key] ?: return ""
         val k = m.first.toString() + ":" + m.second
@@ -258,7 +258,7 @@ class Repo(context: Context) {
      * отрисовка строки заново читали бы БД в главном потоке, пока в неё пишет загрузчик, — интерфейс
      * подвисал бы до конца загрузки.
      */
-    private fun invalidateEpg(sourceId: Long, done: Boolean) {
+    @Synchronized private fun invalidateEpg(sourceId: Long, done: Boolean) {
         if (done) {
             mapFor.clear()
             iconCache.clear()
@@ -270,16 +270,19 @@ class Repo(context: Context) {
         }
     }
 
+    @Synchronized private fun getCachedEpg(ck: String): CachedEpg? = cache[ck]
+    @Synchronized private fun putCachedEpg(ck: String, v: CachedEpg) { cache[ck] = v }
+
     /**
      * Программа канала по возрастанию, без перекрытий (конец обрезан по началу следующей),
      * со сдвигом tvg-shift. Пустой список — программы нет (или ещё не загружена).
      */
     fun programmes(ch: Channel): List<Programme> {
         val ck = ch.playlistId.toString() + ":" + ch.key
-        cache[ck]?.let { return it.list }
+        getCachedEpg(ck)?.let { return it.list }
         val m = mapping(ch.playlistId)[ch.key]
         if (m == null) {
-            cache[ck] = CachedEpg(-1, emptyList())
+            putCachedEpg(ck, CachedEpg(-1, emptyList()))
             return emptyList()
         }
         val shift = Math.round(ch.tvgShift * 3600).toLong()
@@ -292,7 +295,7 @@ class Repo(context: Context) {
                 main.post {
                     reading.remove(ck)
                     // загрузка успела закончиться и сбросить кэш — прочитанное могло устареть: не кэшируем, прочитается заново
-                    if (epgBusy()) cache[ck] = CachedEpg(m.first, list)
+                    if (epgBusy()) putCachedEpg(ck, CachedEpg(m.first, list))
                     scheduleReadEvent()
                 }
             }
@@ -301,7 +304,7 @@ class Repo(context: Context) {
         val t0 = System.nanoTime()
         val list = readProgrammes(m.first, m.second, shift)
         epgIcon(ch)
-        cache[ck] = CachedEpg(m.first, list)
+        putCachedEpg(ck, CachedEpg(m.first, list))
         // диагностика: чтение программы в главном потоке дольше кадра — признак борьбы с загрузчиком за БД
         val ms = (System.nanoTime() - t0) / 1_000_000
         if (ms >= 30 && Looper.myLooper() === Looper.getMainLooper()) Log.w("IPTV", "slow epg read ${ms} ms (${list.size} передач)")
@@ -365,7 +368,7 @@ class Repo(context: Context) {
     // ================================================================== поиск
 
     /** Найденная передача (время — уже со сдвигом tvg-shift) */
-    class Hit(val channel: Channel, val start: Long, val stop: Long, val title: String)
+    class Hit(val channel: Channel, val start: Long, var stop: Long, val title: String)
 
     /** Где искать программу канала */
     class SearchSource(val channel: Channel, val sourceId: Long, val xmlId: String)
@@ -394,12 +397,25 @@ class Repo(context: Context) {
             val to = now + 7 * 86400L - shift
             rd.rawQuery("SELECT start,stop,title FROM programme WHERE source_id=? AND xml_id=? AND start>=? AND start<? ORDER BY start",
                 arrayOf(s.sourceId.toString(), s.xmlId, from.toString(), to.toString())).use { c ->
+                var prevHit: Hit? = null
                 while (c.moveToNext()) {
-                    val title = c.getString(2)
-                    if (!words.all { title.contains(it, true) }) continue
                     val start = c.getLong(0) + shift
                     val stop = c.getLong(1) + shift
-                    if (stop > now || start >= archFrom) out.add(Hit(ch, start, stop, title))
+                    if (stop <= start) continue
+                    prevHit?.let { h ->
+                        if (h.stop > start) {
+                            h.stop = start
+                            if (h.stop <= h.start || (h.stop <= now && h.start < archFrom)) out.remove(h)
+                        }
+                    }
+                    prevHit = null
+                    val title = c.getString(2)
+                    if (!words.all { title.contains(it, true) }) continue
+                    if (stop > now || start >= archFrom) {
+                        val h = Hit(ch, start, stop, title)
+                        out.add(h)
+                        prevHit = h
+                    }
                 }
             }
         }

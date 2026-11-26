@@ -92,7 +92,7 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
     private var retry = 0
 
     init {
-        overlay.setOnTouchListener { _, e -> android.util.Log.d("IPTV", "touch ${e.action} layers=${layers.size}"); layers.isEmpty() && gestures.onTouchEvent(e) }
+        overlay.setOnTouchListener { _, e -> layers.isEmpty() && gestures.onTouchEvent(e) }
         info.onAction = { a ->
             info.show(if (info.sticky) 0 else Prefs.infoHide)
             when (a) {

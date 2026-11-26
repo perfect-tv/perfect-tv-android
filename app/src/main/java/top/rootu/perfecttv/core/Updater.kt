@@ -76,16 +76,21 @@ object Updater {
         return false
     }
 
+    private val RE_NUMBERS = Regex("^\\d+(\\.\\d+)*")
+    private val RE_MD_LINK = Regex("\\[([^\\]]*)\\]\\([^)]*\\)")
+    private val RE_URL = Regex("https?://\\S+")
+    private val RE_NEWLINES = Regex("\n\\{3,\\}")
+
     private fun numbers(v: String): List<Int>? =
-        Regex("""^\d+(\.\d+)*""").find(v.trim().removePrefix("v"))?.value?.split('.')?.map { it.toIntOrNull() ?: 0 }
+        RE_NUMBERS.find(v.trim().removePrefix("v"))?.value?.split('.')?.map { it.toIntOrNull() ?: 0 }
 
     /** Описание релиза без разметки Markdown: заголовки, ссылки, `**`, строка «Full Changelog»; не длиннее [max] знаков */
     fun cleanNotes(body: String, max: Int = 700): String {
         val lines = body.replace("\r", "").lines()
             .filterNot { it.contains("Full Changelog", ignoreCase = true) }
             .map { it.trim().removePrefix("#").trim().removePrefix("#").trim().removePrefix("#").trim() }
-            .map { it.replace("**", "").replace(Regex("""\[([^\]]*)]\([^)]*\)"""), "$1").replace(Regex("""https?://\S+"""), "").trim() }
-        val text = lines.joinToString("\n").replace(Regex("\n{3,}"), "\n\n").trim()
+            .map { it.replace("**", "").replace(RE_MD_LINK, "$1").replace(RE_URL, "").trim() }
+        val text = lines.joinToString("\n").replace(RE_NEWLINES, "\n\n").trim()
         return if (text.length > max) text.take(max).trimEnd() + "…" else text
     }
 

@@ -247,7 +247,7 @@ class Loaders(private val db: Db, private val resolver: android.content.ContentR
                         for (c in channels) {
                             val xml = matcher.match(c.tvgId, c.tvgName, c.name) ?: continue
                             wanted.add(xml)
-                            xmlDays.merge(xml, c.archiveDays, ::maxOf)
+                            xmlDays[xml] = maxOf(xmlDays[xml] ?: 0, c.archiveDays)
                             mapIns.bindLong(1, sourceId)
                             mapIns.bindString(2, c.key)
                             mapIns.bindString(3, xml)

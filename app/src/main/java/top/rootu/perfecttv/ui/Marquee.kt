@@ -129,6 +129,7 @@ class Marquee(private val view: View) {
  * Однострочный TextView, который при [active] прокручивает название, не влезающее в ширину
  * (циклом из [MarqueeMath]); иначе — обычная обрезка многоточием. Текст выровнен по левому краю.
  */
+@android.annotation.SuppressLint("AppCompatCustomView")
 class MarqueeTextView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : TextView(context, attrs) {
     private var t0 = 0L
     private var shownText: CharSequence? = null

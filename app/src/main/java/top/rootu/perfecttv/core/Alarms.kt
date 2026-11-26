@@ -66,6 +66,7 @@ object Alarms {
 
     class Receiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != null && intent.action != Intent.ACTION_BOOT_COMPLETED) return
             if (!App.foreground) notifyDue(context)
             schedule(context)
         }

@@ -2,6 +2,8 @@ package top.rootu.perfecttv.player
 
 import android.graphics.Color
 import android.graphics.Typeface
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
 import top.rootu.perfecttv.core.Prefs
@@ -12,6 +14,7 @@ import top.rootu.perfecttv.core.Prefs
  * несёт сам поток (белый — речь, жёлтый — песня…), он остаётся как есть; заданный цвет или фон
  * заменяет цвета потока (для телетекста — при создании реплики, см. `TeletextTs.cue`).
  */
+@OptIn(UnstableApi::class)
 object SubtitleStyle {
     val SIZES = listOf(75, 100, 125, 150, 200)
     val BOTTOMS = listOf(4, 8, 12, 18)

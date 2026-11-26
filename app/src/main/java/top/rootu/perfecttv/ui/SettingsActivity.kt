@@ -736,7 +736,7 @@ class SettingsActivity : Activity() {
             if (old != null && old.text.toString() != current) { old.error = str(R.string.wrong_pin); old.requestFocus(); return@button }
             if (remove) { Prefs.pin = ""; showMain(); return@button }
             val p = new1!!.text.toString()
-            if (!Regex("^\\d{4,6}$").matches(p)) { new1.error = str(R.string.x_to_x_digits_required, 4, 6); new1.requestFocus(); return@button }
+            if (!RE_PIN.matches(p)) { new1.error = str(R.string.x_to_x_digits_required, 4, 6); new1.requestFocus(); return@button }
             if (new2!!.text.toString() != p) { new2.error = str(R.string.does_not_match); new2.requestFocus(); return@button }
             Prefs.pin = p
             showMain()
@@ -930,5 +930,6 @@ class SettingsActivity : Activity() {
         const val PICK_FILE = 10
         const val PICK_PERMISSION = 11
         val PIN_INPUTS get() = listOf(str(R.string.ring_like_fire_tv), str(R.string.rows_like_google), str(R.string.keypad))
+        private val RE_PIN = Regex("^\\d\\{4,6\\}$")
     }
 }

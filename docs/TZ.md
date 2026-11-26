@@ -36,23 +36,23 @@
 
 ```
 playlist        id, name, url, epg_mode(0 — из плейлиста, 1 — плейлист + свои, 2 — только свои),
-                user_epg (список URL через \n), header_epg (из #EXTM3U), loaded_at, etag, last_modified,
-                channels_count, error, sort
-channel         id, playlist_id, num, key, name, url, grp, logo, tvg_id, tvg_name, tvg_shift,
-                catchup_type, catchup_source, catchup_days, user_agent, referrer, headers_json,
-                epg_source_id, epg_xml_id   — сопоставление с EPG (заполняет матчер)
-                UNIQUE(playlist_id, num)
-epg_source      id, url, loaded_at, etag, last_modified, status, error, programmes_count
-epg_channel     source_id, xml_id, names (через \n), icon        PK(source_id, xml_id)
+                user_epg (список URL через \n), header_epg (из #EXTM3U), user_agent, loaded_at, etag,
+                last_modified, channels_count, error, sort
+channel         playlist_id, num, key, name, url, grp, logo, tvg_id, tvg_name, tvg_shift,
+                catchup_type, catchup_source, catchup_days, user_agent, referrer, headers_json
+                PK(playlist_id, num)  WITHOUT ROWID
+epg_source      id, url, loaded_at, etag, last_modified, status, error, programmes_count, load_id
+epg_channel     source_id, xml_id, names (через \n), icon        PK(source_id, xml_id)  WITHOUT ROWID
+epg_map         source_id, ch_key, xml_id                        PK(source_id, ch_key)  WITHOUT ROWID
 programme       source_id, xml_id, start, stop, title, sub_title, descr, category, icon, load_id
-                PK(source_id, xml_id, start)  WITHOUT ROWID
-                индекс (source_id, xml_id, stop)
-favorite        playlist_id, key, sort
-history         playlist_id, key, at
-hidden          playlist_id, kind(group|channel), key, title
-score           playlist_id, key, value                     — адаптивная сортировка
-reminder        id(key:start), playlist_id, ch_key, ch_name, ch_num, logo, start, stop, title, descr, snooze
-epg_map         source_id, ch_key, xml_id                    — сопоставление канала с EPG (по ключу канала)
+                UNIQUE INDEX programme_key(source_id, xml_id, start)
+favorite        playlist_id, key, sort                           PK(playlist_id, key)  WITHOUT ROWID
+history         playlist_id, key, at                             PK(playlist_id, key)  WITHOUT ROWID
+hidden          playlist_id, kind(group|channel), key, title     PK(playlist_id, kind, key)  WITHOUT ROWID
+locked          playlist_id, kind(group|channel), key            PK(playlist_id, kind, key)  WITHOUT ROWID
+score           playlist_id, key, value                          PK(playlist_id, key)  WITHOUT ROWID
+reminder        id(key:start), playlist_id, playlist_name, ch_key, ch_name, ch_num, logo,
+                start, stop, title, descr, snooze, archive_days, missed_seen
 ```
 
 - Настройки и «где остановились» (последний плейлист, канал, категория) — `SharedPreferences` (`core/Prefs`).
@@ -102,7 +102,7 @@ epg_map         source_id, ch_key, xml_id                    — сопоста�
 2. `tvg-name` или имя канала == одно из `display-name`, после нормализации (`Names`): нижний регистр; без «(архив)», «телеканал», «канал», «тв», «orig», «50»; `(+2)` → `+2`; знаки → пробел; «канал 5» → «канал5». Затем сравнение с транслитерацией похожих букв (`а→a`, `о→o`, `з→3`, …);
 3. логотип: `tvg-logo`, иначе `icon` из EPG.
 
-Результат пишется в `channel.epg_source_id/epg_xml_id` после загрузки EPG или плейлиста. `tvg-shift` (часы) сдвигает программу канала при показе.
+Результат пишется в `epg_map` после загрузки EPG. `tvg-shift` (часы) сдвигает программу канала при показе.
 
 ## 7. Время
 
@@ -217,7 +217,7 @@ epg_map         source_id, ch_key, xml_id                    — сопоста�
 - **Файл плейлиста**: системный выбор файла; если его нет (на Android TV часто заглушка) — встроенный список .m3u/.m3u8 в памяти, «Загрузках» и на USB (`/storage/*`).
 - **Очки адаптивной сортировки копятся всегда** (канал, на котором смотрели дольше порога), даже если сортировка выключена: после включения порядок сразу готов, а ряд «Популярные» на главном экране берёт те же очки. Выключенная сортировка только не применяет их к порядку каналов.
 - Порядок плейлистов («Выше» / «Ниже»), «Скрытые категории и каналы» всех плейлистов, сброс очков адаптивной сортировки, «Запускать последний канал» (выкл. — при запуске гид).
-- Ввод с пульта — системная клавиатура. Позже, по желанию, — ввод с телефона по QR-коду: локальный HTTP-сервер приложения (фаза 5).
+- Ввод с пульта — системная клавиатура; ввод с телефона по QR-коду — локальный HTTP-сервер приложения (`core/PhoneInput.kt`).
 
 **Главный экран Android TV** (`data/Home.kt`, настройка «Главный экран Android TV», по умолчанию включена; право `WRITE_EPG_DATA`). При уходе приложения с экрана (`TvActivity.onStop`) в фоновом потоке обновляются: ряд «Популярные» — канал-превью по умолчанию (виден сразу) с самыми смотримыми каналами (до 12, по очкам адаптивной сортировки; логотип, название, текущая передача), «Избранные» — второй канал-превью с карточкой на каждый избранный канал (до 12; пользователь включает его в «Настроить каналы» главного экрана) и «Продолжить просмотр» — карточка последнего канала. Скрытые и заблокированные каналы на главный экран не выносятся. Баннеры карточек рисуются самими (`data/Posters.kt`, 800 × 450, JPEG в `cacheDir/posters`, лаунчеру отдаёт `Posters.Provider`): логотипы бывают квадратными, круглыми и вытянутыми. С картинкой передачи (TMDB, если включён и ответил за 4 с, иначе EPG) — картинка на весь баннер, снизу затемнение, логотип канала в прямоугольнике (как логотипы в программе, 1,45 : 1, тёмная плашка с тонкой каймой) в левом нижнем углу; без картинки — логотип на сером фоне, как баннер «О передаче» в плеере; у канала нет логотипа (или он не загрузился) — на картинке передачи значок приложения (`icon.xml`) вместо логотипа, в той же рамке (файл «i»), а без картинки — баннер приложения. Баннеры входят в «Кэш логотипов и баннеров» (размер и очистка — в настройках, раздел «Данные»); при выключении настройки главного экрана удаляются; не публиковавшиеся дольше суток удаляются, а при превышении 10 МБ — самые старые, при старте процесса (в том числе когда лаунчер сам поднял провайдер) и при каждом обновлении — карточки обновляются при каждом уходе из приложения, дольше файлы лаунчеру не нужны. Имя файла — канал + начало передачи + «a» (с картинкой) или «n» (без): готовое не рисуется заново. После трёх подряд не загрузившихся картинок остальные в этом обновлении не пробуются. Карточка запускает глубокую ссылку `perfecttv://channel?p=<плейлист>&k=<ключ>`; приложение сменяет плейлист, если нужно, и включает канал. Голос: `android.media.action.MEDIA_PLAY_FROM_SEARCH` — номер или название канала включаются сразу, иначе открывается поиск с этим запросом. Идентификаторы карточек в резервную копию не входят. На устройствах без провайдера ТВ ошибки глотаются.
 

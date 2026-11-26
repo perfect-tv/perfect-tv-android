@@ -120,6 +120,7 @@ object Home {
 
     private fun nowTitle(row: Row) = row.programme?.title ?: row.channel.group
 
+    @android.annotation.SuppressLint("RestrictedApi")
     private fun publishRow(context: Context, helper: PreviewChannelHelper, title: Int, list: List<Row>, default: Boolean,
                            getId: () -> Long, setId: (Long) -> Unit) {
         var id = getId()
@@ -155,6 +156,7 @@ object Home {
         }
     }
 
+    @android.annotation.SuppressLint("RestrictedApi")
     private fun publishContinue(context: Context, helper: PreviewChannelHelper, last: Row?) {
         val old = Prefs.homeWatchNextId
         if (old > 0) {

@@ -1,7 +1,9 @@
 package top.rootu.perfecttv.player
 
 import android.net.Uri
+import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
@@ -12,6 +14,7 @@ import androidx.media3.datasource.UdpDataSource
  * `UdpDataSource` Media3 сам вступает в группу мультикаста, если адрес групповой. Обычная фабрика OkHttp
  * этих схем не открывает, поэтому [Factory] выбирает источник по схеме ссылки.
  */
+@OptIn(UnstableApi::class)
 object UdpSources {
     fun isUdp(url: String) = url.startsWith("udp://", true) || url.startsWith("rtp://", true)
 
