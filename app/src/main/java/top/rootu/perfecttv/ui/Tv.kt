@@ -241,11 +241,20 @@ class Tv(val activity: TvActivity, private val root: FrameLayout, val playback: 
             val dx = e2.x - (e1?.x ?: e2.x)
             val dy = e2.y - (e1?.y ?: e2.y)
             val min = U.px(4f)
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > min) {
-                playerLayer.key(if (dx < 0) "right" else "left", false, 0)
-                // одиночный свайп — шаг; удержания нет: сразу «отпустить»
-                playerLayer.keyUp(if (dx < 0) "right" else "left")
-            } else if (Math.abs(dy) > min) {
+            if (abs(dx) > abs(dy) && abs(dx) > min) {
+                val arch = state.archive != null && state.channel?.hasArchive == true
+                if (arch) {
+                    // archive: натуральный скролл
+                    if (dx > 0) playerLayer.key("right", false, 0) else playerLayer.key("left", false, 0)
+                    // одиночный свайп — шаг; удержания нет: сразу «отпустить»
+                    playerLayer.keyUp(if (dx > 0) "right" else "left")
+                } else {
+                    // live: влево - следующий канал, вправо - предыдущий
+                    if (dx < 0) playerLayer.key("right", false, 0) else playerLayer.key("left", false, 0)
+                    // одиночный свайп — шаг; удержания нет: сразу «отпустить»
+                    playerLayer.keyUp(if (dx < 0) "right" else "left")
+                }
+            } else if (abs(dy) > min) {
                 if (dy < 0) openGuide() else openHistory()
             }
             return true
