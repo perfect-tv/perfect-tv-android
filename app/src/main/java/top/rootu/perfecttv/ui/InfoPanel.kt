@@ -11,7 +11,9 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.ReplacementSpan
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -51,7 +53,10 @@ class InfoPanel(val view: View) {
         val teletext: Boolean = false,
         /** Звуковых дорожек (бейдж, если больше одной) и дорожек субтитров (бейдж, если есть) */
         val audios: Int = 0,
-        val subtitles: Int = 0
+        val subtitles: Int = 0,
+        /** Можно ли сейчас перематывать (архив или DVR-эфир) */
+        val seekable: Boolean = false,
+        val liveEdge: Long = 0
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -64,6 +69,12 @@ class InfoPanel(val view: View) {
     var onHide: (() -> Unit)? = null
     /** Кнопки панели на сенсорных устройствах: prev, pause, next, more, guide, menu, history */
     var onAction: ((String) -> Unit)? = null
+    /**
+     * Перемотка пальцем по шкале (тач): [sec] — целевая позиция в тех же единицах, что и [Model.position]
+     * (в архиве — настенные секунды, в эфире — позиция в окне потока). Вызывается с задержкой ~80 мс
+     * во время движения и один раз в конце.
+     */
+    var onSeek: ((Long) -> Unit)? = null
 
     private var channel: Channel? = null
 
@@ -86,6 +97,19 @@ class InfoPanel(val view: View) {
     private val hints: LinearLayout = view.findViewById(R.id.info_hints)
     private val moreTags: TextView = view.findViewById(R.id.info_more_tags)
     private val moreText: TextView = view.findViewById(R.id.info_more_text)
+    // окно текущей передачи/слота (в тех же единицах, что и Model.position):
+    // нужно, чтобы превращать долю шкалы (0..1) в целевое время перемотки
+    private var winFrom = 0L
+    private var winTo = 0L
+    /** В архиве — настенные секунды, в эфире — позиция в окне потока */
+    private var winArchive = false
+    /** Текущий канал умеет перематываться (архив/DVR): drag по шкале имеет смысл */
+    private var winSeekable = false
+    private var winLive = 0L
+    /**  живая перемотка пальцем: отложенная отправка в плеер (не чаще ~80 мс) */
+    private var pendingSeekSec = 0L
+    private val seekDebounce = Runnable { commitSeek() }
+    private val LIVE_TOL = 3L
 
     init {
         view.background = Scrim(view.resources.getDimension(R.dimen.info_fade), view.resources.getColor(R.color.scrim, null))
@@ -107,7 +131,34 @@ class InfoPanel(val view: View) {
             // тач (не ТВ): кнопки под «Далее»; tag кнопки — действие
             val touch = view.findViewById<LinearLayout>(R.id.info_touch)
             touch.visibility = View.VISIBLE
-            for (i in 0 until touch.childCount) touch.getChildAt(i).let { b -> b.setOnClickListener { onAction?.invoke(b.tag as String) } }
+            for (i in 0 until touch.childCount) touch.getChildAt(i).let { b ->
+                b.setOnClickListener { onAction?.invoke(b.tag as String) }
+            }
+            // шкала: перемотка пальцем (только для перематываемого потока)
+            bar.onSeek = seek@{ fraction ->
+                if (!winSeekable) return@seek
+                // пока палец на шкале — панель закреплена
+                main.removeCallbacks(hideRun)
+                if (!visible) show(0) else if (!sticky) { sticky = true; main.removeCallbacks(hideRun) }
+                val target = (winFrom + (winTo - winFrom) * fraction).toLong()
+                pendingSeekSec = target
+                showSeekPreview(target)
+                // живой seek — с задержкой, чтобы не заливать плеер вызовами
+                main.removeCallbacks(seekDebounce)
+                main.postDelayed(seekDebounce, 80)
+            }
+            bar.onSeekFinished = done@{ fraction ->
+                if (!winSeekable) return@done
+                main.removeCallbacks(seekDebounce)
+                val target = (winFrom + (winTo - winFrom) * fraction).toLong()
+                pendingSeekSec = target
+                commitSeek()
+                bar.clearDragging() // скрыть маркер
+                seekBubble.setTextColor(U.WHITE)
+                // вернуть автоскрытие, если панель была закреплена тачем
+                main.removeCallbacks(hideRun)
+                main.postDelayed(hideRun, 3000L)
+            }
         }
     }
 
@@ -133,31 +184,42 @@ class InfoPanel(val view: View) {
         set(timeStart, Fmt.hhmm(from))
         set(timeEnd, Fmt.hhmm(to))
         val f = { x: Long -> Fmt.progress(from, to, x) }
-        bar.archive = m.archive
+        bar.archive = m.archive // || (m.seekable && m.liveEdge > 0) // оранжевый прогресс при перемотке DVR
+        // запомнить окно для перемотки пальцем
+        winFrom = from
+        winLive = m.liveEdge
+        winTo = if (m.liveEdge > 0) maxOf(from + 1, minOf(to, m.liveEdge)) else to
+        winArchive = m.archive
+        winSeekable = m.seekable // эфир без DVR не перематывается
         // архив идущей передачи (или слота около эфира): красная черта «эфир» на шкале — там, куда дойдёт архив
         val now = Clock.now()
         liveAt = if (m.archive && to > from && now in from..to) (now - from).toFloat() / (to - from) else -1f
         bar.liveMark = liveAt
-        bar.set(f(m.position), if (m.ahead > 0) maxOf(f(m.position + m.ahead), f(m.position) + 0.01f) else f(m.position), m.seek?.let { f(it) })
+        // пока палец на шкале — не перебиваем позицию игрока
+        if (!bar.dragging) {
+            bar.set(f(m.position), if (m.ahead > 0) maxOf(f(m.position + m.ahead), f(m.position) + 0.01f) else f(m.position), m.seek?.let { f(it) })
+        }
         // справа от шкалы: эфир — сколько осталось, архив — время кадра (при перемотке оно в пузыре)
-        set(remain, when {
-            m.seek != null -> ""
-            m.archive -> hhmmss(m.position)
-            p != null -> remainText(p.stop - m.position)
-            else -> ""
-        })
-        if (m.seek != null) {
-            val diff = m.seek - Clock.now()
-            set(seekBubble, hhmmss(m.seek) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(abs(diff)))
-            seekAt = f(m.seek)
-            placeSeek()
-            next.visibility = View.INVISIBLE
-            seekBubble.visibility = View.VISIBLE
-        } else {
-            seekBubble.visibility = View.INVISIBLE
-            liveLabel.visibility = View.INVISIBLE
-            next.visibility = View.VISIBLE
-            set(next, nextText(m))
+        if (!bar.dragging) {
+            set(remain, when {
+                m.seek != null -> ""
+                m.archive -> hhmmss(m.position)
+                p != null -> remainText(p.stop - m.position)
+                else -> ""
+            })
+            if (m.seek != null) {
+                val diff = m.seek - Clock.now()
+                set(seekBubble, hhmmss(m.seek) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(abs(diff)))
+                seekAt = f(m.seek)
+                placeSeek()
+                next.visibility = View.INVISIBLE
+                seekBubble.visibility = View.VISIBLE
+            } else {
+                seekBubble.visibility = View.INVISIBLE
+                liveLabel.visibility = View.INVISIBLE
+                next.visibility = View.VISIBLE
+                set(next, nextText(m))
+            }
         }
         hintArchive = m.archive
         hintPaused = m.paused
@@ -206,6 +268,35 @@ class InfoPanel(val view: View) {
         val total = (liveLabel.parent as View).width.toFloat()
         liveLabel.translationX = (bar.left + bar.width * liveAt - w / 2f).coerceIn(0f, maxOf(0f, total - w))
         liveLabel.visibility = View.VISIBLE
+    }
+
+    // ---------------------------------------------------------- перемотка пальцем
+
+    /** Показать пузырь с целевым временем под текущим положением пальца (без обращения к плееру) */
+    private fun showSeekPreview(sec: Long) {
+        seekAt = if (winTo > winFrom) ((sec - winFrom).toFloat() / (winTo - winFrom)).coerceIn(0f, 1f) else 0f
+        val diff = sec - Clock.now()
+        set(seekBubble, hhmmss(sec) + "   " + (if (diff < 0) "−" else "+") + Fmt.duration(abs(diff)))
+        bar.setDragging(seekAt) // показать маркер
+        seekBubble.setTextColor(seekTextColor(sec))
+        if (!winArchive) set(remain, hhmmss(sec))
+        seekBubble.visibility = View.VISIBLE
+        next.visibility = View.INVISIBLE
+        seekBubble.post { placeSeek() }
+    }
+
+    private fun commitSeek() {
+        val target = pendingSeekSec
+        pendingSeekSec = 0L
+        if (target == 0L || !winSeekable) return
+        onSeek?.invoke(target)
+    }
+
+    private fun seekTextColor(sec: Long): Int = when {
+        winLive > 0 && sec > winLive + LIVE_TOL -> U.ARCHIVE     // past live - as bubble
+        winLive > 0 && sec >= winLive - LIVE_TOL -> U.LIVE       // at live → red
+        winArchive || winLive > 0 -> U.BLACK                     // archive / DVR → black
+        else -> U.WHITE
     }
 
     // ---------------------------------------------------------- подсказки клавиш
@@ -455,6 +546,7 @@ class InfoPanel(val view: View) {
 
     fun hide() {
         main.removeCallbacks(hideRun)
+        main.removeCallbacks(seekDebounce)
         if (!visible) return
         onHide?.invoke()
         visible = false
@@ -493,11 +585,22 @@ private class Scrim(private val fade: Float, private val color: Int) : android.g
     override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
 }
 
-/** Шкала прогресса: подложка, буфер, значение, маркер перемотки */
+/** Шкала прогресса: подложка, буфер, значение, маркер перемотки; тач — перемотка пальцем */
 class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
     private var value = 0f
     private var buffer = 0f
     private var seek: Float? = null
+    private var overLive = false
+
+    var onSeek: ((Float) -> Unit)? = null
+    var onSeekFinished: ((Float) -> Unit)? = null
+
+    /** Палец ведёт по шкале: update() из InfoPanel не должен перебивать value */
+    var dragging = false
+        private set
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downX = 0f
 
     /** Архив или сдвиг: шкала янтарная (эфир — белая) */
     var archive = false
@@ -545,9 +648,53 @@ class InfoBar(context: Context, attrs: AttributeSet? = null) : View(context, att
             val half = U.px(0.25f)
             val x = (w * it).coerceIn(half, w - half)
             val edge = U.px(0.1f)
+            val marker = if (overLive) U.wa(0.45f) else U.WHITE
             U.roundRect(c, x - half - edge, 0f, x + half + edge, h, half, U.PANEL)
-            U.roundRect(c, x - half, edge, x + half, h - edge, half, U.WHITE)
+            U.roundRect(c, x - half, edge, x + half, h - edge, half, marker)
         }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (width == 0) return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                // не забираем жест сразу: даём родителю шанс распознать свайп (смена канала),
+                // и не начинаем перемотку, пока палец не сдвинулся за touch slop
+                parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!dragging && abs(event.x - downX) < touchSlop) return true
+                if (!dragging) {
+                    dragging = true
+                    // жест наш — родитель (pager/свайп канала) не должен вмешиваться
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                onSeek?.invoke((event.x / width).coerceIn(0f, 1f))
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (dragging) {
+                    dragging = false
+                    onSeekFinished?.invoke((event.x / width).coerceIn(0f, 1f))
+                }
+                return true
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    fun setDragging(fraction: Float, overLive: Boolean = false) {
+        seek = fraction.coerceIn(0f, 1f)
+        if (this.overLive != overLive) this.overLive = overLive
+        invalidate()
+    }
+
+    fun clearDragging() {
+        seek = null
+        overLive = false
+        invalidate()
     }
 }
 
