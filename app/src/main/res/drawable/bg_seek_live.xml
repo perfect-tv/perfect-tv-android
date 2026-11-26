@@ -2,5 +2,5 @@
 <!-- Метка «Эфир» под шкалой при перемотке архива: как пузырь перемотки, но красная -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="@color/live" />
-    <corners android:radius="@dimen/radius" />
+    <corners android:radius="@dimen/radius_s" />
 </shape>
