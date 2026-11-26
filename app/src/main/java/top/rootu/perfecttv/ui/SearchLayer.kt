@@ -494,6 +494,7 @@ class SearchLayer(
             drawQueries(c)
             drawResults(c)
             drawHints(c)
+            drawClose(c)
         }
 
         private fun drawField(c: Canvas) {
@@ -766,6 +767,26 @@ class SearchLayer(
             }
         }
 
+        private fun drawClose(c: Canvas) {
+            if (!U.touch) return
+            // белая круглая кнопка с чёрным крестиком как в гиде
+            val d = closeD()
+            val cy = padY + 0.8f * em
+            val cx = width - padX - d / 2
+            U.fill.style = Paint.Style.FILL
+            U.fill.color = U.WHITE
+            c.drawCircle(cx, cy, d / 2, U.fill)
+            val h = d * 0.18f
+            U.fill.style = Paint.Style.STROKE
+            U.fill.strokeWidth = 0.17f * em
+            U.fill.strokeCap = Paint.Cap.ROUND
+            U.fill.color = U.BLACK
+            c.drawLine(cx - h, cy - h, cx + h, cy + h, U.fill)
+            c.drawLine(cx - h, cy + h, cx + h, cy - h, U.fill)
+            U.fill.style = Paint.Style.FILL
+            U.fill.strokeCap = Paint.Cap.BUTT
+        }
+
         // ------------------------------------------------------------------ тач и жесты
 
         private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
@@ -849,6 +870,10 @@ class SearchLayer(
 
         /** Полный тап: фокус + действие (как enter()) */
         private fun tap(x: Float, y: Float) {
+            // Обработчик кнопки закрытия
+            if (U.touch && x > width - padX - closeD() - 1.2f * em && y < padY + 3.0 * em) {
+                return onBack()
+            }
             if (!focusAt(x, y)) return
             when (zone) {
                 Zone.MIC -> voice()
@@ -867,6 +892,13 @@ class SearchLayer(
                 }
             }
         }
+    }
+
+    /** Диаметр кнопки ✕ на сенсорных: стоит у правого края, как в гиде. */
+    private fun closeD(): Float {
+        val capRect = android.graphics.Rect()
+        U.paint(2.2f, U.WHITE).getTextBounds("0", 0, 1, capRect)
+        return capRect.height() * 1.2f
     }
 
     companion object {
