@@ -71,6 +71,9 @@ class GuideLayer(private val tv: Tv) : Layer {
     /** Описание в гиде (настройка): только в виде «Список» */
     private val descOn get() = Prefs.guideDesc && !grid
 
+    private var catsFirst = 0       // first visible row of the category column
+    private var catsScroll = 0f     // fractional scroll (em) for touch drag, optional
+
     // ---------------------------------------------------------- вид «Список»: программа канала в фокусе
     // три колонки: каналы · программа (идущая — со шкалой) · компактные даты; фокус ходит по ←/→
 
@@ -412,6 +415,14 @@ class GuideLayer(private val tv: Tv) : Layer {
         gv.invalidate()
     }
 
+    private fun clampCatsFirst() {
+        val rows = gv.catRows().coerceAtLeast(1)
+        catsFirst = catsFirst.coerceIn(0, maxOf(0, groups.size - rows))
+        // keep the focused category on screen
+        if (groupIndex < catsFirst) catsFirst = groupIndex
+        if (groupIndex >= catsFirst + rows) catsFirst = groupIndex - rows + 1
+    }
+
     /** ↑/↓ — категория (список каналов справа меняется сразу), → — к её каналам */
     private fun catsKey(name: String) {
         val n = groups.size
@@ -423,6 +434,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 "left" -> openPlaylists()
                 "right" -> closeCats()
             }
+            clampCatsFirst()
             gv.invalidate()
             return
         }
@@ -441,6 +453,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         groupIndex = i
         // канал, с которого открыли колонку, — если он есть в категории; иначе начало
         index = catsFromChannel?.let { channels.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+        clampCatsFirst()
         gv.invalidate()
     }
 
@@ -874,7 +887,8 @@ class GuideLayer(private val tv: Tv) : Layer {
             U.drawText(c, catsTitle, l + 3.2f * em, scy, catW - 4.2f * em, pCatItem)
             val rows = catRows()
             val n = groups.size
-            val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
+            // val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, n - rows))
+            val first = catsFirst
             val cat = tv.catalog
             val pin = Prefs.pin.isNotEmpty()
             for (k in 0 until rows) {
@@ -893,8 +907,11 @@ class GuideLayer(private val tv: Tv) : Layer {
                 var tx = l + em
                 val isz = 1.5f * em
                 val ic = if (white) U.BLACK else U.wa(0.7f)
-                if (g.favorites) { Icons.draw(c, Icons.Kind.FAV, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
-                else if (pin && cat?.isGroupLocked(g.key) == true) { Icons.draw(c, Icons.Kind.LOCK, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em }
+                if (g.favorites) {
+                    Icons.draw(c, Icons.Kind.FAV, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em
+                } else if (pin && cat?.isGroupLocked(g.key) == true) {
+                    Icons.draw(c, Icons.Kind.LOCK, tx, cy - isz / 2, isz, ic); tx += isz + 0.5f * em
+                }
                 val p = if (focus) pCatItemBold else pCatItem
                 p.color = if (white) U.BLACK else if (focus) U.WHITE else U.wa(0.85f)
                 U.drawText(c, g.title.ifEmpty { "—" }, tx, cy, r - em - cw - em - tx, p)
@@ -914,34 +931,41 @@ class GuideLayer(private val tv: Tv) : Layer {
                 "▶︎" to str(R.string.hint_categories),
                 str(R.string.key_back) to str(R.string.hint_cancel)
             )
+
             Zone.CATS -> listOf(
                 "▲ ▼" to str(R.string.category),
                 "▶︎" to str(R.string.hint_to_channels),
                 str(R.string.key_back) to str(R.string.hint_cancel),
                 str(R.string.key_hold_ok) to str(R.string.menu)
             )
+
             Zone.PROGRAMS -> listOf(
                 str(R.string.key_ok) to "${str(R.string.watch)} / ${str(R.string.about)}",
                 "◀︎" to str(R.string.hint_to_channels),
                 "▲ ▼" to str(R.string.hint_programme_pick),
                 "▶︎" to str(R.string.hint_dates),
             )
+
             Zone.DATES -> listOf(
                 "▲ ▼" to str(R.string.hint_date),
                 "◀︎" to str(R.string.hint_programmes),
                 str(R.string.key_back) to str(R.string.hint_to_channels),
                 str(R.string.key_hold_ok) to str(R.string.menu)
             )
+
             Zone.GRID -> listOf(
                 str(R.string.key_ok) to str(R.string.about),
                 "◀︎  ▶︎" to str(R.string.hint_programmes),
                 str(R.string.key_back) to str(R.string.hint_to_channels),
                 str(R.string.key_hold_ok) to str(R.string.menu)
             )
+
             Zone.CHANNELS -> listOf(
                 "◀︎" to str(R.string.hint_categories),
                 str(R.string.key_ok) to str(R.string.watch),
-                "▶︎" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme), str(R.string.key_hold_ok) to str(R.string.menu))
+                "▶︎" to str(if (grid) R.string.hint_into_grid else R.string.hint_programme),
+                str(R.string.key_hold_ok) to str(R.string.menu)
+            )
         }
 
         /** Подсказки клавиш под списком: клавиша в рамке и действие */
@@ -973,6 +997,7 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var nowMinute = -1L
         private var archText = ""
         private var archMinute = -1L
+
         // позиция играющего архива у канала в фокусе (-1 — нет), считается раз за кадр: по ней строки программы
         private var archNow = -1L
 
@@ -986,7 +1011,8 @@ class GuideLayer(private val tv: Tv) : Layer {
                 // «канал и передача» плавно переходит в «только канал», когда выезжает панель описания
                 val h = padTop + topH + em
                 if (rail < 0.99f) {
-                    val s = if (rail > 0f) c.saveLayerAlpha(0f, 0f, width.toFloat(), h,
+                    val s = if (rail > 0f) c.saveLayerAlpha(
+                        0f, 0f, width.toFloat(), h,
                         (255 * (1 - rail)).roundToInt()
                     ) else -1
                     drawTopFull(c, ch, now)
@@ -1023,7 +1049,8 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (key != descKey) {
                     descKey = key
                     descLayout = StaticLayout.Builder.obtain(desc, 0, desc.length, pDesc, w.toInt())
-                        .setMaxLines(2).setEllipsize(android.text.TextUtils.TruncateAt.END).setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
+                        .setMaxLines(2).setEllipsize(android.text.TextUtils.TruncateAt.END)
+                        .setAlignment(Layout.Alignment.ALIGN_NORMAL).build()
                 }
                 c.withTranslation(x, t + 4.9f * em) {
                     descLayout?.draw(this)
@@ -1251,8 +1278,9 @@ class GuideLayer(private val tv: Tv) : Layer {
             }
             val viewH = bottom - top
             val target = (fy - viewH / 2 + fh / 2).coerceIn(0f, maxOf(0f, total - viewH))
-            if (plJump || !Anim.on) { plScroll = target; plJump = false }
-            else if (abs(target - plScroll) > 0.5f) {
+            if (plJump || !Anim.on) {
+                plScroll = target; plJump = false
+            } else if (abs(target - plScroll) > 0.5f) {
                 plScroll += (target - plScroll) * 0.35f
                 postInvalidateOnAnimation()
             } else plScroll = target
@@ -1348,7 +1376,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val top = bodyTop
             val bottom = listBottom
             val cur = if (zone == Zone.DATES) dateIndex
-            else days.indexOf(dayOf(if (zone == Zone.CHANNELS) liveIndex() else plIndex.coerceIn(0, plRows.size - 1))).coerceAtLeast(0)
+                else days.indexOf(dayOf(if (zone == Zone.CHANNELS) liveIndex() else plIndex.coerceIn(0, plRows.size - 1))).coerceAtLeast(0)
             val viewH = bottom - top
             val off = (cur * step - viewH / 2 + th / 2).coerceIn(0f, maxOf(0f, days.size * step - viewH))
 
@@ -1396,7 +1424,8 @@ class GuideLayer(private val tv: Tv) : Layer {
 
         private fun layoutOf(s: String, p: TextPaint, w: Int, lines: Int) =
             StaticLayout.Builder.obtain(s, 0, s.length, p, w).setMaxLines(lines)
-                .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(0f, 1.12f).build()
+                .setEllipsize(android.text.TextUtils.TruncateAt.END).setLineSpacing(0f, 1.12f)
+                .build()
 
         /** Справа: картинка передачи (нет — логотип канала), время, название, описание, что сделает OK */
         private fun drawPanel(c: Canvas, now: Long) {
@@ -1408,7 +1437,7 @@ class GuideLayer(private val tv: Tv) : Layer {
             val top = bodyTop
             val bottom = listBottom
             val layerBottom = if (hintsH > 0f) maxOf(height - padBottom, hintsCy + 0.85f * em + 0.05f * em)
-            else height - padBottom
+                else height - padBottom
             val strokePad = 0.1f * em
             val s = c.saveLayerAlpha(l - strokePad, top, l + pw + strokePad, layerBottom, (255 * rail).roundToInt())
             val ih = minOf(pw * 9f / 16f, (bottom - top) * 0.4f)
@@ -1438,7 +1467,7 @@ class GuideLayer(private val tv: Tv) : Layer {
                 panelKey = key
                 panelTitle = layoutOf(p.title, pPanelTitle, w, 2)
                 panelDesc = if (p.desc.isEmpty()) null
-                else layoutOf(p.desc, pPanelDesc, w, panelDescLines(top, layerBottom, ih ))
+                else layoutOf(p.desc, pPanelDesc, w, panelDescLines(top, layerBottom, ih))
             }
             var y = top + ih + 1.2f * em
             pPanelSub.color = U.wa(0.7f)
@@ -1450,11 +1479,13 @@ class GuideLayer(private val tv: Tv) : Layer {
             // клавиша OK в рамке и действие — как в окне «Программа»
             if (hintsH > 0f && zone != Zone.DATES) {
                 val live = p.start <= now && now < p.stop
-                val action = str(when {
-                    live -> R.string.watch_live
-                    p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> R.string.watch_from_archive
-                    else -> R.string.about
-                })
+                val action = str(
+                    when {
+                        live -> R.string.watch_live
+                        p.stop <= now && ch.hasArchive && p.start >= now - ch.archiveDays * 86400L - Cells.SLOT -> R.string.watch_from_archive
+                        else -> R.string.about
+                    }
+                )
                 val cy = hintsCy
                 val ok = str(R.string.key_ok)
                 val kw = maxOf(2f * em, pHintKey.measureText(ok) + em)
@@ -1486,8 +1517,10 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (zone == Zone.PLAYLISTS) {
                 // тап по плейлисту — открыть; мимо колонки — вернуться к категориям
                 if (x < padX + catW && y >= bodyTop) {
-                    val rows = catRows()
-                    val first = (plsIndex - rows / 2).coerceIn(0, maxOf(0, pls.size - rows))
+                    // val rows = catRows()
+                    // val first = (plsIndex - rows / 2).coerceIn(0, maxOf(0, pls.size - rows))
+                    clampCatsFirst()
+                    val first = catsFirst
                     val i = first + ((y - bodyTop) / (catRowH + gap)).toInt()
                     if (i in pls.indices) { plsIndex = i; return choosePlaylist() }
                 }
@@ -1499,7 +1532,8 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (x < padX + catW && y < bodyTop && y >= headY) return tv.openSearch()
                 if (x < padX + catW && y >= bodyTop) {
                     val rows = catRows()
-                    val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                    // val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                    val first = catsFirst
                     setGroup(first + ((y - bodyTop) / (catRowH + gap)).toInt())
                 }
                 return closeCats()
@@ -1509,8 +1543,9 @@ class GuideLayer(private val tv: Tv) : Layer {
                 if (x < padX + catW) {
                     if (y in headY..<bodyTop) return tv.openSearch()
                     if (y >= bodyTop) {
-                        val rows = catRows()
-                        val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                        // val rows = catRows()
+                        // val first = (groupIndex - rows / 2).coerceIn(0, maxOf(0, groups.size - rows))
+                        val first = catsFirst
                         catsFromChannel = focused
                         setGroup(first + ((y - bodyTop) / (catRowH + gap)).toInt())
                     }
@@ -1574,45 +1609,66 @@ class GuideLayer(private val tv: Tv) : Layer {
         private var dragX = 0f
 
         private val gestures = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent): Boolean {
-                dragY = 0f
-                dragX = 0f
-                return true
-            }
+                private var dragCat = 0f
+                private var dragCatActive = false
 
-            override fun onSingleTapUp(e: MotionEvent): Boolean {
-                tap(e.x, e.y)
-                return true
-            }
-
-            override fun onLongPress(e: MotionEvent) {
-                if (e.y < bodyTop) return
-                val i = rowAt(e.y)
-                if (i !in channels.indices) return
-                index = i
-                invalidate()
-                long()
-            }
-
-            // вертикально — каналы (по строке за высоту строки), горизонтально в сетке — время
-            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-                dragY += dy
-                val step = rowH + gap
-                while (dragY > step) { dragY -= step; moveClamped(1) }
-                while (dragY < -step) { dragY += step; moveClamped(-1) }
-                if (grid && (e1?.x ?: 0f) > gridL) {
-                    dragX += dx
-                    val sec = (dragX / (width - padX - gridL) * SPAN).toLong()
-                    if (abs(sec) >= 60) {
-                        live = false
-                        winStart += sec
-                        dragX = 0f
-                    }
+                override fun onDown(e: MotionEvent): Boolean {
+                    dragY = 0f
+                    dragX = 0f
+                    dragCat = 0f
+                    dragCatActive = false
+                    return true
                 }
-                invalidate()
-                return true
-            }
-        })
+
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    tap(e.x, e.y)
+                    return true
+                }
+
+                override fun onLongPress(e: MotionEvent) {
+                    if (e.y < bodyTop) return
+                    val i = rowAt(e.y)
+                    if (i !in channels.indices) return
+                    index = i
+                    invalidate()
+                    long()
+                }
+
+                // вертикально — каналы (по строке за высоту строки), горизонтально в сетке — время
+                override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                    val catVisible = catsFixed || shift > 0.5f
+                    val catL = padX - (1f - shift) * (padX + catW) + shift2 * (catW + em)
+                    if (catVisible && (e1?.x ?: 0f) in catL..(catL + catW) && (e1?.y ?: 0f) >= bodyTop) {
+                        dragCat += dy
+                        val step = catRowH + gap
+                        while (dragCat > step) {
+                            dragCat -= step
+                            catsFirst = (catsFirst + 1).coerceIn(0, maxOf(0, groups.size - gv.catRows()))
+                        }
+                        while (dragCat < -step) {
+                            dragCat += step
+                            catsFirst = (catsFirst - 1).coerceAtLeast(0)
+                        }
+                        invalidate()
+                        return true
+                    }
+                    dragY += dy
+                    val step = rowH + gap
+                    while (dragY > step) { dragY -= step; moveClamped(1) }
+                    while (dragY < -step) { dragY += step; moveClamped(-1) }
+                    if (grid && (e1?.x ?: 0f) > gridL) {
+                        dragX += dx
+                        val sec = (dragX / (width - padX - gridL) * SPAN).toLong()
+                        if (abs(sec) >= 60) {
+                            live = false
+                            winStart += sec
+                            dragX = 0f
+                        }
+                    }
+                    invalidate()
+                    return true
+                }
+            })
 
         private fun moveClamped(d: Int) {
             index = (index + d).coerceIn(0, maxOf(0, channels.size - 1))
@@ -1634,6 +1690,21 @@ class GuideLayer(private val tv: Tv) : Layer {
             if (e.action != MotionEvent.ACTION_SCROLL) return super.onGenericMotionEvent(e)
             val v = e.getAxisValue(MotionEvent.AXIS_VSCROLL)
             val h = e.getAxisValue(MotionEvent.AXIS_HSCROLL)
+            // pointer over category column and it's visible → scroll categories independently
+            val catVisible = catsFixed || shift > 0.5f
+            val catL = padX - (1f - shift) * (padX + catW) + shift2 * (catW + em)
+            val overCats = catVisible && e.x in catL..(catL + catW) && e.y >= bodyTop
+            if (overCats) {
+                if (v != 0f) {
+                    catsFirst = (catsFirst + if (v > 0) -1 else 1).coerceIn(
+                        0,
+                        maxOf(0, groups.size - gv.catRows())
+                    )
+                    invalidate()
+                }
+                return true
+            }
+            // channels / grid
             if (e.metaState and android.view.KeyEvent.META_SHIFT_ON != 0 || h != 0f) {
                 if (grid) {
                     live = false
